@@ -80,8 +80,9 @@ struct ContentView: View {
                         }
                     } label: {
                         if isTranscribing {
-                            ProgressView()
-                                .controlSize(.small)
+                            Image(systemName: "waveform")
+                                .font(.system(size: 14))
+                                .symbolEffect(.breathe, options: .repeating, isActive: isTranscribing)
                         } else {
                             Text("Transcribe")
                         }
