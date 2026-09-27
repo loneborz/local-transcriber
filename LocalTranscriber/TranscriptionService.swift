@@ -6,7 +6,32 @@ enum TranscriptionService {
         url: URL,
         locale: Locale = Locale(identifier: "en-US")
     ) async throws -> Transcript {
-        let file = try AVAudioFile(forReading: url)
+        var temporaryAudioURL: URL?
+        defer {
+            if let temporaryAudioURL {
+                try? FileManager.default.removeItem(at: temporaryAudioURL)
+            }
+        }
+
+        let audioURL: URL
+        let sourceAudioDuration: TimeInterval?
+        switch url.pathExtension.lowercased() {
+        case "mp4", "mov":
+            let outputURL = FileManager.default.temporaryDirectory
+                .appendingPathComponent(UUID().uuidString)
+                .appendingPathExtension("m4a")
+            temporaryAudioURL = outputURL
+            sourceAudioDuration = try await exportAudio(from: url, to: outputURL)
+            audioURL = outputURL
+        default:
+            audioURL = url
+            sourceAudioDuration = nil
+        }
+
+        let file = try AVAudioFile(forReading: audioURL)
+        if let sourceAudioDuration {
+            try validateNormalizedAudio(file, covers: sourceAudioDuration)
+        }
 
         let transcriber = SpeechTranscriber(
             locale: locale,
@@ -48,6 +73,97 @@ enum TranscriptionService {
             duration: duration,
             segments: try await segments
         )
+    }
+
+    private static func exportAudio(from url: URL, to outputURL: URL) async throws -> TimeInterval {
+        let asset = AVURLAsset(url: url)
+        let audioTracks = try await asset.loadTracks(withMediaType: .audio)
+        guard let audioTrack = audioTracks.first else {
+            throw TranscriptionError.noAudioTrack
+        }
+
+        let sourceTimeRange = try await audioTrack.load(.timeRange)
+        let sourceDuration = CMTimeGetSeconds(sourceTimeRange.duration)
+        guard sourceDuration.isFinite, sourceDuration > 0 else {
+            throw TranscriptionError.invalidSourceDuration
+        }
+
+        let preset = AVAssetExportPresetAppleM4A
+        guard await AVAssetExportSession.compatibility(
+            ofExportPreset: preset,
+            with: asset,
+            outputFileType: .m4a
+        ) else {
+            throw TranscriptionError.unsupportedM4AExport
+        }
+
+        guard let exportSession = AVAssetExportSession(asset: asset, presetName: preset) else {
+            throw TranscriptionError.exportSessionUnavailable
+        }
+
+        do {
+            try await exportSession.export(to: outputURL, as: .m4a)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            throw TranscriptionError.exportFailed(error.localizedDescription)
+        }
+
+        return sourceDuration
+    }
+
+    private static func validateNormalizedAudio(
+        _ file: AVAudioFile,
+        covers sourceDuration: TimeInterval
+    ) throws {
+        let sampleRate = file.processingFormat.sampleRate
+        let normalizedDuration = sampleRate.isFinite && sampleRate > 0
+            ? Double(file.length) / sampleRate
+            : .nan
+        guard normalizedDuration.isFinite, normalizedDuration > 0 else {
+            throw TranscriptionError.invalidNormalizedDuration
+        }
+
+        let tolerance = max(2, sourceDuration * 0.001)
+        guard normalizedDuration + tolerance >= sourceDuration else {
+            throw TranscriptionError.truncatedAudio(
+                expected: sourceDuration,
+                actual: normalizedDuration
+            )
+        }
+    }
+}
+
+private enum TranscriptionError: LocalizedError {
+    case noAudioTrack
+    case invalidSourceDuration
+    case unsupportedM4AExport
+    case exportSessionUnavailable
+    case exportFailed(String)
+    case invalidNormalizedDuration
+    case truncatedAudio(expected: TimeInterval, actual: TimeInterval)
+
+    var errorDescription: String? {
+        switch self {
+        case .noAudioTrack:
+            return "This video does not contain an audio track."
+        case .invalidSourceDuration:
+            return "The video's audio track duration could not be determined."
+        case .unsupportedM4AExport:
+            return "This video's audio cannot be exported as an M4A file by AVFoundation."
+        case .exportSessionUnavailable:
+            return "AVFoundation could not create an M4A export session for this video."
+        case .exportFailed(let reason):
+            return "AVFoundation could not export this video's audio: \(reason)"
+        case .invalidNormalizedDuration:
+            return "The exported audio duration could not be determined."
+        case .truncatedAudio(let expected, let actual):
+            return String(
+                format: "The exported audio is incomplete: %.1f seconds exported, expected about %.1f seconds.",
+                actual,
+                expected
+            )
+        }
     }
 }
 
