@@ -1,7 +1,9 @@
 import SwiftUI
+import AVFoundation
 
 struct ContentView: View {
     @State private var selectedFile: URL?
+    @State private var mediaInfo: MediaInfo?
     @State private var isTargeted = false
 
     private let supportedExtensions = [
@@ -14,18 +16,41 @@ struct ContentView: View {
 
     var body: some View {
         VStack(spacing: 20) {
-            Image(systemName: selectedFile == nil ? "waveform.badge.plus" : "checkmark.circle.fill")
-                .font(.system(size: 42, weight: .light))
+            Image(
+                systemName: selectedFile == nil
+                    ? "waveform.badge.plus"
+                    : "checkmark.circle.fill"
+            )
+            .font(.system(size: 42, weight: .light))
 
             if let selectedFile {
-                VStack(spacing: 8) {
+                VStack(spacing: 10) {
                     Text(selectedFile.lastPathComponent)
                         .font(.title3.weight(.medium))
 
+                    if let mediaInfo {
+                        HStack(spacing: 12) {
+                            Text(mediaInfo.type)
+                            Text("·")
+                            Text(mediaInfo.duration)
+                            Text("·")
+                            Text(mediaInfo.fileSize)
+                        }
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    }
+
                     Text(selectedFile.path)
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.tertiary)
                         .textSelection(.enabled)
+
+                    Button("Transcribe") {
+                        print("Transcribe \(selectedFile.path)")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    .padding(.top, 8)
                 }
             } else {
                 VStack(spacing: 8) {
@@ -55,15 +80,84 @@ struct ContentView: View {
                 return false
             }
 
-            guard supportedExtensions.contains(url.pathExtension.lowercased()) else {
+            guard supportedExtensions.contains(
+                url.pathExtension.lowercased()
+            ) else {
                 return false
             }
 
             selectedFile = url
+            mediaInfo = nil
+
+            Task {
+                mediaInfo = await loadMediaInfo(for: url)
+            }
+
             return true
         } isTargeted: { targeted in
             isTargeted = targeted
         }
         .frame(minWidth: 640, minHeight: 420)
     }
+
+    private func loadMediaInfo(for url: URL) async -> MediaInfo {
+        let asset = AVURLAsset(url: url)
+
+        let duration: CMTime
+
+        do {
+            duration = try await asset.load(.duration)
+        } catch {
+            duration = .zero
+        }
+
+        let seconds = max(0, CMTimeGetSeconds(duration))
+
+        let resourceValues = try? url.resourceValues(
+            forKeys: [.fileSizeKey]
+        )
+
+        let bytes = resourceValues?.fileSize ?? 0
+
+        return MediaInfo(
+            type: url.pathExtension.uppercased(),
+            duration: formatDuration(seconds),
+            fileSize: ByteCountFormatter.string(
+                fromByteCount: Int64(bytes),
+                countStyle: .file
+            )
+        )
+    }
+
+    private func formatDuration(_ seconds: Double) -> String {
+        guard seconds.isFinite else {
+            return "Unknown duration"
+        }
+
+        let totalSeconds = Int(seconds.rounded())
+        let hours = totalSeconds / 3600
+        let minutes = (totalSeconds % 3600) / 60
+        let seconds = totalSeconds % 60
+
+        if hours > 0 {
+            return String(
+                format: "%d:%02d:%02d",
+                hours,
+                minutes,
+                seconds
+            )
+        }
+
+        return String(
+            format: "%d:%02d",
+            minutes,
+            seconds
+        )
+    }
+}
+
+private struct MediaInfo {
+    let type: String
+    let duration: String
+    let fileSize: String
 }
