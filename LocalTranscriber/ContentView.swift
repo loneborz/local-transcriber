@@ -5,6 +5,9 @@ struct ContentView: View {
     @State private var selectedFile: URL?
     @State private var mediaInfo: MediaInfo?
     @State private var isTargeted = false
+    @State private var isTranscribing = false
+    @State private var transcript: String?
+    @State private var transcriptionError: String?
 
     private let supportedExtensions = [
         "mp4",
@@ -45,12 +48,49 @@ struct ContentView: View {
                         .foregroundStyle(.tertiary)
                         .textSelection(.enabled)
 
-                    Button("Transcribe") {
-                        print("Transcribe \(selectedFile.path)")
+                    Button {
+                        guard let file = self.selectedFile else {
+                            return
+                        }
+
+                        isTranscribing = true
+                        transcript = nil
+                        transcriptionError = nil
+
+                        Task {
+                            defer { isTranscribing = false }
+
+                            do {
+                                transcript = try await TranscriptionService.transcribe(url: file)
+                            } catch {
+                                transcriptionError = error.localizedDescription
+                            }
+                        }
+                    } label: {
+                        if isTranscribing {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            Text("Transcribe")
+                        }
                     }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
+                    .disabled(isTranscribing)
                     .padding(.top, 8)
+
+                    if let transcript {
+                        Text("Done · \(transcript.count) characters")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    if let transcriptionError {
+                        Text(transcriptionError)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                            .textSelection(.enabled)
+                    }
                 }
             } else {
                 VStack(spacing: 8) {
