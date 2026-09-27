@@ -1,12 +1,14 @@
 import SwiftUI
 import AVFoundation
+import AppKit
+import UniformTypeIdentifiers
 
 struct ContentView: View {
     @State private var selectedFile: URL?
     @State private var mediaInfo: MediaInfo?
     @State private var isTargeted = false
     @State private var isTranscribing = false
-    @State private var transcript: String?
+    @State private var transcript: Transcript?
     @State private var transcriptionError: String?
 
     private let supportedExtensions = [
@@ -80,9 +82,15 @@ struct ContentView: View {
                     .padding(.top, 8)
 
                     if let transcript {
-                        Text("Done · \(transcript.count) characters")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        VStack(spacing: 8) {
+                            Text("Done · \(transcript.characterCount) characters")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+
+                            Button("Save Transcript…") {
+                                saveTranscript(transcript)
+                            }
+                        }
                     }
 
                     if let transcriptionError {
@@ -128,6 +136,8 @@ struct ContentView: View {
 
             selectedFile = url
             mediaInfo = nil
+            transcript = nil
+            transcriptionError = nil
 
             Task {
                 mediaInfo = await loadMediaInfo(for: url)
@@ -193,6 +203,26 @@ struct ContentView: View {
             minutes,
             seconds
         )
+    }
+
+    private func saveTranscript(_ transcript: Transcript) {
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.markdown]
+        panel.nameFieldStringValue = "\(transcript.sourceURL.deletingPathExtension().lastPathComponent).md"
+
+        guard panel.runModal() == .OK, let destination = panel.url else {
+            return
+        }
+
+        do {
+            try TranscriptMarkdownRenderer.render(transcript).write(
+                to: destination,
+                atomically: true,
+                encoding: .utf8
+            )
+        } catch {
+            transcriptionError = error.localizedDescription
+        }
     }
 }
 
