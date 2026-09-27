@@ -116,6 +116,12 @@ struct ContentView: View {
                             .foregroundStyle(.red)
                             .textSelection(.enabled)
                     }
+
+                    Button("New Transcript", action: startNewTranscript)
+                        .font(.caption)
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.tint)
+                        .disabled(isTranscribing)
                 }
             } else {
                 VStack(spacing: 8) {
@@ -158,7 +164,9 @@ struct ContentView: View {
             savedTranscriptURL = nil
 
             Task {
-                mediaInfo = await loadMediaInfo(for: url)
+                let info = await loadMediaInfo(for: url)
+                guard selectedFile == url else { return }
+                mediaInfo = info
             }
 
             return true
@@ -166,6 +174,17 @@ struct ContentView: View {
             isTargeted = targeted
         }
         .frame(minWidth: 640, minHeight: 420)
+    }
+
+    private func startNewTranscript() {
+        guard !isTranscribing else { return }
+
+        selectedFile = nil
+        mediaInfo = nil
+        transcript = nil
+        transcriptionError = nil
+        savedTranscriptURL = nil
+        isTargeted = false
     }
 
     private func loadMediaInfo(for url: URL) async -> MediaInfo {
