@@ -8,6 +8,7 @@ struct ContentView: View {
     @State private var mediaInfo: MediaInfo?
     @State private var isTargeted = false
     @State private var isTranscribing = false
+    @State private var processingPhase: TranscriptionPhase?
     @State private var transcript: Transcript?
     @State private var transcriptionError: String?
     @State private var savedTranscriptURL: URL?
@@ -56,16 +57,23 @@ struct ContentView: View {
                             return
                         }
 
+                        processingPhase = nil
                         isTranscribing = true
                         transcript = nil
                         transcriptionError = nil
                         savedTranscriptURL = nil
 
                         Task {
-                            defer { isTranscribing = false }
+                            defer {
+                                processingPhase = nil
+                                isTranscribing = false
+                            }
 
                             do {
-                                transcript = try await TranscriptionService.transcribe(url: file)
+                                transcript = try await TranscriptionService.transcribe(
+                                    url: file,
+                                    onPhaseChange: { processingPhase = $0 }
+                                )
                             } catch {
                                 transcriptionError = error.localizedDescription
                             }
@@ -82,6 +90,12 @@ struct ContentView: View {
                     .controlSize(.large)
                     .disabled(isTranscribing)
                     .padding(.top, 8)
+
+                    if isTranscribing, let processingPhase {
+                        Text(processingPhase.label)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
 
                     if let transcript {
                         VStack(spacing: 8) {
@@ -184,6 +198,7 @@ struct ContentView: View {
         transcript = nil
         transcriptionError = nil
         savedTranscriptURL = nil
+        processingPhase = nil
         isTargeted = false
     }
 

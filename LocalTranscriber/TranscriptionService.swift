@@ -1,10 +1,23 @@
 import AVFoundation
 import Speech
 
+enum TranscriptionPhase: Sendable {
+    case preparingVideo
+    case transcribing
+
+    var label: String {
+        switch self {
+        case .preparingVideo: "Preparing video…"
+        case .transcribing: "Transcribing…"
+        }
+    }
+}
+
 enum TranscriptionService {
     static func transcribe(
         url: URL,
-        locale: Locale = Locale(identifier: "en-US")
+        locale: Locale = Locale(identifier: "en-US"),
+        onPhaseChange: @MainActor (TranscriptionPhase) -> Void = { _ in }
     ) async throws -> Transcript {
         var temporaryAudioURL: URL?
         defer {
@@ -21,6 +34,7 @@ enum TranscriptionService {
                 .appendingPathComponent(UUID().uuidString)
                 .appendingPathExtension("m4a")
             temporaryAudioURL = outputURL
+            onPhaseChange(.preparingVideo)
             sourceAudioDuration = try await exportAudio(from: url, to: outputURL)
             audioURL = outputURL
         default:
@@ -56,6 +70,7 @@ enum TranscriptionService {
             )
         }
 
+        onPhaseChange(.transcribing)
         if let lastSample = try await analyzer.analyzeSequence(from: file) {
             try await analyzer.finalizeAndFinish(through: lastSample)
         } else {
