@@ -10,6 +10,7 @@ struct ContentView: View {
     @State private var isTranscribing = false
     @State private var transcript: Transcript?
     @State private var transcriptionError: String?
+    @State private var savedTranscriptURL: URL?
 
     private let supportedExtensions = [
         "mp4",
@@ -58,6 +59,7 @@ struct ContentView: View {
                         isTranscribing = true
                         transcript = nil
                         transcriptionError = nil
+                        savedTranscriptURL = nil
 
                         Task {
                             defer { isTranscribing = false }
@@ -89,6 +91,21 @@ struct ContentView: View {
 
                             Button("Save Transcript…") {
                                 saveTranscript(transcript)
+                            }
+
+                            if let savedTranscriptURL {
+                                HStack(spacing: 0) {
+                                    Text("Saved · ")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+
+                                    Button(savedTranscriptURL.lastPathComponent) {
+                                        NSWorkspace.shared.activateFileViewerSelecting([savedTranscriptURL])
+                                    }
+                                    .font(.caption)
+                                    .buttonStyle(.plain)
+                                    .foregroundStyle(.tint)
+                                }
                             }
                         }
                     }
@@ -138,6 +155,7 @@ struct ContentView: View {
             mediaInfo = nil
             transcript = nil
             transcriptionError = nil
+            savedTranscriptURL = nil
 
             Task {
                 mediaInfo = await loadMediaInfo(for: url)
@@ -220,7 +238,10 @@ struct ContentView: View {
                 atomically: true,
                 encoding: .utf8
             )
+            savedTranscriptURL = destination
+            transcriptionError = nil
         } catch {
+            savedTranscriptURL = nil
             transcriptionError = error.localizedDescription
         }
     }
