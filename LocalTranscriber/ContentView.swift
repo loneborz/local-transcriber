@@ -10,6 +10,7 @@ struct ContentView: View {
     @State private var isTranscribing = false
     @State private var processingPhase: TranscriptionPhase?
     @State private var transcript: Transcript?
+    @State private var processingDuration: Duration?
     @State private var transcriptionError: String?
     @State private var savedTranscriptURL: URL?
 
@@ -57,9 +58,12 @@ struct ContentView: View {
                             return
                         }
 
+                        let clock = ContinuousClock()
+                        let startedAt = clock.now
                         processingPhase = nil
                         isTranscribing = true
                         transcript = nil
+                        processingDuration = nil
                         transcriptionError = nil
                         savedTranscriptURL = nil
 
@@ -70,11 +74,16 @@ struct ContentView: View {
                             }
 
                             do {
-                                transcript = try await TranscriptionService.transcribe(
+                                let completedTranscript = try await TranscriptionService.transcribe(
                                     url: file,
                                     onPhaseChange: { processingPhase = $0 }
                                 )
+                                let elapsed = startedAt.duration(to: clock.now)
+                                guard selectedFile == file else { return }
+                                transcript = completedTranscript
+                                processingDuration = elapsed
                             } catch {
+                                guard selectedFile == file else { return }
                                 transcriptionError = error.localizedDescription
                             }
                         }
@@ -103,6 +112,46 @@ struct ContentView: View {
                             Text("Done · \(transcript.characterCount) characters")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
+
+                            if let processingDuration {
+                                let formattedMediaDuration = transcript.duration.flatMap(formatMediaDuration)
+                                let processingTime = formatProcessingDuration(processingDuration)
+                                let realtimeSpeed = transcript.duration.flatMap {
+                                    formatRealtimeSpeed(
+                                        mediaDuration: $0,
+                                        processingDuration: processingDuration
+                                    )
+                                }
+
+                                VStack(spacing: 5) {
+                                    if let formattedMediaDuration {
+                                        Text("\(formattedMediaDuration) processed in \(processingTime)")
+                                    }
+
+                                    Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 3) {
+                                        if let formattedMediaDuration {
+                                            GridRow {
+                                                Text("Media duration")
+                                                Text(formattedMediaDuration).monospacedDigit()
+                                            }
+                                        }
+
+                                        GridRow {
+                                            Text("Processing time")
+                                            Text(processingTime).monospacedDigit()
+                                        }
+
+                                        if let realtimeSpeed {
+                                            GridRow {
+                                                Text("Realtime speed")
+                                                Text(realtimeSpeed).monospacedDigit()
+                                            }
+                                        }
+                                    }
+                                }
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            }
 
                             Button("Save Transcript…") {
                                 saveTranscript(transcript)
@@ -175,6 +224,7 @@ struct ContentView: View {
             selectedFile = url
             mediaInfo = nil
             transcript = nil
+            processingDuration = nil
             transcriptionError = nil
             savedTranscriptURL = nil
 
@@ -197,6 +247,7 @@ struct ContentView: View {
         selectedFile = nil
         mediaInfo = nil
         transcript = nil
+        processingDuration = nil
         transcriptionError = nil
         savedTranscriptURL = nil
         processingPhase = nil
@@ -256,6 +307,74 @@ struct ContentView: View {
             minutes,
             seconds
         )
+    }
+
+    private func formatMediaDuration(_ seconds: TimeInterval) -> String? {
+        guard seconds.isFinite, seconds > 0 else { return nil }
+
+        if seconds < 60 {
+            let tenths = (seconds * 10).rounded() / 10
+            return "\(formatNumber(tenths, decimals: tenths.rounded() == tenths ? 0 : 1))s"
+        }
+
+        guard seconds < Double(Int.max) else { return nil }
+        let wholeSeconds = Int(seconds)
+        let hours = wholeSeconds / 3600
+        let minutes = (wholeSeconds % 3600) / 60
+        return hours > 0
+            ? "\(hours)h \(twoDigits(minutes))m"
+            : "\(minutes)m"
+    }
+
+    private func formatProcessingDuration(_ duration: Duration) -> String {
+        let seconds = durationSeconds(duration)
+        if seconds < 60 {
+            let tenths = (seconds * 10).rounded() / 10
+            return "\(formatNumber(tenths, decimals: tenths.rounded() == tenths ? 0 : 1))s"
+        }
+
+        guard seconds < Double(Int.max) else { return "\(formatNumber(seconds, decimals: 0))s" }
+        let totalSeconds = Int(seconds.rounded())
+        let hours = totalSeconds / 3600
+        let minutes = (totalSeconds % 3600) / 60
+        let remainingSeconds = totalSeconds % 60
+        if hours > 0 {
+            return "\(hours)h \(twoDigits(minutes))m \(twoDigits(remainingSeconds))s"
+        }
+        return "\(minutes)m \(remainingSeconds)s"
+    }
+
+    private func formatRealtimeSpeed(
+        mediaDuration: TimeInterval,
+        processingDuration: Duration
+    ) -> String? {
+        guard mediaDuration.isFinite, mediaDuration > 0 else { return nil }
+        let elapsedSeconds = durationSeconds(processingDuration)
+        guard elapsedSeconds > 0 else { return nil }
+
+        let speed = mediaDuration / elapsedSeconds
+        guard speed.isFinite, speed > 0 else { return nil }
+
+        let rounded = speed >= 20 ? speed.rounded() : (speed * 10).rounded() / 10
+        let decimals = speed < 20 && rounded.rounded() != rounded ? 1 : 0
+        return "\(formatNumber(rounded, decimals: decimals))×"
+    }
+
+    private func durationSeconds(_ duration: Duration) -> Double {
+        let components = duration.components
+        return Double(components.seconds) + Double(components.attoseconds) / 1e18
+    }
+
+    private func formatNumber(_ value: Double, decimals: Int) -> String {
+        String(
+            format: decimals == 0 ? "%.0f" : "%.1f",
+            locale: Locale(identifier: "en_US_POSIX"),
+            value
+        )
+    }
+
+    private func twoDigits(_ value: Int) -> String {
+        String(format: "%02d", value)
     }
 
     private func saveTranscript(_ transcript: Transcript) {
