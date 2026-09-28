@@ -3,11 +3,13 @@ import Speech
 
 enum TranscriptionPhase: Sendable {
     case preparingVideo
+    case preparingLanguage
     case transcribing
 
     var label: String {
         switch self {
         case .preparingVideo: "Preparing video…"
+        case .preparingLanguage: "Preparing language…"
         case .transcribing: "Transcribing…"
         }
     }
@@ -16,7 +18,7 @@ enum TranscriptionPhase: Sendable {
 enum TranscriptionService {
     static func transcribe(
         url: URL,
-        locale: Locale = Locale(identifier: "en-US"),
+        locale: Locale,
         onPhaseChange: @MainActor (TranscriptionPhase) -> Void = { _ in }
     ) async throws -> Transcript {
         var temporaryAudioURL: URL?
@@ -47,28 +49,58 @@ enum TranscriptionService {
             try validateNormalizedAudio(file, covers: sourceAudioDuration)
         }
 
-        let transcriber = SpeechTranscriber(
-            locale: locale,
-            transcriptionOptions: [],
-            reportingOptions: [],
-            attributeOptions: [.audioTimeRange]
+        let transcriptLocaleIdentifier = locale.identifier.replacingOccurrences(of: "_", with: "-")
+        let speechLocale = Self.exactSupportedLocale(
+            await SpeechTranscriber.supportedLocale(equivalentTo: locale),
+            matching: locale
+        )
+        let dictationLocale = Self.exactSupportedLocale(
+            await DictationTranscriber.supportedLocale(equivalentTo: locale),
+            matching: locale
         )
 
-        let analyzer = SpeechAnalyzer(modules: [transcriber])
-
-        async let segments: [TranscriptSegment] = try transcriber.results.reduce(into: []) {
-            partialResult,
-            result in
-
-            let range = result.range
-            partialResult.append(
-                TranscriptSegment(
-                    startTime: CMTimeGetSeconds(range.start),
-                    endTime: CMTimeGetSeconds(CMTimeRangeGetEnd(range)),
-                    text: String(result.text.characters)
-                )
+        let transcriber: any SpeechModule
+        let collectSegments: () async throws -> [TranscriptSegment]
+        if let speechLocale {
+            let speechTranscriber = SpeechTranscriber(
+                locale: speechLocale,
+                transcriptionOptions: [],
+                reportingOptions: [],
+                attributeOptions: [.audioTimeRange]
             )
+            transcriber = speechTranscriber
+            collectSegments = {
+                try await Self.collectSegments(from: speechTranscriber) {
+                    String($0.text.characters)
+                }
+            }
+        } else if let dictationLocale {
+            let dictationTranscriber = DictationTranscriber(
+                locale: dictationLocale,
+                contentHints: [],
+                transcriptionOptions: [],
+                reportingOptions: [],
+                attributeOptions: [.audioTimeRange]
+            )
+            transcriber = dictationTranscriber
+            collectSegments = {
+                try await Self.collectSegments(from: dictationTranscriber) {
+                    String($0.text.characters)
+                }
+            }
+        } else {
+            throw TranscriptionError.unsupportedLocale(transcriptLocaleIdentifier)
         }
+
+        if let installationRequest = try await AssetInventory.assetInstallationRequest(
+            supporting: [transcriber]
+        ) {
+            onPhaseChange(.preparingLanguage)
+            try await installationRequest.downloadAndInstall()
+        }
+
+        let analyzer = SpeechAnalyzer(modules: [transcriber])
+        async let segments = try await collectSegments()
 
         onPhaseChange(.transcribing)
         if let lastSample = try await analyzer.analyzeSequence(from: file) {
@@ -84,10 +116,38 @@ enum TranscriptionService {
 
         return Transcript(
             sourceURL: url,
-            localeIdentifier: locale.identifier,
+            localeIdentifier: transcriptLocaleIdentifier,
             duration: duration,
             segments: try await segments
         )
+    }
+
+    private static func exactSupportedLocale(
+        _ supportedLocale: Locale?,
+        matching requestedLocale: Locale
+    ) -> Locale? {
+        guard let supportedLocale else { return nil }
+        let supportedIdentifier = supportedLocale.identifier.replacingOccurrences(of: "_", with: "-")
+        let requestedIdentifier = requestedLocale.identifier.replacingOccurrences(of: "_", with: "-")
+        return supportedIdentifier.caseInsensitiveCompare(requestedIdentifier) == .orderedSame
+            ? supportedLocale
+            : nil
+    }
+
+    private static func collectSegments<Module: SpeechModule>(
+        from module: Module,
+        text: (Module.Result) -> String
+    ) async throws -> [TranscriptSegment] {
+        try await module.results.reduce(into: []) { partialResult, result in
+            let range = result.range
+            partialResult.append(
+                TranscriptSegment(
+                    startTime: CMTimeGetSeconds(range.start),
+                    endTime: CMTimeGetSeconds(CMTimeRangeGetEnd(range)),
+                    text: text(result)
+                )
+            )
+        }
     }
 
     private static func exportAudio(from url: URL, to outputURL: URL) async throws -> TimeInterval {
@@ -152,6 +212,7 @@ enum TranscriptionService {
 private enum TranscriptionError: LocalizedError {
     case noAudioTrack
     case invalidSourceDuration
+    case unsupportedLocale(String)
     case unsupportedM4AExport
     case exportSessionUnavailable
     case exportFailed(String)
@@ -164,6 +225,8 @@ private enum TranscriptionError: LocalizedError {
             return "This video does not contain an audio track."
         case .invalidSourceDuration:
             return "The video's audio track duration could not be determined."
+        case .unsupportedLocale(let locale):
+            return "No on-device speech transcriber supports \(locale) on this Mac."
         case .unsupportedM4AExport:
             return "This video's audio cannot be exported as an M4A file by AVFoundation."
         case .exportSessionUnavailable:

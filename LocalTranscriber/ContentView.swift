@@ -8,6 +8,7 @@ struct ContentView: View {
     @State private var mediaInfo: MediaInfo?
     @State private var isTargeted = false
     @State private var isTranscribing = false
+    @State private var selectedLanguage = TranscriptionLanguage.english
     @State private var processingPhase: TranscriptionPhase?
     @State private var transcript: Transcript?
     @State private var processingDuration: Duration?
@@ -53,10 +54,26 @@ struct ContentView: View {
                         .foregroundStyle(.tertiary)
                         .textSelection(.enabled)
 
+                    HStack(spacing: 8) {
+                        Text("Language")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+
+                        Picker("Language", selection: $selectedLanguage) {
+                            ForEach(TranscriptionLanguage.allCases) { language in
+                                Text(language.title).tag(language)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                        .disabled(isTranscribing)
+                    }
+
                     Button {
                         guard let file = self.selectedFile else {
                             return
                         }
+                        let locale = selectedLanguage.locale
 
                         let clock = ContinuousClock()
                         let startedAt = clock.now
@@ -76,6 +93,7 @@ struct ContentView: View {
                             do {
                                 let completedTranscript = try await TranscriptionService.transcribe(
                                     url: file,
+                                    locale: locale,
                                     onPhaseChange: { processingPhase = $0 }
                                 )
                                 let elapsed = startedAt.duration(to: clock.now)
@@ -405,4 +423,35 @@ private struct MediaInfo {
     let type: String
     let duration: String
     let fileSize: String
+}
+
+private enum TranscriptionLanguage: String, CaseIterable, Identifiable {
+    case english = "en-US"
+    case dutch = "nl-NL"
+    case german = "de-DE"
+    case french = "fr-FR"
+    case russian = "ru-RU"
+    case spanish = "es-ES"
+    case italian = "it-IT"
+    case portuguese = "pt-BR"
+    case turkish = "tr-TR"
+    case swedish = "sv-SE"
+
+    var id: String { rawValue }
+    var locale: Locale { Locale(identifier: rawValue) }
+
+    var title: String {
+        switch self {
+        case .english: "English"
+        case .dutch: "Dutch"
+        case .german: "German"
+        case .french: "French"
+        case .russian: "Russian"
+        case .spanish: "Spanish"
+        case .italian: "Italian"
+        case .portuguese: "Portuguese"
+        case .turkish: "Turkish"
+        case .swedish: "Swedish"
+        }
+    }
 }
