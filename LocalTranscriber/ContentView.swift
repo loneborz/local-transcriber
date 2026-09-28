@@ -14,6 +14,7 @@ struct ContentView: View {
     @State private var processingDuration: Duration?
     @State private var transcriptionError: String?
     @State private var savedTranscriptURL: URL?
+    @State private var isWaveformHovered = false
 
     private let supportedExtensions = [
         "mp4",
@@ -24,18 +25,127 @@ struct ContentView: View {
     ]
 
     var body: some View {
-        VStack(spacing: 20) {
-            Image(
-                systemName: selectedFile == nil
-                    ? "waveform.badge.plus"
-                    : "checkmark.circle.fill"
-            )
-            .font(.system(size: 42, weight: .light))
+        VStack(spacing: 18) {
+            Group {
+                if transcript != nil, !isTranscribing {
+                    Button(action: startNewTranscript) {
+                        WaveformBars(isAnimating: false, showsPlus: false)
+                            .scaleEffect(isWaveformHovered ? 1.04 : 1)
+                            .opacity(isWaveformHovered ? 0.82 : 1)
+                    }
+                    .buttonStyle(.plain)
+                    .help("New Transcript")
+                    .accessibilityLabel("New Transcript")
+                    .onHover { isWaveformHovered = $0 }
+                    .animation(.easeOut(duration: 0.15), value: isWaveformHovered)
+                } else {
+                    WaveformBars(isAnimating: isTranscribing, showsPlus: selectedFile == nil)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.top, 4)
 
-            if let selectedFile {
+            if selectedFile != nil, transcript == nil {
+                Text(isTranscribing ? (processingPhase?.label ?? "") : "")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(height: 18)
+            }
+
+            if let transcript, !isTranscribing {
+                VStack(spacing: 0) {
+                    Text("Click me to return")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.top, 8)
+
+                    VStack(spacing: 5) {
+                        Text("Done · \(transcript.characterCount) characters")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                        if let processingDuration {
+                            let formattedMediaDuration = transcript.duration.flatMap(formatMediaDuration)
+                            let processingTime = formatProcessingDuration(processingDuration)
+                            let realtimeSpeed = transcript.duration.flatMap {
+                                formatRealtimeSpeed(
+                                    mediaDuration: $0,
+                                    processingDuration: processingDuration
+                                )
+                            }
+
+                            VStack(spacing: 5) {
+                                if let formattedMediaDuration {
+                                    Text("\(formattedMediaDuration) processed in \(processingTime)")
+                                }
+
+                                Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 3) {
+                                    if let formattedMediaDuration {
+                                        GridRow {
+                                            Text("Media duration")
+                                            Text(formattedMediaDuration).monospacedDigit()
+                                        }
+                                    }
+
+                                    GridRow {
+                                        Text("Processing time")
+                                        Text(processingTime).monospacedDigit()
+                                    }
+
+                                    if let realtimeSpeed {
+                                        GridRow {
+                                            Text("Realtime speed")
+                                            Text(realtimeSpeed).monospacedDigit()
+                                        }
+                                    }
+                                }
+                            }
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        }
+                    }
+                    .padding(.top, 30)
+
+                    Button("Save Transcript…") {
+                        saveTranscript(transcript)
+                    }
+                    .padding(.top, 22)
+
+                    if let savedTranscriptURL {
+                        HStack(spacing: 0) {
+                            Text("Saved · ")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+
+                            Button(savedTranscriptURL.lastPathComponent) {
+                                NSWorkspace.shared.activateFileViewerSelecting([savedTranscriptURL])
+                            }
+                            .font(.caption)
+                            .buttonStyle(.plain)
+                            .foregroundStyle(.tint)
+                        }
+                        .padding(.top, 8)
+                    }
+
+                    if let transcriptionError {
+                        Text(transcriptionError)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                            .textSelection(.enabled)
+                    }
+                }
+            } else if let selectedFile {
                 VStack(spacing: 10) {
-                    Text(selectedFile.lastPathComponent)
-                        .font(.title3.weight(.medium))
+                    Button {
+                        NSWorkspace.shared.activateFileViewerSelecting([selectedFile])
+                    } label: {
+                        Text(selectedFile.lastPathComponent)
+                            .font(.title3.weight(.medium))
+                            .foregroundStyle(.tint)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Reveal original file in Finder")
 
                     if let mediaInfo {
                         HStack(spacing: 12) {
@@ -48,11 +158,6 @@ struct ContentView: View {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                     }
-
-                    Text(selectedFile.path)
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                        .textSelection(.enabled)
 
                     HStack(spacing: 8) {
                         Text("Language")
@@ -106,91 +211,12 @@ struct ContentView: View {
                             }
                         }
                     } label: {
-                        if isTranscribing {
-                            Image(systemName: "waveform")
-                                .font(.system(size: 14))
-                                .symbolEffect(.breathe, options: .repeating, isActive: isTranscribing)
-                        } else {
-                            Text("Transcribe")
-                        }
+                        Text("Transcribe")
                     }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
                     .disabled(isTranscribing)
                     .padding(.top, 8)
-
-                    if isTranscribing, let processingPhase {
-                        Text(processingPhase.label)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    if let transcript {
-                        VStack(spacing: 8) {
-                            Text("Done · \(transcript.characterCount) characters")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-
-                            if let processingDuration {
-                                let formattedMediaDuration = transcript.duration.flatMap(formatMediaDuration)
-                                let processingTime = formatProcessingDuration(processingDuration)
-                                let realtimeSpeed = transcript.duration.flatMap {
-                                    formatRealtimeSpeed(
-                                        mediaDuration: $0,
-                                        processingDuration: processingDuration
-                                    )
-                                }
-
-                                VStack(spacing: 5) {
-                                    if let formattedMediaDuration {
-                                        Text("\(formattedMediaDuration) processed in \(processingTime)")
-                                    }
-
-                                    Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 3) {
-                                        if let formattedMediaDuration {
-                                            GridRow {
-                                                Text("Media duration")
-                                                Text(formattedMediaDuration).monospacedDigit()
-                                            }
-                                        }
-
-                                        GridRow {
-                                            Text("Processing time")
-                                            Text(processingTime).monospacedDigit()
-                                        }
-
-                                        if let realtimeSpeed {
-                                            GridRow {
-                                                Text("Realtime speed")
-                                                Text(realtimeSpeed).monospacedDigit()
-                                            }
-                                        }
-                                    }
-                                }
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            }
-
-                            Button("Save Transcript…") {
-                                saveTranscript(transcript)
-                            }
-
-                            if let savedTranscriptURL {
-                                HStack(spacing: 0) {
-                                    Text("Saved · ")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-
-                                    Button(savedTranscriptURL.lastPathComponent) {
-                                        NSWorkspace.shared.activateFileViewerSelecting([savedTranscriptURL])
-                                    }
-                                    .font(.caption)
-                                    .buttonStyle(.plain)
-                                    .foregroundStyle(.tint)
-                                }
-                            }
-                        }
-                    }
 
                     if let transcriptionError {
                         Text(transcriptionError)
@@ -198,64 +224,84 @@ struct ContentView: View {
                             .foregroundStyle(.red)
                             .textSelection(.enabled)
                     }
-
-                    Button("New Transcript", action: startNewTranscript)
-                        .font(.caption)
-                        .buttonStyle(.plain)
-                        .foregroundStyle(.tint)
-                        .disabled(isTranscribing)
                 }
             } else {
-                VStack(spacing: 8) {
-                    Text("Drop audio or video")
-                        .font(.title2.weight(.semibold))
+                VStack(spacing: 0) {
+                    Text("Media in. Markdown out.")
+                        .font(.title3.weight(.semibold))
+                        .padding(.bottom, 20)
 
-                    Text("MP4 · MOV · M4A · MP3 · WAV")
+                    Text(isTargeted ? "Feed me" : "Drop here")
+                        .font(.callout)
                         .foregroundStyle(.secondary)
+                        .frame(width: 260, height: 72)
+                        .background(
+                            isTargeted
+                                ? Color.accentColor.opacity(0.1)
+                                : Color.primary.opacity(0.035),
+                            in: RoundedRectangle(cornerRadius: 16)
+                        )
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(
+                                    isTargeted
+                                        ? Color.accentColor.opacity(0.65)
+                                        : Color.secondary.opacity(0.22),
+                                    lineWidth: 1
+                                )
+                        }
+                        .scaleEffect(isTargeted ? 0.98 : 1)
+                        .animation(.easeOut(duration: 0.18), value: isTargeted)
+                        .dropDestination(for: URL.self) { urls, _ in
+                            guard let url = urls.first else {
+                                return false
+                            }
+
+                            guard supportedExtensions.contains(
+                                url.pathExtension.lowercased()
+                            ) else {
+                                return false
+                            }
+
+                            selectedFile = url
+                            mediaInfo = nil
+                            transcript = nil
+                            processingDuration = nil
+                            transcriptionError = nil
+                            savedTranscriptURL = nil
+
+                            Task {
+                                let info = await loadMediaInfo(for: url)
+                                guard selectedFile == url else { return }
+                                mediaInfo = info
+                            }
+
+                            return true
+                        } isTargeted: { targeted in
+                            isTargeted = targeted
+                        }
+                        .padding(.bottom, 20)
+
+                    Text("MP4, MOV, M4A, MP3 or WAV.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .padding(.bottom, 12)
+
+                    Text("If it’s video, I’ll pull out the audio first. Then I’ll transcribe it locally into timestamped Markdown.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .padding(.bottom, 22)
+
+                    Text("Stick around and watch the magic happen!")
+                        .font(.body.weight(.medium))
                 }
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 420)
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .padding(40)
         .background(.ultraThinMaterial)
-        .overlay {
-            RoundedRectangle(cornerRadius: 28)
-                .stroke(
-                    isTargeted
-                        ? Color.accentColor
-                        : Color.secondary.opacity(0.25),
-                    lineWidth: isTargeted ? 2 : 1
-                )
-                .padding(24)
-        }
-        .dropDestination(for: URL.self) { urls, _ in
-            guard let url = urls.first else {
-                return false
-            }
-
-            guard supportedExtensions.contains(
-                url.pathExtension.lowercased()
-            ) else {
-                return false
-            }
-
-            selectedFile = url
-            mediaInfo = nil
-            transcript = nil
-            processingDuration = nil
-            transcriptionError = nil
-            savedTranscriptURL = nil
-
-            Task {
-                let info = await loadMediaInfo(for: url)
-                guard selectedFile == url else { return }
-                mediaInfo = info
-            }
-
-            return true
-        } isTargeted: { targeted in
-            isTargeted = targeted
-        }
         .frame(minWidth: 640, minHeight: 420)
     }
 
@@ -416,6 +462,50 @@ struct ContentView: View {
             savedTranscriptURL = nil
             transcriptionError = error.localizedDescription
         }
+    }
+}
+
+private struct WaveformBars: View {
+    let isAnimating: Bool
+    let showsPlus: Bool
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private let barHeights: [CGFloat] = [14, 23, 34, 46, 35, 24, 14]
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 60, paused: !isAnimating || reduceMotion)) { timeline in
+            HStack(alignment: .center, spacing: 5) {
+                ForEach(barHeights.indices, id: \.self) { index in
+                    Capsule()
+                        .fill(.primary)
+                        .frame(width: 5, height: barHeights[index])
+                        .scaleEffect(
+                            y: barScale(at: index, time: timeline.date.timeIntervalSinceReferenceDate),
+                            anchor: .center
+                        )
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .frame(width: 68, height: 52)
+        .overlay(alignment: .topTrailing) {
+            if showsPlus {
+                Image(systemName: "plus.circle.fill")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(.tint)
+                    .background(Circle().fill(.background))
+                    .offset(x: 5, y: -3)
+            }
+        }
+        .accessibilityHidden(true)
+    }
+
+    private func barScale(at index: Int, time: TimeInterval) -> CGFloat {
+        guard isAnimating, !reduceMotion else { return 1 }
+
+        let wave = (sin(time * 1.2 + Double(index) * 1.15) + 1) / 2
+        return 0.45 + 0.55 * CGFloat(wave)
     }
 }
 
