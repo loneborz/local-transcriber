@@ -257,6 +257,11 @@ struct ContentView: View {
                                 return false
                             }
 
+                            guard url.isFileURL else {
+                                transcriptionError = "Only local files are supported. Drop a supported media file from Finder."
+                                return false
+                            }
+
                             guard supportedExtensions.contains(
                                 url.pathExtension.lowercased()
                             ) else {
@@ -281,6 +286,13 @@ struct ContentView: View {
                             isTargeted = targeted
                         }
                         .padding(.bottom, 20)
+
+                    if let transcriptionError {
+                        Text(transcriptionError)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                            .textSelection(.enabled)
+                    }
 
                     Text("MP4, MOV, M4A, MP3 or WAV.")
                         .font(.callout)

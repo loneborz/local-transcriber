@@ -18,7 +18,7 @@ No accounts. No cloud transcription service. No model picker.
 
 ## What it does
 
-Drop an MP4, MOV, M4A, MP3, or WAV file. Audio files are transcribed directly. For video, AVFoundation extracts the audio to a temporary M4A before transcription.
+Drop a local MP4, MOV, M4A, MP3, or WAV file. Audio files are transcribed directly. For video, AVFoundation extracts the audio to a temporary M4A before transcription.
 
 ## Languages
 
@@ -84,12 +84,16 @@ After a run, the app reports media duration, processing time, and realtime speed
 
 ## Privacy
 
-For local files, media is processed on the Mac with AVFoundation and Apple's on-device speech stack. The app has no media upload, cloud transcription, account, or external model API. macOS may download Apple-provided language assets when required.
+Only local file URLs are accepted. The app has no URL downloading, media upload, cloud transcription, account, or external model API. Media is processed locally with AVFoundation and Apple's on-device speech stack. macOS may download Apple-provided language assets when required.
 
 ## Non-goals
 
-No cloud transcription, accounts, summarization, knowledge base, AI transcript cleanup, user-facing model picker, or transcript editor.
+No URL downloading, cloud transcription, accounts, summarization, knowledge base, AI transcript cleanup, user-facing model picker, or transcript editor.
 
 ## Status
 
 Early-stage macOS project focused on local transcription and Markdown export.
+
+## License
+
+[MIT License](LICENSE).

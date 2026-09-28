@@ -60,7 +60,7 @@
 				000000000000000000000010 /* LocalTranscriber */,
 			);
 			name = LocalTranscriber;
-			productName = MyApp;
+			productName = LocalTranscriber;
 			productReference = 000000000000000000000120 /* LocalTranscriber.app */;
 			productType = "com.apple.product-type.application";
 		};
