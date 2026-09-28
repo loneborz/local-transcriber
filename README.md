@@ -92,6 +92,8 @@ No URL downloading, cloud transcription, accounts, summarization, knowledge base
 
 ## Status
 
+Requires macOS 26.0 or later.
+
 Early-stage macOS project focused on local transcription and Markdown export.
 
 ## License
