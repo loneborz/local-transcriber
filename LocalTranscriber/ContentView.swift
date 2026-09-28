@@ -455,7 +455,12 @@ struct ContentView: View {
 
     private func saveTranscript(_ transcript: Transcript) {
         let panel = NSSavePanel()
-        panel.allowedContentTypes = [UTType(filenameExtension: "md")!]
+        guard let markdownType = UTType(filenameExtension: "md") else {
+            transcriptionError = "Markdown files are not supported on this Mac."
+            return
+        }
+
+        panel.allowedContentTypes = [markdownType]
         panel.nameFieldStringValue = "\(transcript.sourceURL.deletingPathExtension().lastPathComponent).md"
 
         guard panel.runModal() == .OK, let destination = panel.url else {
