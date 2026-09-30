@@ -3,6 +3,10 @@ import AVFoundation
 import AppKit
 import UniformTypeIdentifiers
 
+extension FocusedValues {
+    @Entry var pasteLinks: (() -> Void)?
+}
+
 struct ContentView: View {
     @State private var queue = BatchQueue()
     @State private var isTargeted = false
@@ -66,12 +70,12 @@ struct ContentView: View {
                             .textSelection(.enabled)
                     }
 
-                    Text("MP4, MOV, M4A, MP3 or WAV.")
+                    Text("MP4, MOV, M4A, MP3 or WAV, or a YouTube link (drop it or press ⌘V).")
                         .font(.callout)
                         .foregroundStyle(.secondary)
                         .padding(.bottom, 12)
 
-                    Text("If it’s video, I’ll pull out the audio first. Then I’ll transcribe it locally into timestamped Markdown.")
+                    Text("If it’s video, I’ll pull out the audio first. For a YouTube link, I’ll download its audio first. Then I’ll transcribe it locally into timestamped Markdown.")
                         .font(.callout)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -104,7 +108,7 @@ struct ContentView: View {
 
                     destinationControl
 
-                    Text(isTargeted || isQueueTargeted ? "Feed me" : "Drop more files to add them to the queue")
+                    Text(isTargeted || isQueueTargeted ? "Feed me" : "Drop more files or links to add them to the queue")
                         .font(.subheadline)
                         .foregroundStyle(isTargeted || isQueueTargeted ? Color.accentColor : .secondary)
 
@@ -155,6 +159,7 @@ struct ContentView: View {
         } isTargeted: { targeted in
             isTargeted = targeted
         }
+        .focusedSceneValue(\.pasteLinks, pasteFromClipboard)
     }
 
     private var languagePicker: some View {
@@ -206,28 +211,59 @@ struct ContentView: View {
     }
 
     private func addDroppedFiles(_ urls: [URL]) -> Bool {
-        let fileURLs = urls.filter(\.isFileURL)
-        guard !fileURLs.isEmpty else {
-            if !urls.isEmpty {
-                notice = "Only local files are supported. Drop a supported media file from Finder."
+        var sources: [JobSource] = []
+        var hasUnsupportedItem = false
+        for url in urls {
+            if url.isFileURL {
+                if supportedExtensions.contains(url.pathExtension.lowercased()) {
+                    sources.append(.file(url))
+                }
+            } else if let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https" {
+                sources.append(linkSource(for: url))
+            } else {
+                hasUnsupportedItem = true
             }
-            return false
         }
 
-        let supportedURLs = fileURLs.filter {
-            supportedExtensions.contains($0.pathExtension.lowercased())
-        }
-        guard !supportedURLs.isEmpty else {
+        guard !sources.isEmpty else {
+            if hasUnsupportedItem {
+                notice = "Drop a supported media file or a YouTube link."
+            }
             return false
         }
 
         notice = nil
-        for job in queue.enqueue(supportedURLs, locale: selectedLanguage.locale) {
-            Task {
-                job.mediaInfo = await loadMediaInfo(for: job.url)
+        for job in queue.enqueue(sources, locale: selectedLanguage.locale) {
+            if case .file(let url) = job.source {
+                Task {
+                    job.mediaInfo = await loadMediaInfo(for: url)
+                }
             }
         }
         return true
+    }
+
+    // Anything that is not a supported YouTube link becomes a Failed job.
+    private func linkSource(for url: URL) -> JobSource {
+        if let video = YouTubeURL.parse(url) {
+            return .youtube(videoID: video.videoID, url: video.canonical)
+        }
+        return .invalid(input: url.absoluteString, reason: "Only YouTube links are supported.")
+    }
+
+    private func pasteFromClipboard() {
+        let pasteboard = NSPasteboard.general
+        var urls = (pasteboard.readObjects(forClasses: [NSURL.self]) as? [URL]) ?? []
+        if urls.isEmpty, let text = pasteboard.string(forType: .string) {
+            urls = text.split(whereSeparator: \.isWhitespace)
+                .compactMap { URL(string: String($0)) }
+                .filter { ["http", "https"].contains($0.scheme?.lowercased()) }
+        }
+        guard !urls.isEmpty else {
+            notice = "Nothing to paste. Copy a YouTube link or a media file first."
+            return
+        }
+        _ = addDroppedFiles(urls)
     }
 
     private func loadMediaInfo(for url: URL) async -> MediaInfo {
@@ -326,19 +362,15 @@ private struct JobRow: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Button {
-                        NSWorkspace.shared.activateFileViewerSelecting([job.url])
-                    } label: {
-                        Text(job.url.lastPathComponent)
-                            .font(.callout.weight(.medium))
-                            .foregroundStyle(.tint)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                    }
-                    .buttonStyle(.plain)
-                    .help("Reveal original file in Finder")
+                    nameView
 
-                    if let mediaInfo = job.mediaInfo {
+                    if let metadata = job.metadata {
+                        Text(metadata.detailText)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .fixedSize()
+                    } else if let mediaInfo = job.mediaInfo {
                         Text("\(mediaInfo.type) · \(mediaInfo.duration) · \(mediaInfo.fileSize)")
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -406,13 +438,47 @@ private struct JobRow: View {
         .padding(.vertical, 6)
     }
 
+    // Local files reveal in Finder; YouTube jobs open the video; a rejected link is plain text.
+    @ViewBuilder
+    private var nameView: some View {
+        switch job.source {
+        case .file(let url):
+            Button {
+                NSWorkspace.shared.activateFileViewerSelecting([url])
+            } label: {
+                nameLabel(foreground: .tint)
+            }
+            .buttonStyle(.plain)
+            .help("Reveal original file in Finder")
+        case .youtube(_, let url):
+            Button {
+                NSWorkspace.shared.open(url)
+            } label: {
+                nameLabel(foreground: .tint)
+            }
+            .buttonStyle(.plain)
+            .help("Open on YouTube")
+        case .invalid:
+            nameLabel(foreground: .secondary)
+                .textSelection(.enabled)
+        }
+    }
+
+    private func nameLabel(foreground: some ShapeStyle) -> some View {
+        Text(job.displayName)
+            .font(.callout.weight(.medium))
+            .foregroundStyle(foreground)
+            .lineLimit(1)
+            .truncationMode(.middle)
+    }
+
     @ViewBuilder
     private var statusIcon: some View {
         switch job.state {
         case .waiting:
             Image(systemName: "clock")
                 .foregroundStyle(.secondary)
-        case .transcribing:
+        case .downloading, .transcribing:
             ProgressView()
                 .controlSize(.small)
         case .complete:
@@ -429,6 +495,9 @@ private struct JobRow: View {
         switch job.state {
         case .waiting:
             Text("Waiting")
+                .foregroundStyle(.secondary)
+        case .downloading:
+            Text("Downloading…")
                 .foregroundStyle(.secondary)
         case .transcribing(let phase):
             Text(phase?.label ?? "Transcribing…")

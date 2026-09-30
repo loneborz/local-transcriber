@@ -53,6 +53,7 @@
 				000000000000000120000000 /* Sources */,
 				000000000000000130000000 /* Frameworks */,
 				000000000000000140000000 /* Resources */,
+				000000000000000150000000 /* Embed YouTube helper */,
 			);
 			buildRules = (
 			);
@@ -105,6 +106,20 @@
 			);
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		000000000000000150000000 /* Embed YouTube helper */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			name = "Embed YouTube helper";
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/bash;
+			shellScript = "set -euo pipefail\n[ \"${PLATFORM_NAME}\" = \"macosx\" ] || exit 0\n\n# Installs the vendored YouTube helper (see Vendor/YouTubeHelper/README.md):\n# the only Mach-O goes to Contents/Helpers, everything else is data in Resources.\nSRC=\"${SRCROOT}/Vendor/YouTubeHelper\"\nAPP=\"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}\"\n\nrm -rf \"${APP}/Helpers/python3.13\" \"${APP}/Resources/python-home\"\nmkdir -p \"${APP}/Helpers\" \"${APP}/Resources\"\ncp \"${SRC}/python3.13\" \"${APP}/Helpers/python3.13\"\ncp -R \"${SRC}/python-home\" \"${APP}/Resources/python-home\"\ncp \"${SRC}/yt-dlp\" \"${SRC}/ytdlp_launcher.py\" \"${APP}/Resources/\"\n\nIDENTITY=\"${EXPANDED_CODE_SIGN_IDENTITY:--}\"\n[ -n \"${IDENTITY}\" ] || IDENTITY=\"-\"\nFLAGS=()\nif [ \"${ENABLE_HARDENED_RUNTIME:-NO}\" = \"YES\" ]; then\n  FLAGS+=(--options runtime)\n  [ \"${IDENTITY}\" = \"-\" ] || FLAGS+=(--timestamp)\nfi\n\n# The helper is signed before the app. Entitlements: app-sandbox + inherit only.\ncodesign --force --sign \"${IDENTITY}\" ${FLAGS[@]+\"${FLAGS[@]}\"} \\\n  --entitlements \"${SRC}/helper-inherit.entitlements\" \"${APP}/Helpers/python3.13\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		000000000000000120000000 /* Sources */ = {
@@ -253,7 +268,9 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_APP_SANDBOX = YES;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				ENABLE_USER_SELECTED_FILES = readwrite;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Local Transcriber";
@@ -291,8 +308,10 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_APP_SANDBOX = YES;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				ENABLE_USER_SELECTED_FILES = readwrite;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Local Transcriber";

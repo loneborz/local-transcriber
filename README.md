@@ -4,7 +4,7 @@
 
 Local Transcriber is a small native macOS utility for turning local audio and video into timestamped Markdown transcripts with Apple's on-device speech stack.
 
-Drop in a file, choose the language, and let the app handle the rest.
+Drop in a file or a YouTube link, choose the language, and let the app handle the rest.
 
 No accounts. No cloud transcription service. No model picker.
 
@@ -19,6 +19,8 @@ No accounts. No cloud transcription service. No model picker.
 ## What it does
 
 Drop a local MP4, MOV, M4A, MP3, or WAV file. Audio files are transcribed directly. For video, AVFoundation extracts the audio to a temporary M4A before transcription.
+
+You can also drop or paste (⌘V) a YouTube link. The app downloads that video's audio to a temporary M4A inside its sandbox, transcribes it, and deletes the download. Local files and YouTube links share one queue and run one at a time; a link that cannot be fetched fails only its own row. The saved Markdown is named `<video title> [<video ID>].md`.
 
 ## Languages
 
@@ -59,7 +61,7 @@ Timestamped Markdown
 
 ## Output
 
-Choose **Save Transcript…** to write a `.md` file. The document title comes from the source filename. Transcript segments are ordered by audio time, grouped by minute, and headed with the first segment's timestamp in each group.
+Finished transcripts are saved automatically to the output folder you choose once. **Save Transcript…** appears only if an automatic save fails. The document title comes from the source filename, or for a YouTube link the video title and ID. Transcript segments are ordered by audio time, grouped by minute, and headed with the first segment's timestamp in each group.
 
 The saved Markdown includes the source, duration when available, selected locale, and Apple engine metadata:
 
@@ -84,15 +86,17 @@ After a run, the app reports media duration, processing time, and realtime speed
 
 ## Privacy
 
-Only local file URLs are accepted. The app has no URL downloading, media upload, cloud transcription, account, or external model API. Media is processed locally with AVFoundation and Apple's on-device speech stack. macOS may download Apple-provided language assets when required.
+The app uses the network for two things only: downloading the audio of a YouTube link you give it, and the Apple-provided language assets that macOS may download when a language needs them. Transcription itself never leaves your Mac: media is processed locally with AVFoundation and Apple's on-device speech stack. There is no media upload, cloud transcription, account, or external model API.
+
+YouTube audio is fetched with a pinned copy of [yt-dlp](https://github.com/yt-dlp/yt-dlp) and a small bundled Python runtime, run as a sandboxed helper inside the app (see `Vendor/YouTubeHelper/README.md`). The helper runs inside the app's sandbox with no entitlements of its own, is stopped when the app quits, and only supports YouTube links. Downloaded audio is temporary and is removed when a job finishes, fails, or at the next launch.
 
 ## Non-goals
 
-No URL downloading, cloud transcription, accounts, summarization, knowledge base, AI transcript cleanup, user-facing model picker, or transcript editor.
+Downloading from sites other than YouTube, playlists or channels, cloud transcription, accounts, summarization, knowledge base, AI transcript cleanup, user-facing model picker, or transcript editor.
 
 ## Status
 
-Requires macOS 26.0 or later.
+Requires macOS 26.0 or later. The bundled YouTube helper is Apple silicon only; YouTube links are not supported on Intel Macs.
 
 Early-stage macOS project focused on local transcription and Markdown export.
 
