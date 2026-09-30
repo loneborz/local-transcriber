@@ -23,6 +23,8 @@ final class TranscriptionJob: Identifiable {
     var mediaInfo: MediaInfo?
     var state: State = .waiting
     var savedTranscriptURL: URL?
+    // Set when transcription succeeded but the automatic save did not.
+    var saveError: String?
 
     init(url: URL, locale: Locale) {
         self.url = url
@@ -38,6 +40,7 @@ final class TranscriptionJob: Identifiable {
 @MainActor @Observable
 final class BatchQueue {
     private(set) var jobs: [TranscriptionJob] = []
+    let destination = OutputDestination()
     private var isRunning = false
 
     var isProcessing: Bool { isRunning }
@@ -97,8 +100,23 @@ final class BatchQueue {
                 onPhaseChange: { job.state = .transcribing($0) }
             )
             job.state = .complete(transcript, processingDuration: startedAt.duration(to: clock.now))
+            save(transcript, for: job)
         } catch {
             job.state = .failed(error.localizedDescription)
+        }
+    }
+
+    // A failed save never fails the job: it stays Complete with its transcript
+    // in memory, and the error is recorded for the manual Save fallback.
+    private func save(_ transcript: Transcript, for job: TranscriptionJob) {
+        do {
+            job.savedTranscriptURL = try destination.write(
+                TranscriptMarkdownRenderer.render(transcript),
+                baseName: job.url.deletingPathExtension().lastPathComponent
+            )
+            job.saveError = nil
+        } catch {
+            job.saveError = error.localizedDescription
         }
     }
 }

@@ -7,7 +7,7 @@ struct ContentView: View {
     @State private var queue = BatchQueue()
     @State private var isTargeted = false
     @State private var isQueueTargeted = false
-    @State private var selectedLanguage = TranscriptionLanguage.english
+    @AppStorage("defaultLanguage") private var selectedLanguage = TranscriptionLanguage.english
     @State private var notice: String?
 
     private let supportedExtensions = [
@@ -54,6 +54,9 @@ struct ContentView: View {
                         .padding(.bottom, 12)
 
                     languagePicker
+                        .padding(.bottom, 8)
+
+                    destinationControl
                         .padding(.bottom, 14)
 
                     if let notice {
@@ -83,6 +86,8 @@ struct ContentView: View {
                 VStack(spacing: 12) {
                     HStack(spacing: 10) {
                         Button("Transcribe") {
+                            // No destination yet: ask once; cancelling starts nothing.
+                            guard queue.destination.isReady || queue.destination.choose() else { return }
                             queue.start()
                         }
                         .buttonStyle(.borderedProminent)
@@ -96,6 +101,8 @@ struct ContentView: View {
                         .controlSize(.large)
                         .disabled(!queue.canClear)
                     }
+
+                    destinationControl
 
                     Text(isTargeted || isQueueTargeted ? "Feed me" : "Drop more files to add them to the queue")
                         .font(.subheadline)
@@ -164,6 +171,38 @@ struct ContentView: View {
             .labelsHidden()
             .pickerStyle(.menu)
         }
+    }
+
+    private var destinationControl: some View {
+        HStack(spacing: 6) {
+            switch queue.destination.status {
+            case .none:
+                Button("Choose an output folder…") {
+                    queue.destination.choose()
+                }
+                .buttonStyle(.link)
+            case .ready(let url):
+                Text("Saves to: \(url.lastPathComponent)")
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .help(url.path(percentEncoded: false))
+                Button("Change…") {
+                    queue.destination.choose()
+                }
+                .buttonStyle(.link)
+            case .unavailable(let message):
+                Text(message)
+                    .foregroundStyle(.red)
+                    .lineLimit(2)
+                Button("Choose…") {
+                    queue.destination.choose()
+                }
+                .buttonStyle(.link)
+            }
+        }
+        .font(.subheadline)
+        .disabled(queue.isProcessing)
     }
 
     private func addDroppedFiles(_ urls: [URL]) -> Bool {
@@ -312,6 +351,14 @@ private struct JobRow: View {
                     .font(.caption)
                     .fixedSize(horizontal: false, vertical: true)
 
+                if case .complete = job.state, job.savedTranscriptURL == nil, let saveError = job.saveError {
+                    Text("Not saved: \(saveError)")
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .textSelection(.enabled)
+                }
+
                 if case .complete = job.state, let savedTranscriptURL = job.savedTranscriptURL {
                     HStack(spacing: 0) {
                         Text("Saved · ")
@@ -340,7 +387,7 @@ private struct JobRow: View {
             .fixedSize()
             .disabled(!job.isWaiting)
 
-            if case .complete = job.state {
+            if case .complete = job.state, job.saveError != nil, job.savedTranscriptURL == nil {
                 Button("Save Transcript…", action: onSave)
                     .controlSize(.small)
             }
