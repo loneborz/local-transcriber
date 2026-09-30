@@ -4,17 +4,11 @@ import AppKit
 import UniformTypeIdentifiers
 
 struct ContentView: View {
-    @State private var selectedFile: URL?
-    @State private var mediaInfo: MediaInfo?
+    @State private var queue = BatchQueue()
     @State private var isTargeted = false
-    @State private var isTranscribing = false
+    @State private var isQueueTargeted = false
     @State private var selectedLanguage = TranscriptionLanguage.english
-    @State private var processingPhase: TranscriptionPhase?
-    @State private var transcript: Transcript?
-    @State private var processingDuration: Duration?
-    @State private var transcriptionError: String?
-    @State private var savedTranscriptURL: URL?
-    @State private var isWaveformHovered = false
+    @State private var notice: String?
 
     private let supportedExtensions = [
         "mp4",
@@ -26,206 +20,11 @@ struct ContentView: View {
 
     var body: some View {
         VStack(spacing: 18) {
-            Group {
-                if transcript != nil, !isTranscribing {
-                    Button(action: startNewTranscript) {
-                        WaveformBars(isAnimating: false, showsPlus: false)
-                            .scaleEffect(isWaveformHovered ? 1.04 : 1)
-                            .opacity(isWaveformHovered ? 0.82 : 1)
-                    }
-                    .buttonStyle(.plain)
-                    .help("New Transcript")
-                    .accessibilityLabel("New Transcript")
-                    .onHover { isWaveformHovered = $0 }
-                    .animation(.easeOut(duration: 0.15), value: isWaveformHovered)
-                } else {
-                    WaveformBars(isAnimating: isTranscribing, showsPlus: selectedFile == nil)
-                }
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.top, 4)
+            WaveformBars(isAnimating: queue.isProcessing, showsPlus: queue.jobs.isEmpty)
+                .frame(maxWidth: .infinity)
+                .padding(.top, 4)
 
-            if selectedFile != nil, transcript == nil {
-                Text(isTranscribing ? (processingPhase?.label ?? "") : "")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .frame(height: 18)
-            }
-
-            if let transcript, !isTranscribing {
-                VStack(spacing: 0) {
-                    Text("Click me to return")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.top, 8)
-
-                    VStack(spacing: 5) {
-                        Text("Done · \(transcript.characterCount) characters")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-
-                        if let processingDuration {
-                            let formattedMediaDuration = transcript.duration.flatMap(formatMediaDuration)
-                            let processingTime = formatProcessingDuration(processingDuration)
-                            let realtimeSpeed = transcript.duration.flatMap {
-                                formatRealtimeSpeed(
-                                    mediaDuration: $0,
-                                    processingDuration: processingDuration
-                                )
-                            }
-
-                            VStack(spacing: 5) {
-                                if let formattedMediaDuration {
-                                    Text("\(formattedMediaDuration) processed in \(processingTime)")
-                                }
-
-                                Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 3) {
-                                    if let formattedMediaDuration {
-                                        GridRow {
-                                            Text("Media duration")
-                                            Text(formattedMediaDuration).monospacedDigit()
-                                        }
-                                    }
-
-                                    GridRow {
-                                        Text("Processing time")
-                                        Text(processingTime).monospacedDigit()
-                                    }
-
-                                    if let realtimeSpeed {
-                                        GridRow {
-                                            Text("Realtime speed")
-                                            Text(realtimeSpeed).monospacedDigit()
-                                        }
-                                    }
-                                }
-                            }
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        }
-                    }
-                    .padding(.top, 30)
-
-                    Button("Save Transcript…") {
-                        saveTranscript(transcript)
-                    }
-                    .padding(.top, 22)
-
-                    if let savedTranscriptURL {
-                        HStack(spacing: 0) {
-                            Text("Saved · ")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-
-                            Button(savedTranscriptURL.lastPathComponent) {
-                                NSWorkspace.shared.activateFileViewerSelecting([savedTranscriptURL])
-                            }
-                            .font(.caption)
-                            .buttonStyle(.plain)
-                            .foregroundStyle(.tint)
-                        }
-                        .padding(.top, 8)
-                    }
-
-                    if let transcriptionError {
-                        Text(transcriptionError)
-                            .font(.caption)
-                            .foregroundStyle(.red)
-                            .textSelection(.enabled)
-                    }
-                }
-            } else if let selectedFile {
-                VStack(spacing: 10) {
-                    Button {
-                        NSWorkspace.shared.activateFileViewerSelecting([selectedFile])
-                    } label: {
-                        Text(selectedFile.lastPathComponent)
-                            .font(.title3.weight(.medium))
-                            .foregroundStyle(.tint)
-                    }
-                    .buttonStyle(.plain)
-                    .help("Reveal original file in Finder")
-
-                    if let mediaInfo {
-                        HStack(spacing: 12) {
-                            Text(mediaInfo.type)
-                            Text("·")
-                            Text(mediaInfo.duration)
-                            Text("·")
-                            Text(mediaInfo.fileSize)
-                        }
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    }
-
-                    HStack(spacing: 8) {
-                        Text("Language")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-
-                        Picker("Language", selection: $selectedLanguage) {
-                            ForEach(TranscriptionLanguage.allCases) { language in
-                                Text(language.title).tag(language)
-                            }
-                        }
-                        .labelsHidden()
-                        .pickerStyle(.menu)
-                        .disabled(isTranscribing)
-                    }
-
-                    Button {
-                        guard let file = self.selectedFile else {
-                            return
-                        }
-                        let locale = selectedLanguage.locale
-
-                        let clock = ContinuousClock()
-                        let startedAt = clock.now
-                        processingPhase = nil
-                        isTranscribing = true
-                        transcript = nil
-                        processingDuration = nil
-                        transcriptionError = nil
-                        savedTranscriptURL = nil
-
-                        Task {
-                            defer {
-                                processingPhase = nil
-                                isTranscribing = false
-                            }
-
-                            do {
-                                let completedTranscript = try await TranscriptionService.transcribe(
-                                    url: file,
-                                    locale: locale,
-                                    onPhaseChange: { processingPhase = $0 }
-                                )
-                                let elapsed = startedAt.duration(to: clock.now)
-                                guard selectedFile == file else { return }
-                                transcript = completedTranscript
-                                processingDuration = elapsed
-                            } catch {
-                                guard selectedFile == file else { return }
-                                transcriptionError = error.localizedDescription
-                            }
-                        }
-                    } label: {
-                        Text("Transcribe")
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
-                    .disabled(isTranscribing)
-                    .padding(.top, 8)
-
-                    if let transcriptionError {
-                        Text(transcriptionError)
-                            .font(.caption)
-                            .foregroundStyle(.red)
-                            .textSelection(.enabled)
-                    }
-                }
-            } else {
+            if queue.jobs.isEmpty {
                 VStack(spacing: 0) {
                     Text("Media in. Markdown out.")
                         .font(.title3.weight(.semibold))
@@ -252,43 +51,13 @@ struct ContentView: View {
                         }
                         .scaleEffect(isTargeted ? 0.98 : 1)
                         .animation(.easeOut(duration: 0.18), value: isTargeted)
-                        .dropDestination(for: URL.self) { urls, _ in
-                            guard let url = urls.first else {
-                                return false
-                            }
+                        .padding(.bottom, 12)
 
-                            guard url.isFileURL else {
-                                transcriptionError = "Only local files are supported. Drop a supported media file from Finder."
-                                return false
-                            }
+                    languagePicker
+                        .padding(.bottom, 14)
 
-                            guard supportedExtensions.contains(
-                                url.pathExtension.lowercased()
-                            ) else {
-                                return false
-                            }
-
-                            selectedFile = url
-                            mediaInfo = nil
-                            transcript = nil
-                            processingDuration = nil
-                            transcriptionError = nil
-                            savedTranscriptURL = nil
-
-                            Task {
-                                let info = await loadMediaInfo(for: url)
-                                guard selectedFile == url else { return }
-                                mediaInfo = info
-                            }
-
-                            return true
-                        } isTargeted: { targeted in
-                            isTargeted = targeted
-                        }
-                        .padding(.bottom, 20)
-
-                    if let transcriptionError {
-                        Text(transcriptionError)
+                    if let notice {
+                        Text(notice)
                             .font(.caption)
                             .foregroundStyle(.red)
                             .textSelection(.enabled)
@@ -302,32 +71,113 @@ struct ContentView: View {
                     Text("If it’s video, I’ll pull out the audio first. Then I’ll transcribe it locally into timestamped Markdown.")
                         .font(.callout)
                         .foregroundStyle(.secondary)
-                        .padding(.bottom, 22)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.bottom, 16)
 
                     Text("Stick around and watch the magic happen!")
                         .font(.body.weight(.medium))
                 }
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 420)
+            } else {
+                VStack(spacing: 12) {
+                    Button("Transcribe") {
+                        queue.start()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    .disabled(queue.isProcessing || !queue.hasWaitingJobs)
+
+                    Text(isTargeted || isQueueTargeted ? "Feed me" : "Drop more files to add them to the queue")
+                        .font(.subheadline)
+                        .foregroundStyle(isTargeted || isQueueTargeted ? Color.accentColor : .secondary)
+
+                    if let notice {
+                        Text(notice)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                            .textSelection(.enabled)
+                    }
+
+                    ScrollView {
+                        VStack(spacing: 0) {
+                            ForEach(queue.jobs) { job in
+                                JobRow(job: job) {
+                                    if case .complete(let transcript, _) = job.state {
+                                        saveTranscript(transcript, for: job)
+                                    }
+                                }
+
+                                if job.id != queue.jobs.last?.id {
+                                    Divider()
+                                }
+                            }
+                        }
+                    }
+                    .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 8))
+                    // ScrollView is a platform view and does not pass drops up to the
+                    // window-level destination, so it is a drop target itself.
+                    .contentShape(Rectangle())
+                    .dropDestination(for: URL.self) { urls, _ in
+                        addDroppedFiles(urls)
+                    } isTargeted: { targeted in
+                        isQueueTargeted = targeted
+                    }
+                }
+                .frame(maxWidth: 600, maxHeight: .infinity)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .padding(40)
         .background(.ultraThinMaterial)
         .frame(minWidth: 640, minHeight: 420)
+        .contentShape(Rectangle())
+        .dropDestination(for: URL.self) { urls, _ in
+            addDroppedFiles(urls)
+        } isTargeted: { targeted in
+            isTargeted = targeted
+        }
     }
 
-    private func startNewTranscript() {
-        guard !isTranscribing else { return }
+    private var languagePicker: some View {
+        HStack(spacing: 8) {
+            Text("Default language")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
 
-        selectedFile = nil
-        mediaInfo = nil
-        transcript = nil
-        processingDuration = nil
-        transcriptionError = nil
-        savedTranscriptURL = nil
-        processingPhase = nil
-        isTargeted = false
+            Picker("Default language", selection: $selectedLanguage) {
+                ForEach(TranscriptionLanguage.allCases) { language in
+                    Text(language.title).tag(language)
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+        }
+    }
+
+    private func addDroppedFiles(_ urls: [URL]) -> Bool {
+        let fileURLs = urls.filter(\.isFileURL)
+        guard !fileURLs.isEmpty else {
+            if !urls.isEmpty {
+                notice = "Only local files are supported. Drop a supported media file from Finder."
+            }
+            return false
+        }
+
+        let supportedURLs = fileURLs.filter {
+            supportedExtensions.contains($0.pathExtension.lowercased())
+        }
+        guard !supportedURLs.isEmpty else {
+            return false
+        }
+
+        notice = nil
+        for job in queue.enqueue(supportedURLs, locale: selectedLanguage.locale) {
+            Task {
+                job.mediaInfo = await loadMediaInfo(for: job.url)
+            }
+        }
+        return true
     }
 
     private func loadMediaInfo(for url: URL) async -> MediaInfo {
@@ -385,6 +235,170 @@ struct ContentView: View {
         )
     }
 
+    private func saveTranscript(_ transcript: Transcript, for job: TranscriptionJob) {
+        let panel = NSSavePanel()
+        guard let markdownType = UTType(filenameExtension: "md") else {
+            notice = "Markdown files are not supported on this Mac."
+            return
+        }
+
+        panel.allowedContentTypes = [markdownType]
+        panel.nameFieldStringValue = "\(transcript.sourceURL.deletingPathExtension().lastPathComponent).md"
+
+        guard panel.runModal() == .OK, let destination = panel.url else {
+            return
+        }
+
+        do {
+            try TranscriptMarkdownRenderer.render(transcript).write(
+                to: destination,
+                atomically: true,
+                encoding: .utf8
+            )
+            job.savedTranscriptURL = destination
+            notice = nil
+        } catch {
+            job.savedTranscriptURL = nil
+            notice = error.localizedDescription
+        }
+    }
+}
+
+private struct JobRow: View {
+    let job: TranscriptionJob
+    let onSave: () -> Void
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 10) {
+            statusIcon
+                .frame(width: 16, height: 16)
+
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Button {
+                        NSWorkspace.shared.activateFileViewerSelecting([job.url])
+                    } label: {
+                        Text(job.url.lastPathComponent)
+                            .font(.callout.weight(.medium))
+                            .foregroundStyle(.tint)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Reveal original file in Finder")
+
+                    if let mediaInfo = job.mediaInfo {
+                        Text("\(mediaInfo.type) · \(mediaInfo.duration) · \(mediaInfo.fileSize)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .fixedSize()
+                    }
+                }
+
+                statusText
+                    .font(.caption)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if case .complete = job.state, let savedTranscriptURL = job.savedTranscriptURL {
+                    HStack(spacing: 0) {
+                        Text("Saved · ")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                        Button(savedTranscriptURL.lastPathComponent) {
+                            NSWorkspace.shared.activateFileViewerSelecting([savedTranscriptURL])
+                        }
+                        .font(.caption)
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.tint)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Picker("Language", selection: language) {
+                ForEach(TranscriptionLanguage.allCases) { language in
+                    Text(language.title).tag(language)
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .controlSize(.small)
+            .fixedSize()
+            .disabled(!job.isWaiting)
+
+            if case .complete = job.state {
+                Button("Save Transcript…", action: onSave)
+                    .controlSize(.small)
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+    }
+
+    @ViewBuilder
+    private var statusIcon: some View {
+        switch job.state {
+        case .waiting:
+            Image(systemName: "clock")
+                .foregroundStyle(.secondary)
+        case .transcribing:
+            ProgressView()
+                .controlSize(.small)
+        case .complete:
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundStyle(.green)
+        case .failed:
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.red)
+        }
+    }
+
+    @ViewBuilder
+    private var statusText: some View {
+        switch job.state {
+        case .waiting:
+            Text("Waiting")
+                .foregroundStyle(.secondary)
+        case .transcribing(let phase):
+            Text(phase?.label ?? "Transcribing…")
+                .foregroundStyle(.secondary)
+        case .complete(let transcript, let processingDuration):
+            Text("Complete · \(transcript.characterCount) characters · \(completionMetrics(for: transcript, processingDuration: processingDuration))")
+                .foregroundStyle(.secondary)
+        case .failed(let message):
+            Text("Failed · \(message)")
+                .foregroundStyle(.red)
+                .textSelection(.enabled)
+        }
+    }
+
+    // The job owns a Locale; the picker only edits it while the job is Waiting.
+    private var language: Binding<TranscriptionLanguage> {
+        Binding(
+            get: { TranscriptionLanguage.allCases.first { $0.locale == job.locale } ?? .english },
+            set: { job.locale = $0.locale }
+        )
+    }
+
+    private func completionMetrics(for transcript: Transcript, processingDuration: Duration) -> String {
+        let processingTime = formatProcessingDuration(processingDuration)
+        var text = "Processed in \(processingTime)"
+
+        if let mediaDuration = transcript.duration.flatMap(formatMediaDuration) {
+            text = "\(mediaDuration) processed in \(processingTime)"
+        }
+
+        if let realtimeSpeed = transcript.duration.flatMap({
+            formatRealtimeSpeed(mediaDuration: $0, processingDuration: processingDuration)
+        }) {
+            text += " · \(realtimeSpeed) realtime"
+        }
+
+        return text
+    }
+
     private func formatMediaDuration(_ seconds: TimeInterval) -> String? {
         guard seconds.isFinite, seconds > 0 else { return nil }
 
@@ -400,6 +414,22 @@ struct ContentView: View {
         return hours > 0
             ? "\(hours)h \(twoDigits(minutes))m"
             : "\(minutes)m"
+    }
+
+    private func formatRealtimeSpeed(
+        mediaDuration: TimeInterval,
+        processingDuration: Duration
+    ) -> String? {
+        guard mediaDuration.isFinite, mediaDuration > 0 else { return nil }
+        let elapsedSeconds = durationSeconds(processingDuration)
+        guard elapsedSeconds > 0 else { return nil }
+
+        let speed = mediaDuration / elapsedSeconds
+        guard speed.isFinite, speed > 0 else { return nil }
+
+        let rounded = speed >= 20 ? speed.rounded() : (speed * 10).rounded() / 10
+        let decimals = speed < 20 && rounded.rounded() != rounded ? 1 : 0
+        return "\(formatNumber(rounded, decimals: decimals))×"
     }
 
     private func formatProcessingDuration(_ duration: Duration) -> String {
@@ -420,22 +450,6 @@ struct ContentView: View {
         return "\(minutes)m \(remainingSeconds)s"
     }
 
-    private func formatRealtimeSpeed(
-        mediaDuration: TimeInterval,
-        processingDuration: Duration
-    ) -> String? {
-        guard mediaDuration.isFinite, mediaDuration > 0 else { return nil }
-        let elapsedSeconds = durationSeconds(processingDuration)
-        guard elapsedSeconds > 0 else { return nil }
-
-        let speed = mediaDuration / elapsedSeconds
-        guard speed.isFinite, speed > 0 else { return nil }
-
-        let rounded = speed >= 20 ? speed.rounded() : (speed * 10).rounded() / 10
-        let decimals = speed < 20 && rounded.rounded() != rounded ? 1 : 0
-        return "\(formatNumber(rounded, decimals: decimals))×"
-    }
-
     private func durationSeconds(_ duration: Duration) -> Double {
         let components = duration.components
         return Double(components.seconds) + Double(components.attoseconds) / 1e18
@@ -451,34 +465,6 @@ struct ContentView: View {
 
     private func twoDigits(_ value: Int) -> String {
         String(format: "%02d", value)
-    }
-
-    private func saveTranscript(_ transcript: Transcript) {
-        let panel = NSSavePanel()
-        guard let markdownType = UTType(filenameExtension: "md") else {
-            transcriptionError = "Markdown files are not supported on this Mac."
-            return
-        }
-
-        panel.allowedContentTypes = [markdownType]
-        panel.nameFieldStringValue = "\(transcript.sourceURL.deletingPathExtension().lastPathComponent).md"
-
-        guard panel.runModal() == .OK, let destination = panel.url else {
-            return
-        }
-
-        do {
-            try TranscriptMarkdownRenderer.render(transcript).write(
-                to: destination,
-                atomically: true,
-                encoding: .utf8
-            )
-            savedTranscriptURL = destination
-            transcriptionError = nil
-        } catch {
-            savedTranscriptURL = nil
-            transcriptionError = error.localizedDescription
-        }
     }
 }
 
@@ -524,12 +510,6 @@ private struct WaveformBars: View {
         let wave = (sin(time * 1.2 + Double(index) * 1.15) + 1) / 2
         return 0.45 + 0.55 * CGFloat(wave)
     }
-}
-
-private struct MediaInfo {
-    let type: String
-    let duration: String
-    let fileSize: String
 }
 
 private enum TranscriptionLanguage: String, CaseIterable, Identifiable {
