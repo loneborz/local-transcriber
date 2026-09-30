@@ -1,9 +1,10 @@
 ---
 id: LTR-1
 title: Build batch queue foundation
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-09-30 20:03'
+updated_date: '2026-09-30 20:09'
 labels: []
 milestone: m-0
 dependencies: []
