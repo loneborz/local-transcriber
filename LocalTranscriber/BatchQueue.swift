@@ -52,6 +52,22 @@ final class BatchQueue {
         return newJobs
     }
 
+    // Only a Waiting job can be removed; the runner re-scans `jobs` on every
+    // pass, so a removed job never runs. Source media is never touched.
+    func remove(_ job: TranscriptionJob) {
+        guard job.isWaiting else { return }
+        jobs.removeAll { $0.id == job.id }
+    }
+
+    // Idle means no batch is running, so any mix of Waiting, Complete and
+    // Failed jobs can be cleared. Never cancels an active job.
+    var canClear: Bool { !jobs.isEmpty && !isRunning }
+
+    func clear() {
+        guard canClear else { return }
+        jobs.removeAll()
+    }
+
     func start() {
         guard !isRunning, hasWaitingJobs else { return }
         isRunning = true

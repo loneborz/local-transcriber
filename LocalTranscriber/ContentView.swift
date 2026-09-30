@@ -81,12 +81,21 @@ struct ContentView: View {
                 .frame(maxWidth: 420)
             } else {
                 VStack(spacing: 12) {
-                    Button("Transcribe") {
-                        queue.start()
+                    HStack(spacing: 10) {
+                        Button("Transcribe") {
+                            queue.start()
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
+                        .disabled(queue.isProcessing || !queue.hasWaitingJobs)
+
+                        Button("Clear") {
+                            queue.clear()
+                            notice = nil
+                        }
+                        .controlSize(.large)
+                        .disabled(!queue.canClear)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
-                    .disabled(queue.isProcessing || !queue.hasWaitingJobs)
 
                     Text(isTargeted || isQueueTargeted ? "Feed me" : "Drop more files to add them to the queue")
                         .font(.subheadline)
@@ -102,11 +111,13 @@ struct ContentView: View {
                     ScrollView {
                         VStack(spacing: 0) {
                             ForEach(queue.jobs) { job in
-                                JobRow(job: job) {
+                                JobRow(job: job, onSave: {
                                     if case .complete(let transcript, _) = job.state {
                                         saveTranscript(transcript, for: job)
                                     }
-                                }
+                                }, onRemove: {
+                                    queue.remove(job)
+                                })
 
                                 if job.id != queue.jobs.last?.id {
                                     Divider()
@@ -267,6 +278,7 @@ struct ContentView: View {
 private struct JobRow: View {
     let job: TranscriptionJob
     let onSave: () -> Void
+    let onRemove: () -> Void
 
     var body: some View {
         HStack(alignment: .center, spacing: 10) {
@@ -331,6 +343,16 @@ private struct JobRow: View {
             if case .complete = job.state {
                 Button("Save Transcript…", action: onSave)
                     .controlSize(.small)
+            }
+
+            if job.isWaiting {
+                Button(action: onRemove) {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Remove from queue")
+                .accessibilityLabel("Remove from queue")
             }
         }
         .padding(.horizontal, 10)
