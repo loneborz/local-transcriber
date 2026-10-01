@@ -58,15 +58,6 @@ struct ContentView: View {
                         .animation(.easeOut(duration: 0.18), value: isTargeted)
                         .padding(.bottom, 12)
 
-                    languagePicker
-                        .padding(.bottom, 8)
-
-                    destinationControl
-                        .padding(.bottom, 8)
-
-                    sourcePackageToggle
-                        .padding(.bottom, 14)
-
                     if let notice {
                         Text(notice)
                             .font(.caption)
@@ -108,9 +99,13 @@ struct ContentView: View {
                         .disabled(!queue.canClear)
                     }
 
+                    languageRow
+
                     destinationControl
 
-                    sourcePackageToggle
+                    if queue.hasYouTubeJobs {
+                        sourcePackageToggle
+                    }
 
                     summaryView
 
@@ -171,19 +166,31 @@ struct ContentView: View {
         .focusedSceneValue(\.pasteLinks, pasteFromClipboard)
     }
 
-    private var languagePicker: some View {
+    // Queue-level language: new items inherit it (it is the persisted default).
+    // Existing jobs change only through Apply to all, and only while Waiting.
+    private var languageRow: some View {
         HStack(spacing: 8) {
-            Text("Default language")
+            Text("Language")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
 
-            Picker("Default language", selection: $selectedLanguage) {
+            Picker("Language", selection: $selectedLanguage) {
                 ForEach(TranscriptionLanguage.allCases) { language in
                     Text(language.title).tag(language)
                 }
             }
             .labelsHidden()
             .pickerStyle(.menu)
+            .controlSize(.small)
+            .fixedSize()
+
+            if queue.waitingCount >= 2 {
+                Button("Apply to all") {
+                    queue.applyLocale(selectedLanguage.locale)
+                }
+                .controlSize(.small)
+                .help("Set this language on every waiting item")
+            }
         }
     }
 
