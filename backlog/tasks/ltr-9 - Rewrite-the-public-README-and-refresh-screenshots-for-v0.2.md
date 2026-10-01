@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-01 16:58'
-updated_date: '2026-10-01 17:11'
+updated_date: '2026-10-01 17:16'
 labels: []
 dependencies:
   - LTR-8
@@ -48,4 +48,6 @@ Screenshots: captured from the Debug build (Xcode 27, macOS 27, 1x display) with
 README facts checked against source: language list (TranscriptionLanguage), renderer metadata lines and the flat-vs-package Source line (TranscriptMarkdownRenderer.render), 30-minute download limit and limitations (doc-1), deployment target 26.0 (project.pbxproj), unsupported-extension behaviour (addDroppedFiles ignores them silently). Not verified: a clean-clone build on another Mac, other signing teams, Intel, notarization. No GitHub settings changed. Awaiting human review; criteria left unchecked.
 
 Queue screenshot replaced (docs/screenshots/queue.png, 640x491 PNG) with a window-only capture (screencapture -l, title bar included, no cursor/desktop) of the real completed queue open in the running Debug build: summary '2 succeeded · 0 failed · 2h 55m of media · processed in 1m 52s · 94× realtime'; hello.m4a (M4A · 2:05:39, 91× realtime, saved hello.md); YouTube job 'Python Machine Learning Tutorial (Data Science)' (49:43, 102× realtime); English selected, Desktop output folder, source-package checkbox visible. App brought to front for an active-window capture; queue, prefs, outputs untouched, app left running. Reviewed for personal information: only the approved filenames, public YouTube title/channel and 'Desktop' label are visible. Legibility checked on a 440 px downscale (sips): headings, summary and row titles clear, the small per-row detail text is readable but small. Not verified: rendering in an actual GitHub README preview. README alt text unchanged (still accurate). Status and criteria unchanged.
+
+Screenshot presentation revised after GitHub review (side-by-side 440 px images were too small and wrapped): stacked Markdown images, queue screenshot first as the primary visual with a one-line caption, empty-state screenshot at the start of Inputs. Both re-captured natively (not upscaled) from the real running build at an 860x540 pt window, window-only screencapture -l, active window: queue.png and empty-state.png are 860x540 PNG. Queue capture is the real completed queue (2 succeeded, 2h 55m of media, 94x realtime; hello.m4a and the public YouTube job). To reach the empty state the queue was cleared after the queue capture. Prefs/window frame restored, app quit. Status and criteria unchanged.
 <!-- SECTION:NOTES:END -->

@@ -4,11 +4,9 @@
 
 Local Transcriber is a native macOS app that turns audio, video and YouTube links into timestamped Markdown transcripts. Speech recognition runs on your Mac with Apple's on-device speech stack; there is no cloud transcription service, no account and no model picker.
 
-<p align="center">
-  <img src="docs/screenshots/empty-state.png" alt="Local Transcriber's empty state: a waveform mark, the tagline, a drop target and a one-line list of supported inputs" width="440">
-  &nbsp;
-  <img src="docs/screenshots/queue.png" alt="Local Transcriber's queue after a run: language and output-folder controls, a summary line, and two completed jobs with their saved Markdown files" width="440">
-</p>
+![Local Transcriber after a run: the language and output-folder controls, a summary line, and two completed jobs (a local audio file and a YouTube link) with their saved Markdown files](docs/screenshots/queue.png)
+
+*A finished queue: one local file and one YouTube link, transcribed in sequence and saved to the output folder.*
 
 ## What it does
 
@@ -30,6 +28,8 @@ media file or YouTube link
 The product boundary is deliberate: `media or URL -> local transcript package`. The transcript is the artifact. The app does not summarize, index, search, rewrite or "clean up" what was said.
 
 ## Inputs
+
+![Local Transcriber's empty state: a waveform mark, the tagline "Media in. Markdown out.", a drop target and a one-line list of supported inputs](docs/screenshots/empty-state.png)
 
 - **Local files:** MP4, MOV, M4A, MP3 and WAV. Audio files are transcribed directly; for video, AVFoundation first extracts the audio to a temporary M4A.
 - **YouTube links:** `youtube.com` (including `www.`, `m.` and `music.`) and `youtu.be` watch, shorts, live and embed links. Playlist parameters are dropped, so a link transcribes one video.
