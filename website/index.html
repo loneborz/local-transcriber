@@ -63,13 +63,12 @@
 
 <section class="hero" id="top">
   <div class="container">
-    <p class="eyebrow">Native macOS app</p>
     <h1>Media in. Markdown out.</h1>
     <p class="lead">
-      Local Transcriber turns audio, video and YouTube links into timestamped
-      Markdown transcripts. Speech recognition runs on your Mac with Apple's
-      on-device speech stack: no cloud transcription service, no account and
-      no model picker.
+      Local Transcriber is a native macOS app that turns audio, video and
+      YouTube links into timestamped Markdown transcripts. Speech recognition
+      runs on your Mac with Apple's <span class="nowrap">on-device</span> speech stack: no cloud
+      transcription service, no account and no model picker.
     </p>
     <div class="actions">
       <a class="btn" href="https://github.com/loneborz/local-transcriber">View on GitHub</a>
@@ -233,36 +232,30 @@ Transcript text...</code></pre>
   </div>
 </section>
 
-<section class="band band-alt" id="packages">
+<section class="band band-alt band-compact" id="packages">
   <div class="container">
-    <div class="section-head">
+    <div class="section-head section-head-compact">
       <p class="eyebrow">Source packages</p>
-      <h2>Keep the audio and its provenance next to the transcript.</h2>
+      <h2>Keep the audio and its provenance with the transcript.</h2>
       <p>
-        Turn on <em>Save YouTube links as source packages</em> and each link is
-        saved as a folder named after its video ID instead of a single file.
-        The option appears only while the queue contains a YouTube link, and
-        local files are always saved as a single <code>.md</code>.
+        Turn on <em>Save YouTube links as source packages</em> (shown only
+        while the queue contains a YouTube link) and each link is saved as a
+        folder named after its video ID instead of a single file. Local files
+        are always saved as a single <code>.md</code>.
       </p>
     </div>
 
-    <div class="split split-top">
-      <div>
-<pre class="plain"><code>&lt;output folder&gt;/
-  jNQXAC9IVRw/
-    audio.m4a        the downloaded audio
-    source.json      where it came from
-    transcript.md    the timestamped transcript,
-                     with the video's URL, channel
-                     and date</code></pre>
-        <p class="small">
-          An existing folder is never reused (a repeat becomes
-          <code>jNQXAC9IVRw 2/</code>), and a package that cannot be completed
-          is not left half-written.
-        </p>
-      </div>
-      <figure class="doc" aria-label="Sample source.json">
-        <div class="doc-bar"><span class="doc-dots" aria-hidden="true"></span><span class="doc-name">source.json</span></div>
+    <figure class="doc pkg" aria-label="Example source package for one YouTube video">
+      <div class="doc-bar"><span class="doc-dots" aria-hidden="true"></span><span class="doc-name">jNQXAC9IVRw</span></div>
+      <div class="pkg-body">
+        <div class="pkg-tree">
+          <p class="pkg-root">&lt;output folder&gt;/jNQXAC9IVRw/</p>
+          <ul>
+            <li><code>audio.m4a</code><span>the downloaded audio</span></li>
+            <li><code>source.json</code><span>where it came from</span></li>
+            <li><code>transcript.md</code><span>the timestamped transcript, with the video's URL, channel and date</span></li>
+          </ul>
+        </div>
 <pre><code>{
   "acquiredAt" : "2026-10-01T00:13:47Z",
   "audioFilename" : "audio.m4a",
@@ -276,52 +269,49 @@ Transcript text...</code></pre>
   "transcriptionLocale" : "en-US",
   "videoID" : "jNQXAC9IVRw"
 }</code></pre>
-      </figure>
-    </div>
-    <p class="prose">
-      <code>source.json</code> is a small, versioned schema owned by the app,
-      not a copy of what the downloader reports. Unknown fields are omitted.
+      </div>
+    </figure>
+    <p class="small">
+      An existing folder is never reused (a repeat becomes
+      <code>jNQXAC9IVRw 2/</code>), and a package that cannot be completed is
+      not left half-written. <code>source.json</code> is a small, versioned
+      schema owned by the app, not a copy of what the downloader reports;
+      unknown fields are omitted.
     </p>
   </div>
 </section>
 
-<section class="band" id="limits">
+<section class="band band-compact" id="limits">
   <div class="container">
-    <div class="section-head">
-      <p class="eyebrow">Limitations</p>
-      <h2>An early project, stated plainly.</h2>
+    <div class="section-head section-head-compact">
+      <h2>Current limitations</h2>
     </div>
 
-    <div class="two-col">
-      <div class="card">
-        <h3>Current limitations</h3>
-        <ul class="plain-list">
-          <li>Requires macOS 26 or later.</li>
-          <li>No published release and no prebuilt download. The app has not been notarized.</li>
-          <li>The YouTube helper is Apple silicon only. Intel Macs are untested, and YouTube links are not expected to work there.</li>
-          <li>YouTube extraction depends on a pinned yt-dlp that never updates itself and can stop working as YouTube changes.</li>
-          <li>Only YouTube is supported as a link source: no other sites, playlists or channels. A single download is limited to 30 minutes.</li>
-          <li>There are no automated tests; behavior is checked by running the real app.</li>
-        </ul>
-      </div>
-      <div class="card">
-        <h3>Not in scope</h3>
-        <ul class="plain-list">
-          <li>Cloud transcription and accounts</li>
-          <li>Summarization, search or retrieval over transcripts</li>
-          <li>A knowledge-base layer</li>
-          <li>Automatic correction or rewriting of transcript text</li>
-          <li>A model picker or a transcript editor</li>
-          <li>Downloads from sites other than YouTube</li>
-        </ul>
-      </div>
+    <dl class="facts">
+      <div><dt>Platform</dt><dd>Requires macOS 26 or later.</dd></div>
+      <div><dt>Distribution</dt><dd>No published release and no prebuilt download. The app has not been notarized.</dd></div>
+      <div><dt>Hardware</dt><dd>The YouTube helper is Apple silicon only. Intel Macs are untested, and YouTube links are not expected to work there.</dd></div>
+      <div><dt>YouTube</dt><dd>Extraction depends on a pinned yt-dlp that never updates itself and can stop working as YouTube changes. Only YouTube is supported as a link source: no other sites, playlists or channels. A single download is limited to 30 minutes.</dd></div>
+      <div><dt>Testing</dt><dd>There are no automated tests; behavior is checked by running the real app.</dd></div>
+    </dl>
+
+    <div class="scope">
+      <h3>Not in scope</h3>
+      <ul class="chips">
+        <li>Cloud transcription and accounts</li>
+        <li>Summarization, search or retrieval over transcripts</li>
+        <li>A knowledge-base layer</li>
+        <li>Automatic correction or rewriting of transcript text</li>
+        <li>A model picker or a transcript editor</li>
+        <li>Downloads from sites other than YouTube</li>
+      </ul>
     </div>
   </div>
 </section>
 
-<section class="band band-alt" id="build">
+<section class="band band-alt band-compact" id="build">
   <div class="container">
-    <div class="section-head">
+    <div class="section-head section-head-compact">
       <p class="eyebrow">Build from source</p>
       <h2>There is no download yet. Build it with Xcode.</h2>
       <p>
@@ -330,28 +320,24 @@ Transcript text...</code></pre>
       </p>
     </div>
 
-    <div class="split split-top">
-      <figure class="doc" aria-label="Build commands">
-        <div class="doc-bar"><span class="doc-dots" aria-hidden="true"></span><span class="doc-name">Terminal</span></div>
-<pre><code>git clone https://github.com/loneborz/local-transcriber.git
-cd local-transcriber
-xcodebuild -project LocalTranscriber.xcodeproj \
-  -scheme LocalTranscriber \
-  -destination 'platform=macOS' build</code></pre>
-      </figure>
-      <div class="split-copy">
-        <p>
-          Or open <code>LocalTranscriber.xcodeproj</code> in Xcode and run the
-          <code>LocalTranscriber</code> scheme. Code signing is set to
-          Automatic, so Xcode may ask you to pick your own development team
-          under Signing &amp; Capabilities. A build phase copies the YouTube
-          helper into the app and signs it.
-        </p>
-        <div class="actions">
-          <a class="btn" href="https://github.com/loneborz/local-transcriber">View on GitHub</a>
-          <a class="btn btn-secondary" href="https://github.com/loneborz/local-transcriber#readme">Read the README</a>
-        </div>
-      </div>
+    <ol class="build-steps card">
+      <li>
+        <span class="step-num" aria-hidden="true">1</span>
+        <p>Clone the <a href="https://github.com/loneborz/local-transcriber">local-transcriber repository</a> from GitHub.</p>
+      </li>
+      <li>
+        <span class="step-num" aria-hidden="true">2</span>
+        <p>Open <code>LocalTranscriber.xcodeproj</code> in Xcode.</p>
+      </li>
+      <li>
+        <span class="step-num" aria-hidden="true">3</span>
+        <p>Run the <code>LocalTranscriber</code> scheme. Xcode may ask you to pick your own development team under Signing &amp; Capabilities. A build phase copies the YouTube helper into the app and signs it.</p>
+      </li>
+    </ol>
+
+    <div class="actions actions-left">
+      <a class="btn" href="https://github.com/loneborz/local-transcriber">View on GitHub</a>
+      <a class="btn btn-secondary" href="https://github.com/loneborz/local-transcriber#build-and-run">Read build instructions</a>
     </div>
   </div>
 </section>
