@@ -25,24 +25,32 @@ struct ContentView: View {
 
     var body: some View {
         VStack(spacing: 18) {
-            WaveformBars(isAnimating: queue.isProcessing, showsPlus: queue.jobs.isEmpty)
-                .frame(maxWidth: .infinity)
-                .padding(.top, 4)
+            if !queue.jobs.isEmpty {
+                WaveformBars(isAnimating: queue.isProcessing)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 4)
+            }
 
             if queue.jobs.isEmpty {
-                VStack(spacing: 0) {
-                    Text("Media in. Markdown out.")
-                        .font(.title3.weight(.semibold))
-                        .padding(.bottom, 20)
+                // Three groups: mark + tagline, drop target, input hint. The
+                // column is centered so a taller window does not leave a loose
+                // empty lower third.
+                VStack(spacing: 28) {
+                    VStack(spacing: 12) {
+                        WaveformBars(isAnimating: false)
 
-                    Text(isTargeted ? "Feed me" : "Drop here")
+                        Text("Media in. Markdown out.")
+                            .font(.title3.weight(.semibold))
+                    }
+
+                    Text(isTargeted ? "Drop to add" : "Drop here")
                         .font(.callout)
                         .foregroundStyle(.secondary)
                         .frame(width: 260, height: 72)
                         .background(
                             isTargeted
                                 ? Color.accentColor.opacity(0.1)
-                                : Color.primary.opacity(0.035),
+                                : Color.primary.opacity(0.06),
                             in: RoundedRectangle(cornerRadius: 16)
                         )
                         .overlay {
@@ -50,37 +58,28 @@ struct ContentView: View {
                                 .stroke(
                                     isTargeted
                                         ? Color.accentColor.opacity(0.65)
-                                        : Color.secondary.opacity(0.22),
+                                        : Color.secondary.opacity(0.4),
                                     lineWidth: 1
                                 )
                         }
                         .scaleEffect(isTargeted ? 0.98 : 1)
                         .animation(.easeOut(duration: 0.18), value: isTargeted)
-                        .padding(.bottom, 12)
 
-                    if let notice {
-                        Text(notice)
-                            .font(.caption)
-                            .foregroundStyle(.red)
-                            .textSelection(.enabled)
+                    VStack(spacing: 8) {
+                        Text("MP4, MOV, M4A, MP3, WAV or a YouTube link · ⌘V to paste")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+
+                        if let notice {
+                            Text(notice)
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                                .textSelection(.enabled)
+                        }
                     }
-
-                    Text("MP4, MOV, M4A, MP3 or WAV, or a YouTube link (drop it or press ⌘V).")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                        .padding(.bottom, 12)
-
-                    Text("If it’s video, I’ll pull out the audio first. For a YouTube link, I’ll download its audio first. Then I’ll transcribe it locally into timestamped Markdown.")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(.bottom, 16)
-
-                    Text("Stick around and watch the magic happen!")
-                        .font(.body.weight(.medium))
                 }
                 .multilineTextAlignment(.center)
-                .frame(maxWidth: 420)
+                .frame(maxWidth: 420, maxHeight: .infinity)
             } else {
                 VStack(spacing: 12) {
                     HStack(spacing: 10) {
@@ -680,7 +679,6 @@ private enum MetricsFormat {
 
 private struct WaveformBars: View {
     let isAnimating: Bool
-    let showsPlus: Bool
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -702,15 +700,6 @@ private struct WaveformBars: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(width: 68, height: 52)
-        .overlay(alignment: .topTrailing) {
-            if showsPlus {
-                Image(systemName: "plus.circle.fill")
-                    .font(.system(size: 18, weight: .medium))
-                    .foregroundStyle(.tint)
-                    .background(Circle().fill(.background))
-                    .offset(x: 5, y: -3)
-            }
-        }
         .accessibilityHidden(true)
     }
 
