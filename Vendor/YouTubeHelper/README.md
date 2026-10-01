@@ -37,10 +37,13 @@ Contents/Resources/ytdlp_launcher.py
   `meriyah` and MIT-licensed code from `astring` (see yt-dlp's `THIRD_PARTY_LICENSES.txt`).
 - The PyInstaller-bundled executables (`yt-dlp_macos`, `yt-dlp_macos.zip`) include GPLv3+ code
   and are licensed as a combined work under GPLv3+. They are **not** used here.
-- CPython is under the Python Software Foundation licence and the interpreter statically links
-  OpenSSL. Python's `LICENSE.txt` is already included in the bundled standard library
-  (`python-home/lib/python3.13/LICENSE.txt`). The OpenSSL licence text and a user-facing notice
-  are still missing and need to be added before a public release.
+- CPython is under the Python Software Foundation licence. The interpreter statically links
+  OpenSSL 3 (Apache-2.0), expat, libffi, mpdecimal, libuuid, bzip2, liblzma and SQLite
+  (per `PYTHON.json` of the pinned python-build-standalone archive).
+- `THIRD_PARTY_NOTICES.txt` reproduces every licence text that has to accompany the app. It is
+  shipped to users as the About panel's credits: `LocalTranscriber/Credits.rtf` is generated
+  from it (`textutil -convert rtf -font Menlo -fontsize 10 Vendor/YouTubeHelper/THIRD_PARTY_NOTICES.txt
+  -output LocalTranscriber/Credits.rtf`). Regenerate both when the pinned Python or yt-dlp changes.
 
 ## Updating
 
