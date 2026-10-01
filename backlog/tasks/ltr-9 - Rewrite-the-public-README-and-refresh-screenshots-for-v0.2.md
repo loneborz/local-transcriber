@@ -1,11 +1,11 @@
 ---
 id: LTR-9
 title: Rewrite the public README and refresh screenshots for v0.2
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-01 16:58'
-updated_date: '2026-10-01 17:16'
+updated_date: '2026-10-01 17:18'
 labels: []
 dependencies:
   - LTR-8
@@ -20,16 +20,16 @@ The public README still describes the v0.1 single-file app: its screenshots show
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 README.md opens with the title, one-sentence product statement (media or URL -> local transcript package) and a current screenshot of the running app
-- [ ] #2 README answers what it is, the workflow, supported inputs, what it produces, what is local versus network-dependent, how to build and run, key technical decisions and current limitations
-- [ ] #3 The YouTube path is described accurately: transcription is local; the media is downloaded over the network; the helper is arm64 Python 3.13 plus pinned yt-dlp with no runtime self-update; Intel support, notarization and a public release artifact are not claimed
-- [ ] #4 The README does not claim summarization, RAG, knowledge management, cloud transcription or silent transcript rewriting, and does not claim the whole app works offline when URLs are used
-- [ ] #5 Sample Markdown and source.json in the README match what the current build actually writes
-- [ ] #6 Screenshots in docs/screenshots are captured from the real current build (refined empty state and a representative queue state), contain no personal data, and replace the outdated v0.1 images; no UI is altered for the screenshots
-- [ ] #7 Backlog mechanics and agent operating rules are not part of the main product story; any development notes are short and link to existing docs instead of duplicating them
-- [ ] #8 GitHub About metadata (description, topics, homepage) is reviewed and recommendations are reported but not applied
-- [ ] #9 Only documentation and screenshot assets (and this task file) change; no file under LocalTranscriber/, Vendor/ or LocalTranscriber.xcodeproj changes
-- [ ] #10 All README links and relative image paths resolve, and the screenshots render at the README size
+- [x] #1 README.md opens with the title, one-sentence product statement (media or URL -> local transcript package) and a current screenshot of the running app
+- [x] #2 README answers what it is, the workflow, supported inputs, what it produces, what is local versus network-dependent, how to build and run, key technical decisions and current limitations
+- [x] #3 The YouTube path is described accurately: transcription is local; the media is downloaded over the network; the helper is arm64 Python 3.13 plus pinned yt-dlp with no runtime self-update; Intel support, notarization and a public release artifact are not claimed
+- [x] #4 The README does not claim summarization, RAG, knowledge management, cloud transcription or silent transcript rewriting, and does not claim the whole app works offline when URLs are used
+- [x] #5 Sample Markdown and source.json in the README match what the current build actually writes
+- [x] #6 Screenshots in docs/screenshots are captured from the real current build (refined empty state and a representative queue state), contain no personal data, and replace the outdated v0.1 images; no UI is altered for the screenshots
+- [x] #7 Backlog mechanics and agent operating rules are not part of the main product story; any development notes are short and link to existing docs instead of duplicating them
+- [x] #8 GitHub About metadata (description, topics, homepage) is reviewed and recommendations are reported but not applied
+- [x] #9 Only documentation and screenshot assets (and this task file) change; no file under LocalTranscriber/, Vendor/ or LocalTranscriber.xcodeproj changes
+- [x] #10 All README links and relative image paths resolve, and the screenshots render at the README size
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -50,4 +50,12 @@ README facts checked against source: language list (TranscriptionLanguage), rend
 Queue screenshot replaced (docs/screenshots/queue.png, 640x491 PNG) with a window-only capture (screencapture -l, title bar included, no cursor/desktop) of the real completed queue open in the running Debug build: summary '2 succeeded · 0 failed · 2h 55m of media · processed in 1m 52s · 94× realtime'; hello.m4a (M4A · 2:05:39, 91× realtime, saved hello.md); YouTube job 'Python Machine Learning Tutorial (Data Science)' (49:43, 102× realtime); English selected, Desktop output folder, source-package checkbox visible. App brought to front for an active-window capture; queue, prefs, outputs untouched, app left running. Reviewed for personal information: only the approved filenames, public YouTube title/channel and 'Desktop' label are visible. Legibility checked on a 440 px downscale (sips): headings, summary and row titles clear, the small per-row detail text is readable but small. Not verified: rendering in an actual GitHub README preview. README alt text unchanged (still accurate). Status and criteria unchanged.
 
 Screenshot presentation revised after GitHub review (side-by-side 440 px images were too small and wrapped): stacked Markdown images, queue screenshot first as the primary visual with a one-line caption, empty-state screenshot at the start of Inputs. Both re-captured natively (not upscaled) from the real running build at an 860x540 pt window, window-only screencapture -l, active window: queue.png and empty-state.png are 860x540 PNG. Queue capture is the real completed queue (2 succeeded, 2h 55m of media, 94x realtime; hello.m4a and the public YouTube job). To reach the empty state the queue was cleared after the queue capture. Prefs/window frame restored, app quit. Status and criteria unchanged.
+
+Human review of the GitHub-rendered branch page (claude/ltr-9-github-page) passed: the completed queue works as the primary visual and is readable, the caption is useful, the flow from identity to visual proof to 'What it does' is natural, the empty-state screenshot is well placed under Inputs, and the stacked layout is approved. Link check: README relative links (AGENTS.md, backlog/, doc-1, Vendor/YouTubeHelper/README.md, LICENSE, both screenshots) return HTTP 200 on the branch; both images downloaded from GitHub raw are 860x540 and byte-identical to the local files. source.json sample keys match SourcePackageManifest fields; Markdown sample matches TranscriptMarkdownRenderer and a real hello.md produced this session. Diff vs main touches no file under LocalTranscriber/, Vendor/ or LocalTranscriber.xcodeproj. GitHub metadata reviewed, recommendations reported, nothing applied.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Rewrote the public README for the current v0.2 app (queue, per-job and queue-level language, output and source packages, local-versus-network table, YouTube helper facts and caveats, build steps, limitations, third-party notes) and replaced the outdated v0.1 screenshots with native 860x540 captures of the real build: the completed queue as the primary visual and the LTR-8 empty state under Inputs. Verified against source (renderer, manifest, languages, deployment target), by running the app for captures, by a link check on the pushed branch, and by human review of the GitHub-rendered branch page. Documentation and assets only; no product, Vendor or project changes; GitHub metadata recommendations reported, not applied. Not verified: clean-clone build on another Mac, Intel, notarization (none claimed). Not yet merged to main.
+<!-- SECTION:FINAL_SUMMARY:END -->
