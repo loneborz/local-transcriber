@@ -4,7 +4,7 @@
 
 Local Transcriber is a native macOS app that turns audio, video and YouTube links into timestamped Markdown transcripts. Speech recognition runs on your Mac with Apple's on-device speech stack; there is no cloud transcription service, no account and no model picker.
 
-![Local Transcriber after a run: the language and output-folder controls, a summary line, and two completed jobs (a local audio file and a YouTube link) with their saved Markdown files](docs/screenshots/queue.png)
+![Local Transcriber after a run: the language and output-folder controls, a summary line, and two completed jobs (a local audio file and a YouTube link) with their saved Markdown files](https://transcribe.wavesweb.nl/assets/queue.png)
 
 *A finished queue: one local file and one YouTube link, transcribed in sequence and saved to the output folder.*
 
@@ -29,7 +29,7 @@ The product boundary is deliberate: `media or URL -> local transcript package`. 
 
 ## Inputs
 
-![Local Transcriber's empty state: a waveform mark, the tagline "Media in. Markdown out.", a drop target and a one-line list of supported inputs](docs/screenshots/empty-state.png)
+![Local Transcriber's empty state: a waveform mark, the tagline "Media in. Markdown out.", a drop target and a one-line list of supported inputs](https://transcribe.wavesweb.nl/assets/empty-state.png)
 
 - **Local files:** MP4, MOV, M4A, MP3 and WAV. Audio files are transcribed directly; for video, AVFoundation first extracts the audio to a temporary M4A.
 - **YouTube links:** `youtube.com` (including `www.`, `m.` and `music.`) and `youtu.be` watch, shorts, live and embed links. Playlist parameters are dropped, so a link transcribes one video.
@@ -145,8 +145,6 @@ Or open `LocalTranscriber.xcodeproj` in Xcode and run the `LocalTranscriber` sch
 - The YouTube helper is an isolated, sandbox-inheriting child process, kept separate from the transcription code.
 - Output folder, default language and the source-package option are remembered in `UserDefaults`.
 
-Architecture, data flow, the helper's sandbox and signing model, and the measured facts behind them are written up in the engineering reference at [`backlog/docs/doc-1 - LocalTranscriber-Engineering-Reference.md`](backlog/docs/doc-1%20-%20LocalTranscriber-Engineering-Reference.md).
-
 ## Current limitations
 
 - Requires macOS 26 or later.
@@ -173,10 +171,6 @@ An early, working macOS project. The queue, language handling, automatic output,
 - [CPython](https://www.python.org/) 3.13 from [python-build-standalone](https://github.com/astral-sh/python-build-standalone) (Python Software Foundation licence), which statically links OpenSSL.
 
 The exact versions and checksums are listed in [`Vendor/YouTubeHelper/README.md`](Vendor/YouTubeHelper/README.md). The OpenSSL licence text and an in-app notice are not included yet, and are needed before any binary distribution.
-
-## Contributing
-
-This repository also carries its task history in [`backlog/`](backlog/) and working rules for coding agents in [`AGENTS.md`](AGENTS.md); neither is needed to build or use the app.
 
 ## License
 
