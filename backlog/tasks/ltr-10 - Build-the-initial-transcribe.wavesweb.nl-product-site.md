@@ -1,11 +1,11 @@
 ---
 id: LTR-10
 title: Build the initial transcribe.wavesweb.nl product site
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-01 17:38'
-updated_date: '2026-10-01 18:18'
+updated_date: '2026-10-01 18:52'
 labels:
   - website
 dependencies: []
@@ -37,21 +37,21 @@ Non-goals:
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 All work is done on a branch, not main; nothing is committed to main, pushed to main or merged without separate explicit approval, and the report states which of changed locally, verified locally, committed, pushed and deployed applies
-- [ ] #2 Only files under website/ (and this task file) are added or changed; no file under LocalTranscriber/, Vendor/, LocalTranscriber.xcodeproj or README.md changes, and website/ contains nothing that should not be public
-- [ ] #3 The site is static HTML and CSS (at most a small inline script for progressive enhancement) with no framework, build step or package manifest, and makes no request to any origin other than its own; fonts are system fonts or self-hosted files
-- [ ] #4 The layout follows the ChatMD site structure (index.html, styles.css, optional fonts/, favicon and apple-touch icon, og.png, canonical and Open Graph metadata, skip link, sticky nav, banded sections) but contains no ChatMD name, copy, terminal block or CLI styling, and looks native to macOS
-- [ ] #5 The hero headline is exactly "Media in. Markdown out." with a one-sentence statement (media or URL -> local transcript package) and the real queue screenshot from docs/screenshots/queue.png in a window frame
-- [ ] #6 The page explains media or YouTube link -> one sequential queue -> on-device transcription -> timestamped Markdown, including the supported inputs, per-job language and the ten languages, all matching README.md
-- [ ] #7 A local-versus-network section states that transcription, audio extraction and file writing happen on the Mac, and that YouTube audio download and Apple language assets are the network steps; it does not claim the app is fully offline when links are used
-- [ ] #8 A source-package section shows the folder layout (audio.m4a, source.json, transcript.md) and a sample transcript and source.json that match what the current build writes, as in README.md
-- [ ] #9 A limitations section states honestly: macOS 26 or later; YouTube helper is Apple silicon only; not notarized and no release; pinned yt-dlp can break as YouTube changes; YouTube only, 30-minute download limit; early project
-- [ ] #10 The call to action is "View on GitHub" (https://github.com/loneborz/local-transcriber) and "Build from source" (with the clone and xcodebuild steps from the README); there is no download button and no statement or implication that a release exists
-- [ ] #11 The copy makes no claim of summarization, search, RAG, knowledge management, cloud transcription, automatic correction, Intel support or distribution, and uses no AI marketing language; each factual claim is traced to README.md, doc-1 or the source in the implementation notes
-- [ ] #12 Screenshots are the real docs/screenshots images (queue.png, empty-state.png) copied into website/, shown at or below their native 860x540 size with width/height attributes and meaningful alt text, never upscaled
-- [ ] #13 The page is verified in a real browser from a local static server at roughly 390, 768 and 1280 px wide in light and dark appearance: no horizontal scroll, no console errors, readable text contrast, working keyboard focus and skip link, and prefers-reduced-motion respected
-- [ ] #14 Every internal link, anchor, asset path and external link resolves, and all paths are relative so the site works with website/ as the document root; title, description, canonical (https://transcribe.wavesweb.nl/) and a 1200x630 og.png are present
-- [ ] #15 Publishing to production happens only after the user approves the merge; after that, the live https://transcribe.wavesweb.nl/ is checked (HTTPS 200, expected title and assets, record state before and after) and the result reported separately from local verification
+- [x] #1 All work is done on a branch, not main; nothing is committed to main, pushed to main or merged without separate explicit approval, and the report states which of changed locally, verified locally, committed, pushed and deployed applies
+- [x] #2 Only files under website/ (and this task file) are added or changed; no file under LocalTranscriber/, Vendor/, LocalTranscriber.xcodeproj or README.md changes, and website/ contains nothing that should not be public
+- [x] #3 The site is static HTML and CSS (at most a small inline script for progressive enhancement) with no framework, build step or package manifest, and makes no request to any origin other than its own; fonts are system fonts or self-hosted files
+- [x] #4 The layout follows the ChatMD site structure (index.html, styles.css, optional fonts/, favicon and apple-touch icon, og.png, canonical and Open Graph metadata, skip link, sticky nav, banded sections) but contains no ChatMD name, copy, terminal block or CLI styling, and looks native to macOS
+- [x] #5 The hero headline is exactly "Media in. Markdown out." with a one-sentence statement (media or URL -> local transcript package) and the real queue screenshot from docs/screenshots/queue.png in a window frame
+- [x] #6 The page explains media or YouTube link -> one sequential queue -> on-device transcription -> timestamped Markdown, including the supported inputs, per-job language and the ten languages, all matching README.md
+- [x] #7 A local-versus-network section states that transcription, audio extraction and file writing happen on the Mac, and that YouTube audio download and Apple language assets are the network steps; it does not claim the app is fully offline when links are used
+- [x] #8 A source-package section shows the folder layout (audio.m4a, source.json, transcript.md) and a sample transcript and source.json that match what the current build writes, as in README.md
+- [x] #9 A limitations section states honestly: macOS 26 or later; YouTube helper is Apple silicon only; not notarized and no release; pinned yt-dlp can break as YouTube changes; YouTube only, 30-minute download limit; early project
+- [x] #10 The call to action is "View on GitHub" (https://github.com/loneborz/local-transcriber) and "Build from source" (with the clone and xcodebuild steps from the README); there is no download button and no statement or implication that a release exists
+- [x] #11 The copy makes no claim of summarization, search, RAG, knowledge management, cloud transcription, automatic correction, Intel support or distribution, and uses no AI marketing language; each factual claim is traced to README.md, doc-1 or the source in the implementation notes
+- [x] #12 Screenshots are the real docs/screenshots images (queue.png, empty-state.png) copied into website/, shown at or below their native 860x540 size with width/height attributes and meaningful alt text, never upscaled
+- [x] #13 The page is verified in a real browser from a local static server at roughly 390, 768 and 1280 px wide in light and dark appearance: no horizontal scroll, no console errors, readable text contrast, working keyboard focus and skip link, and prefers-reduced-motion respected
+- [x] #14 Every internal link, anchor, asset path and external link resolves, and all paths are relative so the site works with website/ as the document root; title, description, canonical (https://transcribe.wavesweb.nl/) and a 1200x630 og.png are present
+- [x] #15 Publishing to production happens only after the user approves the merge; after that, the live https://transcribe.wavesweb.nl/ is checked (HTTPS 200, expected title and assets, record state before and after) and the result reported separately from local verification
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -64,6 +64,8 @@ Non-goals:
 5. Copy docs/screenshots/queue.png and empty-state.png into website/assets/ unmodified (860x540, width/height set, never upscaled). Compose og.png (1200x630) with headless Chrome from an HTML scratch page in the scratchpad: headline, mark and the existing queue.png in a frame; no new capture, no invented UI.
 6. Verify locally with python3 -m http.server and headless Chrome at 390/768/1280 in light and dark: screenshots, horizontal overflow and console errors via DevTools protocol, link/asset/anchor resolution script, grep for banned claims and ChatMD leftovers, contrast spot-check, reduced-motion and focus styles reviewed.
 7. Confirm git diff touches only website/ and the task file; stop uncommitted for review; no merge, push or deploy.
+
+8. Revision after human review (approved): hero eyebrow removed; Source packages, Limitations and Build from source tightened; the Terminal-style build panel replaced by three short steps (the README xcodebuild command is no longer shown on the page; the README link carries it). Closed by fast-forwarding main (production gate) after commits 3e6c462 and ddface9, then live verification.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -81,4 +83,12 @@ NOT PASSING: criterion 15 requires HTTPS to return 200. Over a verified TLS conn
 PRODUCTION HTTPS RE-VERIFICATION (2026-10-01 18:13 UTC), normal TLS verification only (no -k, no certificate bypass): certificate for CN=transcribe.wavesweb.nl (SAN transcribe.wavesweb.nl), issuer Let's Encrypt YE2, valid 2026-10-01 to 2026-12-30; openssl verify return code 0 (ok); curl ssl_verify_result=0, HTTP/2 200, content-length 16534 for index.html; title "Local Transcriber - Media in. Markdown out."; http:// returns 301 to https://; index.html, styles.css, favicon.svg/png, apple-touch-icon.png, og.png, assets/queue.png and assets/empty-state.png each return 200 over verified HTTPS and are byte-identical to commit 3e6c462. This resolves the blocker recorded above for criterion 15. The task stays In Progress with criteria unchecked: a visual polish pass is still approved before final acceptance.
 
 POLISH PASS (local, uncommitted, not deployed): removed the hero eyebrow and moved "native macOS app" into the lead sentence; Source packages tightened to a compact heading, short intro and one combined example card (folder tree + source.json) with the notes below it; Limitations replaced by a compact "Current limitations" grouped list plus "Not in scope" chips; Build from source replaced the Terminal panel with three short steps and View on GitHub / Read build instructions (README#build-and-run). Dead CSS (.two-col, pre.plain, .plain-list) removed; new CSS is scoped to .band-compact, .pkg, .facts, .scope, .build-steps, .nowrap. Verified locally at 390/768/1280 px light and dark: no horizontal overflow, no console or network errors, no external requests. Not re-verified in production.
+
+FINAL PRODUCTION VERIFICATION (2026-10-01 18:50 UTC), commit ddface9 on main (fast-forward from 3e6c462, pushed normally, no force; the Plesk webhook deployed within seconds). BEFORE: live site was the 3e6c462 version (hero eyebrow present, Terminal panel present). AFTER, over verified TLS (no -k, no bypass; openssl return code 0, curl ssl_verify_result=0): HTTP/2 200; http:// returns 301 to https://transcribe.wavesweb.nl/; title "Local Transcriber - Media in. Markdown out."; hero lead begins "Local Transcriber is a native macOS app that turns" and the eyebrow is gone; Source packages is the combined pkg card; "Current limitations" is the compact list with Not in scope chips; Build from source has no Terminal panel or git clone block, uses three steps and the README#build-and-run link; no download button. index.html, styles.css, favicons, apple-touch-icon, og.png, queue.png and empty-state.png each return 200 and are byte-identical to ddface9. 9 anchors resolve; all local assets, canonical, og:image and the GitHub repo/README#build-and-run/LICENSE and yt-dlp links return 200. Headless Chrome on the live URL at 390/768/1280 px, light and dark: no horizontal overflow, no console or network errors, no external requests, both screenshots load (860x540), correct light/dark backgrounds; representative renders viewed (1280 dark hero, 390 light build). Exposure: /README.md, /CLAUDE.md, /AGENTS.md, /LICENSE, /backlog/, /LocalTranscriber/, /LocalTranscriber.xcodeproj/..., /Vendor/, /docs/..., /website/index.html return 404; /.git/config, /.htaccess, /.env return 403; ../ traversal returns 400. Files changed vs pre-LTR-10 main (a9be3d9): only website/ (8 files) and this task file. Deviation to note for criterion 10: the human-approved polish replaced the page's xcodebuild command block with plain clone / open LocalTranscriber.xcodeproj / run scheme steps, so the "xcodebuild steps" wording is met by the README link, by explicit user decision.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Built and shipped the initial transcribe.wavesweb.nl product site: a static one-page site under website/ (index.html, styles.css, icons, og.png, two real app screenshots), no framework, build step, script or external request, with system fonts and light/dark via prefers-color-scheme. It carries the hero "Media in. Markdown out.", the media/YouTube -> queue -> timestamped Markdown flow, a local-versus-network table, source packages, current limitations and not-in-scope, and build-from-source steps with View on GitHub / Read build instructions; no release or download is claimed. Developed on claude/ltr-10-product-site, reviewed by a human twice (first render, then a polish pass), then fast-forwarded to main (3e6c462, then ddface9) for Plesk auto-deploy. Verified locally in headless Chrome at 390/768/1280 px in light and dark, and live over verified Let's Encrypt TLS: 200, 301 from http, byte-identical assets, working anchors and links, no console errors, no repository files exposed. Notes: criterion 10 is met via the approved polish (clone/open/run-scheme steps plus README link instead of an xcodebuild block); 860 px screenshots look soft on retina (out of scope); Safari/Firefox and real phones were not tested; the TLS certificate expires 2026-12-30 (host-managed).
+<!-- SECTION:FINAL_SUMMARY:END -->
