@@ -94,9 +94,7 @@ struct ContentView: View {
                 VStack(spacing: 12) {
                     HStack(spacing: 10) {
                         Button("Transcribe") {
-                            // No destination yet: ask once; cancelling starts nothing.
-                            guard queue.destination.isReady || queue.destination.choose() else { return }
-                            queue.start()
+                            startQueue()
                         }
                         .buttonStyle(.borderedProminent)
                         .controlSize(.large)
@@ -113,6 +111,8 @@ struct ContentView: View {
                     destinationControl
 
                     sourcePackageToggle
+
+                    summaryView
 
                     Text(isTargeted || isQueueTargeted ? "Feed me" : "Drop more files or links to add them to the queue")
                         .font(.subheadline)
@@ -134,6 +134,9 @@ struct ContentView: View {
                                     }
                                 }, onRemove: {
                                     queue.remove(job)
+                                }, onRetry: {
+                                    queue.retry(job)
+                                    startQueue()
                                 })
 
                                 if job.id != queue.jobs.last?.id {
@@ -222,6 +225,48 @@ struct ContentView: View {
             .font(.subheadline)
             .disabled(queue.isProcessing)
             .help("Each YouTube link gets a folder named after its video ID with audio.m4a, source.json and transcript.md. Local files are saved as before.")
+    }
+
+    // No destination yet: ask once; cancelling starts nothing.
+    private func startQueue() {
+        guard queue.destination.isReady || queue.destination.choose() else { return }
+        queue.start()
+    }
+
+    // Shown once any job has finished: counts, totals and where output goes.
+    @ViewBuilder
+    private var summaryView: some View {
+        let summary = queue.summary
+        if summary.hasFinishedJobs {
+            VStack(spacing: 2) {
+                Text(summaryText(for: summary))
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+
+                if case .ready(let folder) = queue.destination.status {
+                    Button("Show output folder: \(folder.lastPathComponent)") {
+                        NSWorkspace.shared.activateFileViewerSelecting([folder])
+                    }
+                    .buttonStyle(.link)
+                }
+            }
+            .font(.caption)
+        }
+    }
+
+    private func summaryText(for summary: BatchSummary) -> String {
+        var parts = ["\(summary.succeeded) succeeded", "\(summary.failed) failed"]
+        if let media = MetricsFormat.mediaDuration(summary.mediaDuration) {
+            parts.append("\(media) of media")
+            parts.append("processed in \(MetricsFormat.processingDuration(summary.processingDuration))")
+        }
+        if let speed = MetricsFormat.realtimeSpeed(
+            mediaDuration: summary.mediaDuration,
+            processingDuration: summary.processingDuration
+        ) {
+            parts.append("\(speed) realtime")
+        }
+        return parts.joined(separator: " · ")
     }
 
     private func addDroppedFiles(_ urls: [URL]) -> Bool {
@@ -368,6 +413,7 @@ private struct JobRow: View {
     let job: TranscriptionJob
     let onSave: () -> Void
     let onRemove: () -> Void
+    let onRetry: () -> Void
 
     var body: some View {
         HStack(alignment: .center, spacing: 10) {
@@ -435,6 +481,11 @@ private struct JobRow: View {
 
             if case .complete = job.state, job.saveError != nil, job.savedTranscriptURL == nil {
                 Button("Save Transcript…", action: onSave)
+                    .controlSize(.small)
+            }
+
+            if job.canRetry {
+                Button("Retry", action: onRetry)
                     .controlSize(.small)
             }
 
@@ -535,28 +586,31 @@ private struct JobRow: View {
     }
 
     private func completionMetrics(for transcript: Transcript, processingDuration: Duration) -> String {
-        let processingTime = formatProcessingDuration(processingDuration)
+        let processingTime = MetricsFormat.processingDuration(processingDuration)
         var text = "Processed in \(processingTime)"
 
-        if let mediaDuration = transcript.duration.flatMap(formatMediaDuration) {
+        if let mediaDuration = transcript.duration.flatMap(MetricsFormat.mediaDuration) {
             text = "\(mediaDuration) processed in \(processingTime)"
         }
 
         if let realtimeSpeed = transcript.duration.flatMap({
-            formatRealtimeSpeed(mediaDuration: $0, processingDuration: processingDuration)
+            MetricsFormat.realtimeSpeed(mediaDuration: $0, processingDuration: processingDuration)
         }) {
             text += " · \(realtimeSpeed) realtime"
         }
 
         return text
     }
+}
 
-    private func formatMediaDuration(_ seconds: TimeInterval) -> String? {
+// Shared by the per-job line and the queue summary so both always agree.
+private enum MetricsFormat {
+    static func mediaDuration(_ seconds: TimeInterval) -> String? {
         guard seconds.isFinite, seconds > 0 else { return nil }
 
         if seconds < 60 {
             let tenths = (seconds * 10).rounded() / 10
-            return "\(formatNumber(tenths, decimals: tenths.rounded() == tenths ? 0 : 1))s"
+            return "\(number(tenths, decimals: tenths.rounded() == tenths ? 0 : 1))s"
         }
 
         guard seconds < Double(Int.max) else { return nil }
@@ -568,12 +622,9 @@ private struct JobRow: View {
             : "\(minutes)m"
     }
 
-    private func formatRealtimeSpeed(
-        mediaDuration: TimeInterval,
-        processingDuration: Duration
-    ) -> String? {
+    static func realtimeSpeed(mediaDuration: TimeInterval, processingDuration: Duration) -> String? {
         guard mediaDuration.isFinite, mediaDuration > 0 else { return nil }
-        let elapsedSeconds = durationSeconds(processingDuration)
+        let elapsedSeconds = seconds(processingDuration)
         guard elapsedSeconds > 0 else { return nil }
 
         let speed = mediaDuration / elapsedSeconds
@@ -581,17 +632,17 @@ private struct JobRow: View {
 
         let rounded = speed >= 20 ? speed.rounded() : (speed * 10).rounded() / 10
         let decimals = speed < 20 && rounded.rounded() != rounded ? 1 : 0
-        return "\(formatNumber(rounded, decimals: decimals))×"
+        return "\(number(rounded, decimals: decimals))×"
     }
 
-    private func formatProcessingDuration(_ duration: Duration) -> String {
-        let seconds = durationSeconds(duration)
+    static func processingDuration(_ duration: Duration) -> String {
+        let seconds = seconds(duration)
         if seconds < 60 {
             let tenths = (seconds * 10).rounded() / 10
-            return "\(formatNumber(tenths, decimals: tenths.rounded() == tenths ? 0 : 1))s"
+            return "\(number(tenths, decimals: tenths.rounded() == tenths ? 0 : 1))s"
         }
 
-        guard seconds < Double(Int.max) else { return "\(formatNumber(seconds, decimals: 0))s" }
+        guard seconds < Double(Int.max) else { return "\(number(seconds, decimals: 0))s" }
         let totalSeconds = Int(seconds.rounded())
         let hours = totalSeconds / 3600
         let minutes = (totalSeconds % 3600) / 60
@@ -602,12 +653,12 @@ private struct JobRow: View {
         return "\(minutes)m \(remainingSeconds)s"
     }
 
-    private func durationSeconds(_ duration: Duration) -> Double {
+    private static func seconds(_ duration: Duration) -> Double {
         let components = duration.components
         return Double(components.seconds) + Double(components.attoseconds) / 1e18
     }
 
-    private func formatNumber(_ value: Double, decimals: Int) -> String {
+    private static func number(_ value: Double, decimals: Int) -> String {
         String(
             format: decimals == 0 ? "%.0f" : "%.1f",
             locale: Locale(identifier: "en_US_POSIX"),
@@ -615,7 +666,7 @@ private struct JobRow: View {
         )
     }
 
-    private func twoDigits(_ value: Int) -> String {
+    private static func twoDigits(_ value: Int) -> String {
         String(format: "%02d", value)
     }
 }

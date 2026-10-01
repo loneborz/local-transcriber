@@ -57,6 +57,23 @@ final class TranscriptionJob: Identifiable {
         if case .waiting = state { return true }
         return false
     }
+
+    // A rejected link fails the same way every time, so only failures of a
+    // real source are worth retrying.
+    var canRetry: Bool {
+        guard case .failed = state else { return false }
+        if case .invalid = source { return false }
+        return true
+    }
+}
+
+struct BatchSummary {
+    var succeeded = 0
+    var failed = 0
+    var mediaDuration: TimeInterval = 0
+    var processingDuration: Duration = .zero
+
+    var hasFinishedJobs: Bool { succeeded + failed > 0 }
 }
 
 @MainActor @Observable
@@ -85,6 +102,34 @@ final class BatchQueue {
     func remove(_ job: TranscriptionJob) {
         guard job.isWaiting else { return }
         jobs.removeAll { $0.id == job.id }
+    }
+
+    // Totals over the jobs currently in the queue. Duration and processing
+    // time come from Complete jobs only; downloading is not processing.
+    var summary: BatchSummary {
+        var summary = BatchSummary()
+        for job in jobs {
+            switch job.state {
+            case .complete(let transcript, let processingDuration):
+                summary.succeeded += 1
+                summary.mediaDuration += transcript.duration ?? 0
+                summary.processingDuration += processingDuration
+            case .failed:
+                summary.failed += 1
+            default:
+                break
+            }
+        }
+        return summary
+    }
+
+    // Returns one Failed job to Waiting. Complete jobs are never touched, so
+    // a retry cannot repeat finished work. The caller starts the queue.
+    func retry(_ job: TranscriptionJob) {
+        guard job.canRetry else { return }
+        job.metadata = nil
+        job.saveError = nil
+        job.state = .waiting
     }
 
     // Idle means no batch is running, so any mix of Waiting, Complete and
