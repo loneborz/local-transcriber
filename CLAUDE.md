@@ -25,6 +25,27 @@
 
 **Done:** do not mark a Backlog task Done until its acceptance criteria are verified and the user has accepted the result.
 
+**Engineering reference:** architecture, data flow, the YouTube helper's sandbox/signing model and the persistent state are in the Backlog document `doc-1` (`backlog doc view doc-1`). Read it before changing queue, output or helper code. Do not duplicate it here.
+
+**Build and run**
+- Build: `xcodebuild -project LocalTranscriber.xcodeproj -scheme LocalTranscriber -destination 'platform=macOS' build`. For a Release check add `-configuration Release -derivedDataPath <scratch dir>`. There are no automated tests; behavior is verified by running the real app.
+- Find the product with `xcodebuild … -showBuildSettings | awk -F' = ' '/ BUILT_PRODUCTS_DIR/{print $2}'`. DerivedData is per checkout path, so a git worktree builds its own separate copy.
+- Launch exactly the build you made: `pkill -x LocalTranscriber`, then `open "<BUILT_PRODUCTS_DIR>/LocalTranscriber.app"` by full path, then confirm with `ps -o command= -p "$(pgrep -x LocalTranscriber)"` that the running path is the one you built. Do not open the app by name: other copies (other DerivedData folders, scratch builds) may be registered with Launch Services and open instead. Every build shares one bundle id, so preferences, the output-folder bookmark and the sandbox container are shared too.
+- Before `git checkout main`, run `git worktree list`: `main` may be checked out in another worktree.
+
+**Runtime verification (reusable lessons)**
+- Get the app's pid with `pgrep -x LocalTranscriber`. Prefer element-based clicks (text and role) over coordinates; a row scrolled outside the window cannot be clicked by coordinates.
+- Queue input with the clipboard and Cmd-V: `printf '<url>' | pbcopy` (several lines queue several links) or `osascript -e 'set the clipboard to (POSIX file "<path>")'` for a file.
+- Synthetic mouse drags only work if the pointer presses and holds (about 0.7 s) before moving, and the source and target are on the same display. A browser address-bar URL must be selected first, then dragged.
+- Do not script other apps (AppleScript to Chrome raises a macOS Automation prompt). Never click such a prompt on the user's behalf.
+- Test runs write real files into the user's configured output folder. Snapshot the folder with `ls` first, afterwards delete only what the test created, and restore anything you changed (output folder, language, the source-package checkbox). Preference changes show up in `~/Library/Containers/nl.wavesweb.LocalTranscriber/Data/Library/Preferences/` a moment later, so re-read before concluding a toggle failed.
+- YouTube runs need the network. Check helper cleanup in `~/Library/Containers/nl.wavesweb.LocalTranscriber/Data/tmp/LocalTranscriber-acquisition` and with `ps -axo pid,ppid,command | grep python3.13`.
+
+**Repository conventions that are easy to break**
+- Do not put YouTube logic in `TranscriptionService.swift`; do not combine `.withoutOverwriting` with `.atomic` in `Data.write`.
+- Files under `LocalTranscriber/` join the app automatically. Vendored helper files live in `Vendor/YouTubeHelper/` and are installed only by the "Embed YouTube helper" build phase in `project.pbxproj`. Xcode may reformat that hand-written entry when building; revert such noise instead of committing it.
+- Helper rules: the only Mach-O is `Contents/Helpers/python3.13`, signed with `app-sandbox` + `inherit` only. Never add `network.client` or other entitlements to it, and keep Python data in `Resources`.
+- Run the vendored Python with `PYTHONDONTWRITEBYTECODE=1`, or it litters `Vendor/` with `__pycache__`.
 
 <!-- BACKLOG.MD GUIDELINES START -->
 <!-- backlog.md-instructions-version: 1.53.0 -->

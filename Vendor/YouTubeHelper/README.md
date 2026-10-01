@@ -38,8 +38,9 @@ Contents/Resources/ytdlp_launcher.py
 - The PyInstaller-bundled executables (`yt-dlp_macos`, `yt-dlp_macos.zip`) include GPLv3+ code
   and are licensed as a combined work under GPLv3+. They are **not** used here.
 - CPython is under the Python Software Foundation licence and the interpreter statically links
-  OpenSSL. Those licence texts still need to be shipped with a public release. This has not been
-  done yet.
+  OpenSSL. Python's `LICENSE.txt` is already included in the bundled standard library
+  (`python-home/lib/python3.13/LICENSE.txt`). The OpenSSL licence text and a user-facing notice
+  are still missing and need to be added before a public release.
 
 ## Updating
 
