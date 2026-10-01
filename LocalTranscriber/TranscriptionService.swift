@@ -263,9 +263,21 @@ struct TranscriptSegment: Sendable {
 }
 
 enum TranscriptMarkdownRenderer {
-    static func render(_ transcript: Transcript) -> String {
-        let sourceName = transcript.sourceURL.lastPathComponent
-        var metadata = ["**Source:** `\(sourceName)`"]
+    // `source` is given for source packages, where the transcript describes
+    // the video itself (title, link, channel, date) instead of the local file
+    // the audio happened to be downloaded into.
+    static func render(_ transcript: Transcript, source: SourceMetadata? = nil) -> String {
+        var metadata: [String]
+        var title: String
+        if let source {
+            title = source.title.split(whereSeparator: \.isNewline).joined(separator: " ")
+            metadata = ["**Source:** \(source.url.absoluteString)"]
+            if let channel = source.channel { metadata.append("**Channel:** \(channel)") }
+            if let published = source.uploadDate { metadata.append("**Published:** \(published)") }
+        } else {
+            title = transcript.sourceURL.deletingPathExtension().lastPathComponent
+            metadata = ["**Source:** `\(transcript.sourceURL.lastPathComponent)`"]
+        }
 
         if let duration = transcript.duration {
             metadata.append("**Duration:** \(timestamp(duration.rounded()))")
@@ -274,7 +286,7 @@ enum TranscriptMarkdownRenderer {
         metadata.append("**Language:** \(transcript.localeIdentifier)")
         metadata.append("**Engine:** Apple SpeechAnalyzer")
 
-        var markdown = "# \(transcript.sourceURL.deletingPathExtension().lastPathComponent)\n\n"
+        var markdown = "# \(title)\n\n"
         markdown += metadata.joined(separator: "  \n")
         markdown += "\n\n## Transcript"
 

@@ -62,6 +62,9 @@ final class TranscriptionJob: Identifiable {
 @MainActor @Observable
 final class BatchQueue {
     private(set) var jobs: [TranscriptionJob] = []
+    // UserDefaults key of the "save YouTube links as source packages" mode.
+    static let sourcePackageModeKey = "sourcePackageMode"
+
     let destination = OutputDestination()
     private var isRunning = false
 
@@ -155,10 +158,26 @@ final class BatchQueue {
     // in memory, and the error is recorded for the manual Save fallback.
     private func save(_ transcript: Transcript, for job: TranscriptionJob, mediaURL: URL) {
         do {
-            job.savedTranscriptURL = try destination.write(
-                TranscriptMarkdownRenderer.render(transcript),
-                baseName: mediaURL.deletingPathExtension().lastPathComponent
-            )
+            if UserDefaults.standard.bool(forKey: Self.sourcePackageModeKey),
+               case .youtube(let videoID, _) = job.source,
+               let metadata = job.metadata {
+                // Source package: only for YouTube jobs. The audio is copied out
+                // of the temporary directory before the caller removes it.
+                job.savedTranscriptURL = try destination.writePackage(
+                    videoID: videoID,
+                    audio: mediaURL,
+                    manifest: SourcePackageManifest(
+                        metadata: metadata,
+                        transcriptionLocale: transcript.localeIdentifier
+                    ).encoded(),
+                    transcript: TranscriptMarkdownRenderer.render(transcript, source: metadata)
+                )
+            } else {
+                job.savedTranscriptURL = try destination.write(
+                    TranscriptMarkdownRenderer.render(transcript),
+                    baseName: mediaURL.deletingPathExtension().lastPathComponent
+                )
+            }
             job.saveError = nil
         } catch {
             job.saveError = error.localizedDescription

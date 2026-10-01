@@ -118,6 +118,53 @@ final class OutputDestination {
         throw OutputError.tooManyCollisions
     }
 
+    // Writes a source package: a new `<videoID>/` folder holding the audio,
+    // `source.json` and `transcript.md`. An existing folder is never reused or
+    // overwritten; the next free `<videoID> 2`, `<videoID> 3`, … is created
+    // instead. If any step fails, the folder created here is removed again so
+    // no half-written package is left behind.
+    func writePackage(videoID: String, audio: URL, manifest: Data, transcript: String) throws -> URL {
+        guard case .ready(let folder) = status else { throw OutputError.notConfigured }
+
+        let didStart = folder.startAccessingSecurityScopedResource()
+        defer { if didStart { folder.stopAccessingSecurityScopedResource() } }
+
+        let fileManager = FileManager.default
+        for attempt in 1...9999 {
+            let name = attempt == 1 ? videoID : "\(videoID) \(attempt)"
+            let package = folder.appendingPathComponent(name, isDirectory: true)
+            do {
+                try fileManager.createDirectory(at: package, withIntermediateDirectories: false)
+            } catch let error as CocoaError where error.code == .fileWriteFileExists {
+                continue
+            } catch {
+                refresh()
+                throw error
+            }
+
+            do {
+                try fileManager.copyItem(
+                    at: audio,
+                    to: package.appendingPathComponent(SourcePackageManifest.audioFilename)
+                )
+                try manifest.write(
+                    to: package.appendingPathComponent(SourcePackageManifest.manifestFilename),
+                    options: .withoutOverwriting
+                )
+                try Data(transcript.utf8).write(
+                    to: package.appendingPathComponent(SourcePackageManifest.transcriptFilename),
+                    options: .withoutOverwriting
+                )
+                return package
+            } catch {
+                try? fileManager.removeItem(at: package)
+                refresh()
+                throw error
+            }
+        }
+        throw OutputError.tooManyCollisions
+    }
+
     @discardableResult
     private func storeBookmark(for url: URL) -> Error? {
         do {

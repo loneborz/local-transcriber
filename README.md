@@ -80,6 +80,38 @@ The saved Markdown includes the source, duration when available, selected locale
 Transcript text...
 ```
 
+### Source packages (YouTube links)
+
+Turn on **Save YouTube links as source packages** (next to the output folder) and each YouTube link is saved as a folder named after its video ID instead of a single `.md`:
+
+```text
+<output folder>/
+  jNQXAC9IVRw/
+    audio.m4a        the downloaded audio
+    source.json      where it came from
+    transcript.md    the timestamped Markdown transcript
+```
+
+An existing folder is never reused: a repeat of the same video is saved as `jNQXAC9IVRw 2/`. Local files are always saved as a single `.md`, whatever this setting says. If the package cannot be written, nothing is left half-written and the transcript can still be saved with **Save Transcript…**.
+
+`source.json` is a stable, versioned format owned by this app (not a copy of what the downloader reports). Fields that are unknown are left out:
+
+```json
+{
+  "acquiredAt" : "2026-10-01T00:13:47Z",
+  "audioFilename" : "audio.m4a",
+  "channel" : "jawed",
+  "durationSeconds" : 19,
+  "publishedDate" : "2005-04-24",
+  "schemaVersion" : 1,
+  "sourceType" : "youtube",
+  "sourceURL" : "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+  "title" : "Me at the zoo",
+  "transcriptionLocale" : "en-US",
+  "videoID" : "jNQXAC9IVRw"
+}
+```
+
 ## Performance
 
 After a run, the app reports media duration, processing time, and realtime speed, calculated as media duration divided by processing time. These are per-run measurements. Results vary by hardware, language, source media, and the native transcription path selected for the locale.

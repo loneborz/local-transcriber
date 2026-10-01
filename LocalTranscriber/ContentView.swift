@@ -12,6 +12,7 @@ struct ContentView: View {
     @State private var isTargeted = false
     @State private var isQueueTargeted = false
     @AppStorage("defaultLanguage") private var selectedLanguage = TranscriptionLanguage.english
+    @AppStorage(BatchQueue.sourcePackageModeKey) private var savesSourcePackages = false
     @State private var notice: String?
 
     private let supportedExtensions = [
@@ -61,6 +62,9 @@ struct ContentView: View {
                         .padding(.bottom, 8)
 
                     destinationControl
+                        .padding(.bottom, 8)
+
+                    sourcePackageToggle
                         .padding(.bottom, 14)
 
                     if let notice {
@@ -107,6 +111,8 @@ struct ContentView: View {
                     }
 
                     destinationControl
+
+                    sourcePackageToggle
 
                     Text(isTargeted || isQueueTargeted ? "Feed me" : "Drop more files or links to add them to the queue")
                         .font(.subheadline)
@@ -208,6 +214,14 @@ struct ContentView: View {
         }
         .font(.subheadline)
         .disabled(queue.isProcessing)
+    }
+
+    private var sourcePackageToggle: some View {
+        Toggle("Save YouTube links as source packages", isOn: $savesSourcePackages)
+            .toggleStyle(.checkbox)
+            .font(.subheadline)
+            .disabled(queue.isProcessing)
+            .help("Each YouTube link gets a folder named after its video ID with audio.m4a, source.json and transcript.md. Local files are saved as before.")
     }
 
     private func addDroppedFiles(_ urls: [URL]) -> Bool {
