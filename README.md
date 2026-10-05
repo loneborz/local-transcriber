@@ -122,9 +122,18 @@ Transcription never leaves the machine, but the app is not fully offline when yo
 
 YouTube audio is fetched by a small helper bundled in the app: a pinned [yt-dlp](https://github.com/yt-dlp/yt-dlp) release (a pure-Python zipapp) run by an arm64 build of Python 3.13. The helper runs as a child of the app inside the same App Sandbox, with no entitlements of its own beyond inheriting the app's, and it is stopped when the app quits. There is no runtime self-update, and ffmpeg and a JavaScript runtime are deliberately not bundled, so a change on YouTube's side can break downloads until the pinned yt-dlp is replaced. Versions, checksums and licence notes are in [`Vendor/YouTubeHelper/README.md`](Vendor/YouTubeHelper/README.md).
 
+## Download
+
+[Download Local Transcriber 0.3.0](https://github.com/loneborz/local-transcriber/releases/download/v0.3.0/LocalTranscriber-0.3.0.dmg) (DMG, 15 MB) from the [v0.3.0 release](https://github.com/loneborz/local-transcriber/releases/tag/v0.3.0).
+
+- Requires macOS 26 or later on a Mac with Apple silicon. There is no Intel or universal build.
+- The DMG and the app are signed with Developer ID and notarized by Apple.
+- Open the DMG, drag Local Transcriber to Applications and open it from there. On first launch macOS asks you to confirm opening an app downloaded from the Internet.
+- SHA-256: `43607ae707deee0adc10b5b9b9c10f08135cb4c2ac96b760a4d8beb5a743e0c6`. Check it with `shasum -a 256 LocalTranscriber-0.3.0.dmg`; the release also has a `.sha256` file.
+
 ## Build and run
 
-There is no published release or prebuilt download yet, so the app is built from source.
+To build the app from source instead:
 
 Requirements: a Mac running macOS 26 or later (the deployment target) and Xcode. Development and testing so far used Apple silicon with Xcode 27.
 
@@ -149,7 +158,7 @@ Or open `LocalTranscriber.xcodeproj` in Xcode and run the `LocalTranscriber` sch
 
 - Requires macOS 26 or later.
 - The YouTube helper is Apple silicon only. Intel Macs are untested, and YouTube links are not expected to work there.
-- The app has not been notarized, and no signed release has been produced.
+- Releases are built for Apple silicon only; there is no Intel or universal download.
 - YouTube extraction depends on a pinned yt-dlp that never updates itself and can stop working as YouTube changes.
 - Only YouTube is supported as a link source: no other sites, playlists or channels. A single download is limited to 30 minutes.
 - Retrying a job that fails for a lasting reason (for example an unavailable video) simply fails again; there is no retry limit or backoff.
@@ -163,7 +172,7 @@ Cloud transcription, accounts, summarization, search or retrieval over transcrip
 
 ## Status
 
-An early, working macOS project. The queue, language handling, automatic output, source packages, retry and the current interface are implemented and were verified by running the app. It is not packaged for distribution.
+An early, working macOS project. The queue, language handling, automatic output, source packages, retry and the current interface are implemented and were verified by running the app. Version 0.3.0 is the first public release, distributed as a notarized DMG.
 
 ## Third-party components
 
