@@ -15,6 +15,11 @@ enum TranscriptionPhase: Sendable {
     }
 }
 
+enum TranscriptTranscriber: String, Sendable {
+    case speechTranscriber = "SpeechTranscriber"
+    case dictationTranscriber = "DictationTranscriber"
+}
+
 enum TranscriptionService {
     static func transcribe(
         url: URL,
@@ -60,6 +65,7 @@ enum TranscriptionService {
         )
 
         let transcriber: any SpeechModule
+        let transcriptTranscriber: TranscriptTranscriber
         let collectSegments: () async throws -> [TranscriptSegment]
         if let speechLocale {
             let speechTranscriber = SpeechTranscriber(
@@ -69,6 +75,7 @@ enum TranscriptionService {
                 attributeOptions: [.audioTimeRange]
             )
             transcriber = speechTranscriber
+            transcriptTranscriber = .speechTranscriber
             collectSegments = {
                 try await Self.collectSegments(from: speechTranscriber) {
                     String($0.text.characters)
@@ -83,6 +90,7 @@ enum TranscriptionService {
                 attributeOptions: [.audioTimeRange]
             )
             transcriber = dictationTranscriber
+            transcriptTranscriber = .dictationTranscriber
             collectSegments = {
                 try await Self.collectSegments(from: dictationTranscriber) {
                     String($0.text.characters)
@@ -117,6 +125,7 @@ enum TranscriptionService {
         return Transcript(
             sourceURL: url,
             localeIdentifier: transcriptLocaleIdentifier,
+            transcriber: transcriptTranscriber,
             duration: duration,
             segments: try await segments
         )
@@ -248,6 +257,7 @@ private enum TranscriptionError: LocalizedError {
 struct Transcript: Sendable {
     let sourceURL: URL
     let localeIdentifier: String
+    let transcriber: TranscriptTranscriber
     let duration: TimeInterval?
     let segments: [TranscriptSegment]
 
@@ -285,6 +295,7 @@ enum TranscriptMarkdownRenderer {
 
         metadata.append("**Language:** \(transcript.localeIdentifier)")
         metadata.append("**Engine:** Apple SpeechAnalyzer")
+        metadata.append("**Transcriber:** \(transcript.transcriber.rawValue)")
 
         var markdown = "# \(title)\n\n"
         markdown += metadata.joined(separator: "  \n")
