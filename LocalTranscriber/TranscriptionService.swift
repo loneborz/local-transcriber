@@ -82,19 +82,23 @@ enum TranscriptionService {
                 }
             }
         } else if let dictationLocale {
+            // Punctuation is on deliberately (LTR-16): it adds sentences in nl-NL and
+            // sv-SE without changing words, and has no effect in ru-RU and tr-TR.
             let dictationTranscriber = DictationTranscriber(
                 locale: dictationLocale,
                 contentHints: [],
-                transcriptionOptions: [],
+                transcriptionOptions: [.punctuation],
                 reportingOptions: [],
                 attributeOptions: [.audioTimeRange]
             )
             transcriber = dictationTranscriber
             transcriptTranscriber = .dictationTranscriber
             collectSegments = {
-                try await Self.collectSegments(from: dictationTranscriber) {
-                    String($0.text.characters)
-                }
+                Self.reattachingLeadingPunctuation(
+                    try await Self.collectSegments(from: dictationTranscriber) {
+                        String($0.text.characters)
+                    }
+                )
             }
         } else {
             throw TranscriptionError.unsupportedLocale(transcriptLocaleIdentifier)
@@ -156,6 +160,31 @@ enum TranscriptionService {
                     text: text(result)
                 )
             )
+        }
+    }
+
+    // DictationTranscriber starts each result after the first with the previous
+    // sentence's closing mark (". De temperatuur"); move it back to where it belongs.
+    private static func reattachingLeadingPunctuation(
+        _ segments: [TranscriptSegment]
+    ) -> [TranscriptSegment] {
+        segments.reduce(into: []) { result, segment in
+            let text = segment.text.drop(while: \.isWhitespace)
+            let mark = text.prefix { ".,?!;:…".contains($0) }
+            guard !mark.isEmpty, let previous = result.popLast() else {
+                result.append(segment)
+                return
+            }
+            result.append(TranscriptSegment(
+                startTime: previous.startTime,
+                endTime: previous.endTime,
+                text: previous.text + mark
+            ))
+            result.append(TranscriptSegment(
+                startTime: segment.startTime,
+                endTime: segment.endTime,
+                text: String(text.dropFirst(mark.count))
+            ))
         }
     }
 
