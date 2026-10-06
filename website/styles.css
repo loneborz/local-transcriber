@@ -455,19 +455,14 @@ kbd {
   .tree li { grid-template-columns: 1fr; gap: 0.1rem; }
 }
 
-/* Local and network: the outlined zone is the Mac; network steps sit outside it. */
-.zones { display: grid; gap: 1.75rem; align-self: start; }
-.zone ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 0.7rem; }
+/* Local and network: two groups keyed by their dot, filled for the Mac and
+   hollow for the network. Items hang under the heading text, past the dot. */
+.zones { display: grid; gap: 2.75rem; align-self: start; }
+.zone ul { margin: 0; padding: 0 0 0 1.1rem; list-style: none; display: grid; gap: 0.7rem; }
 .zone h3 { font-size: 1rem; letter-spacing: -0.01em; margin-bottom: 1rem; }
 
-.zone-mac {
-  padding: 1.5rem 1.6rem 1.6rem;
-  border: 1px solid var(--ink);
-  border-radius: var(--r-surface);
-}
 .zone-mac li { font-size: 1.08rem; }
 
-.zone-net { padding: 0 1.6rem; }
 .zone-net li { color: var(--muted); font-size: 0.98rem; }
 .zone-net li span { display: block; font: 0.75rem/1.5 var(--mono); }
 
@@ -480,11 +475,6 @@ kbd {
 }
 .where.local::before { background: var(--wine); }
 .where.net { color: var(--muted); }
-
-@media (max-width: 480px) {
-  .zone-mac { padding: 1.25rem 1.2rem 1.35rem; }
-  .zone-net { padding: 0 1.2rem; }
-}
 
 /* Download band --------------------------------------------------------- */
 
@@ -578,6 +568,19 @@ kbd {
   line-height: 1.5;
   text-wrap: pretty;
 }
+
+/* Closing note: a short personal epilogue, quieter than the sections above. */
+.closing { padding-top: 0; text-align: center; }
+.closing .wrap { max-width: calc(34rem + 2 * var(--gutter)); }
+.closing h2 {
+  font-size: clamp(1.6rem, 2.6vw, 2rem);
+  line-height: 1.05;
+  margin-bottom: 1rem;
+}
+.closing p { text-wrap: balance; }
+.closing p + p { margin-top: 0.75rem; color: var(--muted); }
+.closing a { color: var(--ink); }
+.closing a:hover { color: var(--wine); }
 
 /* Footer ---------------------------------------------------------------- */
 
