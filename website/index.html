@@ -6,8 +6,8 @@
 <title>Local Transcriber - Media in. Markdown out.</title>
 <meta name="description" content="Local Transcriber is a native macOS app that turns audio, video and YouTube links into timestamped Markdown transcripts. Speech recognition runs on your Mac with Apple's on-device speech stack.">
 <meta name="color-scheme" content="light dark">
-<meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#161618" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f3f0ea" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#171214" media="(prefers-color-scheme: dark)">
 <link rel="canonical" href="https://transcribe.wavesweb.nl/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Local Transcriber">
@@ -19,25 +19,36 @@
 <meta property="og:image:type" content="image/png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="Local Transcriber: Media in. Markdown out. The app window showing a finished queue of two transcripts.">
+<meta property="og:image:alt" content="Local Transcriber: Media in. Markdown out. The app window with two finished transcripts.">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Local Transcriber - Media in. Markdown out.">
 <meta name="twitter:description" content="A native macOS app that turns audio, video and YouTube links into timestamped Markdown transcripts, with speech recognition on your Mac.">
 <meta name="twitter:image" content="https://transcribe.wavesweb.nl/og.png">
-<meta name="twitter:image:alt" content="Local Transcriber: Media in. Markdown out. The app window showing a finished queue of two transcripts.">
+<meta name="twitter:image:alt" content="Local Transcriber: Media in. Markdown out. The app window with two finished transcripts.">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="icon" href="favicon.png" type="image/png" sizes="32x32">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="stylesheet" href="styles.css">
+<script>
+  // A saved choice wins; otherwise CSS follows the system preference.
+  (function () {
+    var root = document.documentElement;
+    root.classList.add("js");
+    try {
+      var saved = localStorage.getItem("lt-theme");
+      if (saved === "light" || saved === "dark") root.setAttribute("data-theme", saved);
+    } catch (e) {}
+  })();
+</script>
 </head>
 <body>
 
 <a class="skip" href="#main">Skip to content</a>
 
 <header class="nav">
-  <div class="nav-inner">
+  <div class="wrap nav-inner">
     <a class="brand" href="#top">
-      <svg class="mark" viewBox="0 0 66 52" width="22" height="18" aria-hidden="true" focusable="false">
+      <svg class="mark" viewBox="0 0 66 52" width="24" height="19" aria-hidden="true" focusable="false">
         <rect x="0" y="19" width="6" height="14" rx="3"/>
         <rect x="10" y="13" width="6" height="26" rx="3"/>
         <rect x="20" y="7" width="6" height="38" rx="3"/>
@@ -52,211 +63,132 @@
       <a href="#how">How it works</a>
       <a href="#output">Output</a>
       <a href="#local">Local and network</a>
-      <a href="#packages">Source packages</a>
-      <a href="#limits">Limitations</a>
+      <a href="#download">Download</a>
     </nav>
-    <a class="btn btn-small" href="https://github.com/loneborz/local-transcriber">GitHub</a>
+    <div class="nav-tools">
+      <button class="theme-toggle" type="button" data-theme-toggle aria-pressed="false" aria-label="Dark theme">
+        <svg class="icon-sun" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4"/><path d="M12 3.2v1.9M12 18.9v1.9M3.2 12h1.9M18.9 12h1.9M5.8 5.8l1.3 1.3M16.9 16.9l1.3 1.3M5.8 18.2l1.3-1.3M16.9 7.1l1.3-1.3"/></svg>
+        <svg class="icon-moon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M18.6 14.8A7.4 7.4 0 1 1 9.2 5.4a6 6 0 0 0 9.4 9.4z"/></svg>
+      </button>
+      <a class="nav-gh" href="https://github.com/loneborz/local-transcriber">GitHub</a>
+    </div>
   </div>
 </header>
 
 <main id="main">
 
 <section class="hero" id="top">
-  <div class="container">
-    <h1>Media in. Markdown out.</h1>
-    <p class="lead">
-      Local Transcriber is a native macOS app that turns audio, video and
-      YouTube links into timestamped Markdown transcripts. Speech recognition
-      runs on your Mac with Apple's <span class="nowrap">on-device</span> speech stack: no cloud
-      transcription service, no account and no model picker.
-    </p>
-    <div class="actions">
-      <a class="btn" href="https://github.com/loneborz/local-transcriber/releases/download/v0.3.0/LocalTranscriber-0.3.0.dmg">Download for Mac</a>
-      <a class="btn btn-secondary" href="https://github.com/loneborz/local-transcriber">View on GitHub</a>
+  <div class="wrap hero-grid">
+    <div class="hero-copy">
+      <h1><span>Media in.</span> <span>Markdown <em>out.</em></span></h1>
+      <p class="lead">
+        Local Transcriber turns audio, video and YouTube links into
+        timestamped Markdown transcripts. Speech recognition runs on your Mac,
+        with Apple's on-device speech stack. No cloud transcription service, no account.
+      </p>
+      <div class="actions">
+        <a class="btn" href="https://github.com/loneborz/local-transcriber/releases/download/v0.3.0/LocalTranscriber-0.3.0.dmg">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19.5h14"/></svg>
+          Download for Mac
+        </a>
+        <a class="text-link" href="https://github.com/loneborz/local-transcriber">Source on GitHub</a>
+      </div>
+      <ul class="reqs" aria-label="Download details">
+        <li>Version 0.3.0</li>
+        <li>macOS 26 or later</li>
+        <li>Apple silicon</li>
+        <li>Notarized DMG, 15&nbsp;MB</li>
+      </ul>
     </div>
-    <p class="note">Local Transcriber 0.3.0 for macOS 26 or later, Apple silicon only. A notarized Developer ID DMG from <a href="https://github.com/loneborz/local-transcriber/releases/tag/v0.3.0">GitHub Releases</a>. You can also <a href="#build">build it from source</a>.</p>
 
-    <figure class="window hero-shot">
-      <img src="assets/queue.png" width="860" height="540"
-           alt="Local Transcriber after a run: the language and output-folder controls, a summary line reading 2 succeeded, 0 failed, 2h 55m of media, and two completed jobs, a local M4A file and a YouTube link, each with its saved Markdown file.">
-      <figcaption>A finished queue: one local file and one YouTube link, transcribed in sequence and saved to the output folder.</figcaption>
-    </figure>
+    <div class="hero-visual">
+      <figure class="shot">
+        <img class="shot-light" src="assets/queue-light.webp" width="1520" height="1120"
+             alt="Local Transcriber after a run: the language and output-folder controls, a summary line reading 2 succeeded, 0 failed, 36.9s of media, and two completed jobs, the local file garden-notes.m4a and the YouTube video Me at the zoo, each saved as a Markdown file.">
+        <img class="shot-dark" src="assets/queue-dark.webp" width="1520" height="1120"
+             alt="Local Transcriber after a run: the language and output-folder controls, a summary line reading 2 succeeded, 0 failed, 36.9s of media, and two completed jobs, the local file garden-notes.m4a and the YouTube video Me at the zoo, each saved as a Markdown file.">
+      </figure>
+      <figure class="file file-float" aria-label="The saved transcript for garden-notes.m4a, opening lines">
+        <figcaption class="file-bar"><span class="file-name">garden-notes.md</span><span class="file-kind">Markdown</span></figcaption>
+<pre tabindex="0"><code><span class="md-h"># garden-notes</span>
+
+<span class="md-k">**Source:**</span> `garden-notes.m4a`
+<span class="md-k">**Duration:**</span> 00:00:18
+<span class="md-k">**Language:**</span> en-US
+<span class="md-k">**Engine:**</span> Apple SpeechAnalyzer
+<span class="md-k">**Transcriber:**</span> SpeechTranscriber
+
+<span class="md-h">## Transcript</span>
+
+<span class="md-h">### 00:00:00</span>
+
+Garden notes for the 1st week of October, the tomatoes are finished for the year, so the plants come out this weekend. <span class="md-dim">…</span></code></pre>
+      </figure>
+    </div>
   </div>
 </section>
 
-<section class="band" id="how">
-  <div class="container">
-    <div class="section-head">
-      <p class="eyebrow">How it works</p>
-      <h2>One queue. One folder. One Markdown file per source.</h2>
-      <p>
-        The product boundary is deliberate: media or a link goes in, a local
-        transcript package comes out. The transcript is the artifact. The app
-        does not summarize, index, search, rewrite or "clean up" what was said.
-      </p>
+<section class="section" id="how">
+  <div class="wrap">
+    <div class="head">
+      <h2>One queue, one folder, one file per <em>source.</em></h2>
+      <p>Drop things in and let it run. Each finished transcript is written straight to a folder you chose once.</p>
     </div>
 
     <ol class="steps">
-      <li class="card">
-        <span class="step-num" aria-hidden="true">1</span>
+      <li>
+        <span class="num" aria-hidden="true">1</span>
         <h3>Add media</h3>
-        <p>Drag files or YouTube links onto the window, or copy and press <kbd>&#8984;V</kbd>. MP4, MOV, M4A, MP3 and WAV files, plus youtube.com and youtu.be links.</p>
+        <p>Drag files or YouTube links onto the window, or copy and press <kbd>&#8984;V</kbd>.</p>
+        <p class="mono-note">MP4 MOV M4A MP3 WAV, youtube.com, youtu.be</p>
       </li>
-      <li class="card">
-        <span class="step-num" aria-hidden="true">2</span>
+      <li>
+        <span class="num" aria-hidden="true">2</span>
         <h3>Queue</h3>
-        <p>Jobs run one at a time: Waiting, Downloading, Transcribing, then Complete or Failed. A failed job never stops the others, and Retry puts it back in line.</p>
+        <p>Jobs run one at a time, each with its own language. A failed job never stops the others, and Retry puts it back in line.</p>
       </li>
-      <li class="card">
-        <span class="step-num" aria-hidden="true">3</span>
-        <h3>Transcribe</h3>
-        <p>Apple's speech stack runs on your Mac. For video, AVFoundation first extracts the audio to a temporary M4A.</p>
+      <li>
+        <span class="num" aria-hidden="true">3</span>
+        <h3>Transcribe on your Mac</h3>
+        <p>Apple's speech stack does the recognition locally. For video, the audio is extracted first.</p>
       </li>
-      <li class="card">
-        <span class="step-num" aria-hidden="true">4</span>
+      <li>
+        <span class="num" aria-hidden="true">4</span>
         <h3>Save</h3>
-        <p>Each transcript is written to the folder you chose once. Files are never overwritten: a name that exists becomes <code>name 2.md</code>.</p>
+        <p>Timestamped Markdown lands in your output folder. Existing files are never overwritten.</p>
       </li>
     </ol>
+  </div>
+</section>
 
-    <div class="split">
-      <figure class="window">
-        <img src="assets/empty-state.png" width="860" height="540" loading="lazy"
-             alt="Local Transcriber's empty state: a waveform mark, the tagline Media in. Markdown out., a drop target and a one-line list of supported inputs.">
-      </figure>
-      <div class="split-copy">
-        <h3>Language per job</h3>
-        <p>
-          Language is set per job. A queue-level selector sets the default for
-          new jobs, and Apply to all changes every job that is still waiting.
-          A job's language is fixed once it starts.
-        </p>
-        <ul class="chips" aria-label="Supported languages">
-          <li>English <span>en-US</span></li>
-          <li>Dutch <span>nl-NL</span></li>
-          <li>German <span>de-DE</span></li>
-          <li>French <span>fr-FR</span></li>
-          <li>Russian <span>ru-RU</span></li>
-          <li>Spanish <span>es-ES</span></li>
-          <li>Italian <span>it-IT</span></li>
-          <li>Portuguese <span>pt-BR</span></li>
-          <li>Turkish <span>tr-TR</span></li>
-          <li>Swedish <span>sv-SE</span></li>
+<section class="section section-deep" id="output">
+  <div class="wrap output-grid">
+    <div class="head">
+      <h2>The transcript is the <em>artifact.</em></h2>
+      <p>
+        One Markdown file per source, ordered by audio time and grouped by
+        minute. The app does not summarize, index, rewrite or "clean up"
+        what was said.
+      </p>
+      <p>
+        YouTube links can instead be saved as a source package: the audio,
+        a small <code>source.json</code> and the transcript, together in one
+        folder named after the video ID.
+      </p>
+    </div>
+
+    <div class="output-files">
+      <figure class="file" aria-label="Example source package for one YouTube video">
+        <figcaption class="file-bar"><span class="file-name">jNQXAC9IVRw/</span><span class="file-kind">Source package</span></figcaption>
+        <ul class="tree">
+          <li><code>audio.m4a</code><span>the downloaded audio</span></li>
+          <li><code>source.json</code><span>where it came from</span></li>
+          <li><code>transcript.md</code><span>the transcript, with the video's URL, channel and date</span></li>
         </ul>
-        <p class="small">
-          Availability depends on what macOS offers for that language, and
-          macOS may download Apple's language assets the first time a language
-          is used.
-        </p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section class="band band-alt" id="output">
-  <div class="container">
-    <div class="section-head">
-      <p class="eyebrow">Output</p>
-      <h2>A timestamped Markdown file you own.</h2>
-      <p>
-        Each transcript is one Markdown file, ordered by audio time and
-        grouped by minute under a timestamp heading. The first time you
-        transcribe, the app asks for an output folder and remembers it.
-      </p>
-    </div>
-
-    <div class="split split-top">
-      <figure class="doc" aria-label="Sample transcript file">
-        <div class="doc-bar"><span class="doc-dots" aria-hidden="true"></span><span class="doc-name">example.md</span></div>
-<pre><code># example
-
-**Source:** `example.m4a`
-**Duration:** 00:05:00
-**Language:** en-US
-**Engine:** Apple SpeechAnalyzer
-
-## Transcript
-
-### 00:00:00
-
-Transcript text...</code></pre>
       </figure>
-      <div class="split-copy">
-        <ul class="ticks">
-          <li>Local files keep their name: <code>example.m4a</code> becomes <code>example.md</code>.</li>
-          <li>YouTube links are saved as <code>&lt;video title&gt; [&lt;video ID&gt;].md</code>.</li>
-          <li>A summary line shows succeeded and failed counts, total media duration, processing time and realtime speed.</li>
-          <li>If an automatic save fails, the job stays complete and offers Save Transcript as a manual fallback.</li>
-        </ul>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section class="band" id="local">
-  <div class="container">
-    <div class="section-head">
-      <p class="eyebrow">Local and network</p>
-      <h2>Transcription stays on the Mac. Links need the network.</h2>
-      <p>
-        Transcription never leaves the machine, but the app is not fully
-        offline when you give it links: a YouTube link cannot be transcribed
-        without downloading its audio first.
-      </p>
-    </div>
-
-    <div class="table-wrap">
-      <table class="matrix">
-        <thead>
-          <tr><th scope="col">Step</th><th scope="col">Where it happens</th></tr>
-        </thead>
-        <tbody>
-          <tr><th scope="row">Transcription, local files and YouTube audio alike</th><td><span class="tag tag-local">On your Mac</span> Apple's speech stack</td></tr>
-          <tr><th scope="row">Audio extraction from video</th><td><span class="tag tag-local">On your Mac</span> AVFoundation</td></tr>
-          <tr><th scope="row">Reading and writing transcripts</th><td><span class="tag tag-local">On your Mac</span></td></tr>
-          <tr><th scope="row">Downloading a YouTube link's audio</th><td><span class="tag tag-net">Over the network</span> from YouTube</td></tr>
-          <tr><th scope="row">Apple language assets for a language you have not used yet</th><td><span class="tag tag-net">Over the network</span> managed by macOS</td></tr>
-        </tbody>
-      </table>
-    </div>
-
-    <p class="prose">
-      The YouTube download is temporary and is deleted when the job ends, and
-      any leftovers are swept at the next launch. Audio is fetched by a small
-      helper bundled in the app: a pinned
-      <a href="https://github.com/yt-dlp/yt-dlp">yt-dlp</a> release run by an
-      arm64 build of Python 3.13. It runs as a child of the app inside the same
-      App Sandbox, with no entitlements of its own, and is stopped when the app
-      quits. There is no runtime self-update.
-    </p>
-  </div>
-</section>
-
-<section class="band band-alt band-compact" id="packages">
-  <div class="container">
-    <div class="section-head section-head-compact">
-      <p class="eyebrow">Source packages</p>
-      <h2>Keep the audio and its provenance with the transcript.</h2>
-      <p>
-        Turn on <em>Save YouTube links as source packages</em> (shown only
-        while the queue contains a YouTube link) and each link is saved as a
-        folder named after its video ID instead of a single file. Local files
-        are always saved as a single <code>.md</code>.
-      </p>
-    </div>
-
-    <figure class="doc pkg" aria-label="Example source package for one YouTube video">
-      <div class="doc-bar"><span class="doc-dots" aria-hidden="true"></span><span class="doc-name">jNQXAC9IVRw</span></div>
-      <div class="pkg-body">
-        <div class="pkg-tree">
-          <p class="pkg-root">&lt;output folder&gt;/jNQXAC9IVRw/</p>
-          <ul>
-            <li><code>audio.m4a</code><span>the downloaded audio</span></li>
-            <li><code>source.json</code><span>where it came from</span></li>
-            <li><code>transcript.md</code><span>the timestamped transcript, with the video's URL, channel and date</span></li>
-          </ul>
-        </div>
-<pre><code>{
+      <figure class="file" aria-label="Example source.json">
+        <figcaption class="file-bar"><span class="file-name">source.json</span><span class="file-kind">Schema version 1</span></figcaption>
+<pre tabindex="0"><code>{
   "acquiredAt" : "2026-10-01T00:13:47Z",
   "audioFilename" : "audio.m4a",
   "channel" : "jawed",
@@ -269,84 +201,92 @@ Transcript text...</code></pre>
   "transcriptionLocale" : "en-US",
   "videoID" : "jNQXAC9IVRw"
 }</code></pre>
-      </div>
-    </figure>
-    <p class="small">
-      An existing folder is never reused (a repeat becomes
-      <code>jNQXAC9IVRw 2/</code>), and a package that cannot be completed is
-      not left half-written. <code>source.json</code> is a small, versioned
-      schema owned by the app, not a copy of what the downloader reports;
-      unknown fields are omitted.
-    </p>
-  </div>
-</section>
-
-<section class="band band-compact" id="limits">
-  <div class="container">
-    <div class="section-head section-head-compact">
-      <h2>Current limitations</h2>
-    </div>
-
-    <dl class="facts">
-      <div><dt>Platform</dt><dd>Requires macOS 26 or later.</dd></div>
-      <div><dt>Distribution</dt><dd>A signed and notarized DMG for Apple silicon, published on GitHub Releases. There is no Intel or universal build.</dd></div>
-      <div><dt>Hardware</dt><dd>The YouTube helper is Apple silicon only. Intel Macs are untested, and YouTube links are not expected to work there.</dd></div>
-      <div><dt>YouTube</dt><dd>Extraction depends on a pinned yt-dlp that never updates itself and can stop working as YouTube changes. Only YouTube is supported as a link source: no other sites, playlists or channels. A single download is limited to 30 minutes.</dd></div>
-      <div><dt>Testing</dt><dd>There are no automated tests; behavior is checked by running the real app.</dd></div>
-    </dl>
-
-    <div class="scope">
-      <h3>Not in scope</h3>
-      <ul class="chips">
-        <li>Cloud transcription and accounts</li>
-        <li>Summarization, search or retrieval over transcripts</li>
-        <li>A knowledge-base layer</li>
-        <li>Automatic correction or rewriting of transcript text</li>
-        <li>A model picker or a transcript editor</li>
-        <li>Downloads from sites other than YouTube</li>
-      </ul>
+      </figure>
     </div>
   </div>
 </section>
 
-<section class="band band-alt band-compact" id="build">
-  <div class="container">
-    <div class="section-head section-head-compact">
-      <p class="eyebrow">Build from source</p>
-      <h2>Prefer to build it yourself? Use Xcode.</h2>
+<section class="section" id="local">
+  <div class="wrap local-grid">
+    <div class="head">
+      <h2>Transcription stays on your <em>Mac.</em></h2>
       <p>
-        You need a Mac running macOS 26 or later and Xcode. Development and
-        testing so far used Apple silicon with Xcode 27.
+        The app is not fully offline when you give it links: a YouTube link
+        cannot be transcribed without downloading its audio first. That
+        download is temporary and deleted when the job ends.
       </p>
     </div>
 
-    <ol class="build-steps card">
-      <li>
-        <span class="step-num" aria-hidden="true">1</span>
-        <p>Clone the <a href="https://github.com/loneborz/local-transcriber">local-transcriber repository</a> from GitHub.</p>
-      </li>
-      <li>
-        <span class="step-num" aria-hidden="true">2</span>
-        <p>Open <code>LocalTranscriber.xcodeproj</code> in Xcode.</p>
-      </li>
-      <li>
-        <span class="step-num" aria-hidden="true">3</span>
-        <p>Run the <code>LocalTranscriber</code> scheme. Xcode may ask you to pick your own development team under Signing &amp; Capabilities. A build phase copies the YouTube helper into the app and signs it.</p>
-      </li>
-    </ol>
+    <table class="matrix">
+      <caption class="visually-hidden">Where each step happens</caption>
+      <thead>
+        <tr><th scope="col">Step</th><th scope="col">Where</th></tr>
+      </thead>
+      <tbody>
+        <tr><th scope="row">Transcription, of files and YouTube audio alike</th><td><span class="where local">On your Mac</span></td></tr>
+        <tr><th scope="row">Audio extraction from video</th><td><span class="where local">On your Mac</span></td></tr>
+        <tr><th scope="row">Reading and writing transcripts</th><td><span class="where local">On your Mac</span></td></tr>
+        <tr><th scope="row">Downloading a YouTube link's audio</th><td><span class="where net">Network, from YouTube</span></td></tr>
+        <tr><th scope="row">Apple language assets, the first time a language is used</th><td><span class="where net">Network, via macOS</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
 
-    <div class="actions actions-left">
-      <a class="btn" href="https://github.com/loneborz/local-transcriber">View on GitHub</a>
-      <a class="btn btn-secondary" href="https://github.com/loneborz/local-transcriber#build-and-run">Read build instructions</a>
+<section class="download" id="download">
+  <div class="wrap download-grid">
+    <div class="download-main">
+      <h2>Download Local <em>Transcriber.</em></h2>
+      <ul class="meta" aria-label="Release">
+        <li>v0.3.0</li>
+        <li>macOS 26+</li>
+        <li>Apple silicon</li>
+        <li>Signed &amp; notarized</li>
+      </ul>
+      <p>Open the DMG, drag Local Transcriber to Applications and open it from there.</p>
+      <div class="actions">
+        <a class="btn btn-light" href="https://github.com/loneborz/local-transcriber/releases/download/v0.3.0/LocalTranscriber-0.3.0.dmg">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19.5h14"/></svg>
+          Download for Mac
+        </a>
+        <a class="text-link" href="https://github.com/loneborz/local-transcriber/releases/tag/v0.3.0">The release on GitHub</a>
+      </div>
     </div>
+
+    <dl class="specs">
+      <div><dt>File</dt><dd><code>LocalTranscriber-0.3.0.dmg</code>, 15&nbsp;MB</dd></div>
+      <div><dt>Signing</dt><dd>The DMG and the app are signed with Developer ID and notarized by Apple.</dd></div>
+      <div><dt>Hardware</dt><dd>Apple silicon only. No Intel or universal build.</dd></div>
+      <div><dt>SHA-256</dt><dd><code class="hash">43607ae707deee0adc10b5b9b9c10f08135cb4c2ac96b760a4d8beb5a743e0c6</code></dd></div>
+      <div><dt>From source</dt><dd>Build it yourself with Xcode. See <a href="https://github.com/loneborz/local-transcriber#build-and-run">Build and run</a>.</dd></div>
+    </dl>
+  </div>
+</section>
+
+<section class="section" id="limits">
+  <div class="wrap limits-grid">
+    <div class="head">
+      <h2>An early release, with known <em>limits.</em></h2>
+      <p>The queue, languages, output and source packages work and were checked in the real app. Some edges are known.</p>
+    </div>
+    <ul class="limits">
+      <li>YouTube is the only link source: no other sites, playlists or channels.</li>
+      <li>Downloads use a pinned yt-dlp that never updates itself, so a change on YouTube's side can break them.</li>
+      <li>A single download is limited to 30 minutes.</li>
+      <li>There are no automated tests; behavior is checked by running the app.</li>
+    </ul>
   </div>
 </section>
 
 </main>
 
 <footer class="footer">
-  <div class="container footer-inner">
-    <p>Local Transcriber is open source under the <a href="https://github.com/loneborz/local-transcriber/blob/main/LICENSE">MIT License</a>. Bundled third-party components keep their own licences.</p>
+  <div class="wrap footer-inner">
+    <p>
+      Local Transcriber is open source under the
+      <a href="https://github.com/loneborz/local-transcriber/blob/main/LICENSE">MIT License</a>.
+      A <a href="https://wavesweb.nl/">Wavesweb</a> Labs project.
+    </p>
     <nav aria-label="Footer">
       <a href="https://github.com/loneborz/local-transcriber">GitHub</a>
       <a href="https://github.com/loneborz/local-transcriber#readme">README</a>
@@ -354,6 +294,28 @@ Transcript text...</code></pre>
     </nav>
   </div>
 </footer>
+
+<script>
+  (function () {
+    var root = document.documentElement;
+    var button = document.querySelector("[data-theme-toggle]");
+    var system = window.matchMedia("(prefers-color-scheme: dark)");
+    function current() {
+      return root.getAttribute("data-theme") || (system.matches ? "dark" : "light");
+    }
+    function sync() {
+      button.setAttribute("aria-pressed", current() === "dark" ? "true" : "false");
+    }
+    button.addEventListener("click", function () {
+      var next = current() === "dark" ? "light" : "dark";
+      root.setAttribute("data-theme", next);
+      try { localStorage.setItem("lt-theme", next); } catch (e) {}
+      sync();
+    });
+    system.addEventListener("change", sync);
+    sync();
+  })();
+</script>
 
 </body>
 </html>
