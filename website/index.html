@@ -217,19 +217,23 @@ Garden notes for the 1st week of October, the tomatoes are finished for the year
       </p>
     </div>
 
-    <table class="matrix">
-      <caption class="visually-hidden">Where each step happens</caption>
-      <thead>
-        <tr><th scope="col">Step</th><th scope="col">Where</th></tr>
-      </thead>
-      <tbody>
-        <tr><th scope="row">Transcription, of files and YouTube audio alike</th><td><span class="where local">On your Mac</span></td></tr>
-        <tr><th scope="row">Audio extraction from video</th><td><span class="where local">On your Mac</span></td></tr>
-        <tr><th scope="row">Reading and writing transcripts</th><td><span class="where local">On your Mac</span></td></tr>
-        <tr><th scope="row">Downloading a YouTube link's audio</th><td><span class="where net">Network, from YouTube</span></td></tr>
-        <tr><th scope="row">Apple language assets, the first time a language is used</th><td><span class="where net">Network, via macOS</span></td></tr>
-      </tbody>
-    </table>
+    <div class="zones">
+      <div class="zone zone-mac">
+        <h3 class="where local">On your Mac</h3>
+        <ul>
+          <li>Transcription, of files and YouTube audio alike</li>
+          <li>Audio extraction from video</li>
+          <li>Reading and writing transcripts</li>
+        </ul>
+      </div>
+      <div class="zone zone-net">
+        <h3 class="where net">Network</h3>
+        <ul>
+          <li>Downloading a YouTube link's audio <span>from YouTube</span></li>
+          <li>Apple language assets, the first time a language is used <span>via macOS</span></li>
+        </ul>
+      </div>
+    </div>
   </div>
 </section>
 
@@ -253,12 +257,12 @@ Garden notes for the 1st week of October, the tomatoes are finished for the year
       </div>
     </div>
 
-    <dl class="specs">
-      <div><dt>File</dt><dd><code>LocalTranscriber-0.3.0.dmg</code>, 15&nbsp;MB</dd></div>
+    <dl class="manifest">
+      <div class="manifest-file"><dt class="visually-hidden">File</dt><dd><code>LocalTranscriber-0.3.0.dmg</code><span>15&nbsp;MB</span></dd></div>
       <div><dt>Signing</dt><dd>The DMG and the app are signed with Developer ID and notarized by Apple.</dd></div>
       <div><dt>Hardware</dt><dd>Apple silicon only. No Intel or universal build.</dd></div>
-      <div><dt>SHA-256</dt><dd><code class="hash">43607ae707deee0adc10b5b9b9c10f08135cb4c2ac96b760a4d8beb5a743e0c6</code></dd></div>
-      <div><dt>From source</dt><dd>Build it yourself with Xcode. See <a href="https://github.com/loneborz/local-transcriber#build-and-run">Build and run</a>.</dd></div>
+      <div class="manifest-hash"><dt>SHA-256</dt><dd><code class="hash">43607ae707deee0adc10b5b9b9c10f08135cb4c2ac96b760a4d8beb5a743e0c6</code></dd></div>
+      <div class="manifest-source"><dt>From source</dt><dd>Build it yourself with Xcode. See <a href="https://github.com/loneborz/local-transcriber#build-and-run">Build and run</a>.</dd></div>
     </dl>
   </div>
 </section>
