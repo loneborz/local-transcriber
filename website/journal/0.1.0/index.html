@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>0.1.0: It started with one file - Local Transcriber Journal</title>
+<meta name="description" content="The smallest version that worked: drop in a recording, pick a language and get timestamped Markdown back, all on the Mac.">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#f3f0ea" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#171214" media="(prefers-color-scheme: dark)">
+<link rel="canonical" href="https://transcribe.wavesweb.nl/journal/0.1.0/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Local Transcriber">
+<meta property="og:locale" content="en_US">
+<meta property="og:url" content="https://transcribe.wavesweb.nl/journal/0.1.0/">
+<meta property="og:title" content="0.1.0: It started with one file - Local Transcriber Journal">
+<meta property="og:description" content="The smallest version that worked: drop in a recording, pick a language and get timestamped Markdown back, all on the Mac.">
+<meta property="og:image" content="https://transcribe.wavesweb.nl/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Local Transcriber: Media in. Markdown out. The app window with two finished transcripts.">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="stylesheet" href="/styles.css">
+<script>
+  // A saved choice wins; otherwise CSS follows the system preference.
+  (function () {
+    var root = document.documentElement;
+    root.classList.add("js");
+    try {
+      var saved = localStorage.getItem("lt-theme");
+      if (saved === "light" || saved === "dark") root.setAttribute("data-theme", saved);
+    } catch (e) {}
+  })();
+</script>
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="nav">
+  <div class="wrap nav-inner">
+    <a class="brand" href="/">
+      <svg class="mark" viewBox="0 0 66 52" width="24" height="19" aria-hidden="true" focusable="false">
+        <rect x="0" y="19" width="6" height="14" rx="3"/>
+        <rect x="10" y="13" width="6" height="26" rx="3"/>
+        <rect x="20" y="7" width="6" height="38" rx="3"/>
+        <rect x="30" y="0" width="6" height="52" rx="3"/>
+        <rect x="40" y="7" width="6" height="38" rx="3"/>
+        <rect x="50" y="13" width="6" height="26" rx="3"/>
+        <rect x="60" y="19" width="6" height="14" rx="3"/>
+      </svg>
+      Local Transcriber
+    </a>
+    <nav class="nav-links" aria-label="Sections">
+      <a href="/#how">How it works</a>
+      <a href="/#output">Output</a>
+      <a href="/#local">Local and network</a>
+      <a href="/#download">Download</a>
+    </nav>
+    <div class="nav-tools">
+      <a class="nav-gh" href="/journal/">Journal</a>
+      <a class="nav-gh" href="https://github.com/loneborz/local-transcriber">GitHub</a>
+      <button class="theme-toggle" type="button" data-theme-toggle aria-pressed="false" aria-label="Dark theme">
+        <svg class="icon-sun" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4"/><path d="M12 3.2v1.9M12 18.9v1.9M3.2 12h1.9M18.9 12h1.9M5.8 5.8l1.3 1.3M16.9 16.9l1.3 1.3M5.8 18.2l1.3-1.3M16.9 7.1l1.3-1.3"/></svg>
+        <svg class="icon-moon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M18.6 14.8A7.4 7.4 0 1 1 9.2 5.4a6 6 0 0 0 9.4 9.4z"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main id="main" class="section journal">
+  <div class="wrap">
+    <article class="journal-grid" id="top">
+      <div>
+        <a class="back" href="/journal/">&larr; Journal</a>
+        <p class="journal-meta">0.1.0<br>Sep 27–28, 2026<br>Development build</p>
+      </div>
+      <div>
+        <h1>It started with one file</h1>
+        <p class="lead">The first version did one job: take a recording, run Apple's speech recognition on the Mac, and hand back a timestamped Markdown file.</p>
+        <div class="prose">
+          <h2>The whole loop</h2>
+          <p>I built it over two days, September 27 and 28. It was a native macOS app with a drop target. You dropped in an MP4, MOV, M4A, MP3 or WAV file, picked one of ten languages and pressed Transcribe. For video, AVFoundation first copied the audio into a temporary M4A. Apple's on-device speech stack then did the recognition and returned the text in timed segments.</p>
+          <p>Save Transcript… wrote the result to a Markdown file. The title came from the filename, a few lines of metadata followed, and the text was grouped by minute under a timestamp heading. The tagline was there from the start: media in, Markdown out.</p>
+          <h2>Why it stays on the Mac</h2>
+          <p>The media was already on my Mac, and I didn't want to send it somewhere else to get text back. So there was no account, no cloud transcription service and no model picker. Apple's speech stack is part of macOS, which meant the app didn't have to ship a model of its own. The only network traffic was macOS fetching Apple's language assets the first time a language was used.</p>
+          <p>Every run also showed the media duration, how long processing took and the speed relative to realtime.</p>
+          <h2>Where it stopped</h2>
+          <p>0.1.0 was a version number in the Xcode project. By the end of the second day the code had an MIT license and a README, but there was no GitHub Release, no signed build and no installer.</p>
+          <p>It also handled exactly one file at a time. Each transcript went through its own Save dialog, and the next file meant starting again from the empty window. With one recording you barely notice that. With five you notice it a lot, and that is where 0.2 begins.</p>
+        </div>
+        <nav aria-label="Journal">
+          <a class="back" href="/journal/">&larr; Back to the Journal</a>
+          <a class="back" href="/journal/0.2.0/" rel="next">Later story: 0.2.0</a>
+        </nav>
+      </div>
+    </article>
+  </div>
+</main>
+
+<footer class="footer">
+  <div class="wrap footer-inner">
+    <p>
+      Local Transcriber is open source under the
+      <a href="https://github.com/loneborz/local-transcriber/blob/main/LICENSE">MIT License</a>.
+      A <a href="https://wavesweb.nl/">Wavesweb</a> Labs project.
+    </p>
+    <nav aria-label="Footer">
+      <a href="/journal/">Journal</a>
+      <a href="https://github.com/loneborz/local-transcriber">GitHub</a>
+      <a href="https://github.com/loneborz/local-transcriber#readme">README</a>
+      <a href="#top">Back to top</a>
+    </nav>
+  </div>
+</footer>
+
+<script>
+  (function () {
+    var root = document.documentElement;
+    var button = document.querySelector("[data-theme-toggle]");
+    var system = window.matchMedia("(prefers-color-scheme: dark)");
+    function current() {
+      return root.getAttribute("data-theme") || (system.matches ? "dark" : "light");
+    }
+    function sync() {
+      button.setAttribute("aria-pressed", current() === "dark" ? "true" : "false");
+    }
+    button.addEventListener("click", function () {
+      var next = current() === "dark" ? "light" : "dark";
+      root.setAttribute("data-theme", next);
+      try { localStorage.setItem("lt-theme", next); } catch (e) {}
+      sync();
+    });
+    system.addEventListener("change", sync);
+    sync();
+  })();
+</script>
+
+</body>
+</html>
