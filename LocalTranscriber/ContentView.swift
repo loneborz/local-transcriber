@@ -9,8 +9,12 @@ extension FocusedValues {
 
 struct ContentView: View {
     @State private var queue = BatchQueue()
+    @State private var recorder = Recorder()
     @State private var isTargeted = false
     @State private var isQueueTargeted = false
+    @State private var showsRecordSetup = false
+    // Include microphone for app recordings; kept for this session only.
+    @State private var includesMicrophoneWithApp = true
     @AppStorage("defaultLanguage") private var selectedLanguage = TranscriptionLanguage.english
     @AppStorage(BatchQueue.sourcePackageModeKey) private var savesSourcePackages = false
     @State private var notice: String?
@@ -24,51 +28,87 @@ struct ContentView: View {
     ]
 
     var body: some View {
-        VStack(spacing: 18) {
-            if !queue.jobs.isEmpty {
-                WaveformBars(isAnimating: queue.isProcessing)
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, 4)
-            }
+        VStack(spacing: 0) {
+            content
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
 
-            if queue.jobs.isEmpty {
-                // Three groups: mark + tagline, drop target, input hint. The
-                // column is centered so a taller window does not leave a loose
-                // empty lower third.
-                VStack(spacing: 28) {
-                    VStack(spacing: 12) {
-                        WaveformBars(isAnimating: false)
+            footer
+        }
+        .background(.ultraThinMaterial)
+        .frame(minWidth: 640, minHeight: 420)
+        .contentShape(Rectangle())
+        .dropDestination(for: URL.self) { urls, _ in
+            addDroppedFiles(urls)
+        } isTargeted: { targeted in
+            isTargeted = targeted
+        }
+        .focusedSceneValue(\.pasteLinks, pasteFromClipboard)
+        .onAppear { recorder.refreshApps() }
+        // Closing the window must not leave a recording running unseen.
+        .onDisappear { recorder.cancel() }
+        .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didLaunchApplicationNotification)) { _ in
+            recorder.refreshApps()
+        }
+        .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didTerminateApplicationNotification)) { _ in
+            recorder.refreshApps()
+        }
+    }
 
-                        Text("Media in. Markdown out.")
-                            .font(.title3.weight(.semibold))
-                    }
+    @ViewBuilder
+    private var content: some View {
+        if queue.jobs.isEmpty {
+            // Three groups: mark + tagline, drop target, Record. The column is
+            // centered so a taller window does not leave a loose empty lower third.
+            VStack(spacing: 24) {
+                VStack(spacing: 12) {
+                    WaveformBars(isAnimating: false)
 
-                    Text(isTargeted ? "Drop to add" : "Drop here")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                        .frame(width: 260, height: 72)
+                    Text("Media in. Markdown out.")
+                        .font(.title3.weight(.semibold))
+                }
+
+                VStack(spacing: 16) {
+                    // The drop target is also the file picker.
+                    Button(action: chooseFiles) {
+                        VStack(spacing: 4) {
+                            Text(isTargeted ? "Drop to add" : "Drop media here")
+                                .font(.callout)
+                            Text("or choose files… · ⌘V to paste a YouTube link")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(width: 330, height: 84)
                         .background(
                             isTargeted
-                                ? Color.accentColor.opacity(0.1)
-                                : Color.primary.opacity(0.06),
-                            in: RoundedRectangle(cornerRadius: 16)
+                                ? Color.accentColor.opacity(0.12)
+                                : Color.primary.opacity(0.045),
+                            in: RoundedRectangle(cornerRadius: 14)
                         )
                         .overlay {
-                            RoundedRectangle(cornerRadius: 16)
-                                .stroke(
+                            RoundedRectangle(cornerRadius: 14)
+                                .strokeBorder(
                                     isTargeted
-                                        ? Color.accentColor.opacity(0.65)
-                                        : Color.secondary.opacity(0.4),
-                                    lineWidth: 1
+                                        ? Color.accentColor.opacity(0.8)
+                                        : Color.secondary.opacity(0.22),
+                                    lineWidth: isTargeted ? 1.5 : 0.5
                                 )
                         }
-                        .scaleEffect(isTargeted ? 0.98 : 1)
-                        .animation(.easeOut(duration: 0.18), value: isTargeted)
+                        .contentShape(RoundedRectangle(cornerRadius: 14))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!recorder.isIdle)
+                    .scaleEffect(isTargeted ? 0.98 : 1)
+                    .animation(.easeOut(duration: 0.18), value: isTargeted)
 
                     VStack(spacing: 8) {
-                        Text("MP4, MOV, M4A, MP3, WAV or a YouTube link · ⌘V to paste")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
+                        if recorder.isIdle {
+                            recordButton
+                                .controlSize(.large)
+                        } else {
+                            recordingStatus(compact: false)
+                        }
+
+                        recorderMessages
 
                         if let notice {
                             Text(notice)
@@ -78,46 +118,40 @@ struct ContentView: View {
                         }
                     }
                 }
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: 420, maxHeight: .infinity)
-            } else {
-                VStack(spacing: 12) {
-                    HStack(spacing: 10) {
-                        Button("Transcribe") {
-                            startQueue()
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.large)
-                        .disabled(queue.isProcessing || !queue.hasWaitingJobs)
+            }
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: 420, maxHeight: .infinity)
+            .padding(40)
+        } else {
+            VStack(alignment: .leading, spacing: 8) {
+                queueActionBar
 
-                        Button("Clear") {
-                            queue.clear()
-                            notice = nil
-                        }
-                        .controlSize(.large)
-                        .disabled(!queue.canClear)
-                    }
+                recorderMessages
 
-                    languageRow
+                if let notice {
+                    Text(notice)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                        .textSelection(.enabled)
+                }
 
-                    destinationControl
-
-                    if queue.hasYouTubeJobs {
-                        sourcePackageToggle
-                    }
-
-                    summaryView
-
-                    Text(isTargeted || isQueueTargeted ? "Feed me" : "Drop more files or links to add them to the queue")
-                        .font(.subheadline)
-                        .foregroundStyle(isTargeted || isQueueTargeted ? Color.accentColor : .secondary)
-
-                    if let notice {
-                        Text(notice)
+                VStack(spacing: 6) {
+                    // Clear belongs to the queue, so it heads the queue with the summary.
+                    HStack(alignment: .firstTextBaseline) {
+                        summaryView
+                        Spacer()
+                        if queue.canClear {
+                            Button("Clear") {
+                                queue.clear()
+                                notice = nil
+                            }
+                            .buttonStyle(.borderless)
                             .font(.caption)
-                            .foregroundStyle(.red)
-                            .textSelection(.enabled)
+                            .foregroundStyle(.secondary)
+                        }
                     }
+                    .padding(.horizontal, 4)
+                    .frame(minHeight: 16)
 
                     ScrollView {
                         VStack(spacing: 0) {
@@ -140,6 +174,12 @@ struct ContentView: View {
                         }
                     }
                     .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 8))
+                    .overlay {
+                        if isTargeted || isQueueTargeted {
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color.accentColor.opacity(0.65), lineWidth: 1)
+                        }
+                    }
                     // ScrollView is a platform view and does not pass drops up to the
                     // window-level destination, so it is a drop target itself.
                     .contentShape(Rectangle())
@@ -149,51 +189,205 @@ struct ContentView: View {
                         isQueueTargeted = targeted
                     }
                 }
-                .frame(maxWidth: 600, maxHeight: .infinity)
             }
+            .frame(maxWidth: 720, maxHeight: .infinity)
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .padding(40)
-        .background(.ultraThinMaterial)
-        .frame(minWidth: 640, minHeight: 420)
-        .contentShape(Rectangle())
-        .dropDestination(for: URL.self) { urls, _ in
-            addDroppedFiles(urls)
-        } isTargeted: { targeted in
-            isTargeted = targeted
-        }
-        .focusedSceneValue(\.pasteLinks, pasteFromClipboard)
     }
 
-    // Queue-level language: new items inherit it (it is the persisted default).
-    // Existing jobs change only through Apply to all, and only while Waiting.
-    private var languageRow: some View {
+    // Inputs on the left, Transcribe on the right so it can come and go
+    // without moving them. A running recording replaces the whole row.
+    private var queueActionBar: some View {
         HStack(spacing: 8) {
-            Text("Language")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+            WaveformBars(isAnimating: queue.isProcessing)
+                .scaleEffect(0.55)
+                .frame(width: 38, height: 28)
+                .padding(.trailing, 4)
 
-            Picker("Language", selection: $selectedLanguage) {
-                ForEach(TranscriptionLanguage.allCases) { language in
-                    Text(language.title).tag(language)
+            if recorder.isIdle {
+                Button("Add Files", action: chooseFiles)
+                recordButton
+
+                Spacer()
+
+                if !queue.isProcessing && queue.waitingCount > 0 {
+                    Button("Transcribe \(queue.waitingCount)", action: startQueue)
+                        .buttonStyle(.borderedProminent)
+                }
+            } else {
+                recordingStatus(compact: true)
+                Spacer()
+            }
+        }
+        .controlSize(.large)
+        .frame(minHeight: 28)
+    }
+
+    private var recordButton: some View {
+        Button("Record") {
+            recorder.refreshApps()
+            showsRecordSetup = true
+        }
+        .disabled(recorder.unsavedRecording != nil)
+        .popover(isPresented: $showsRecordSetup, arrowEdge: .bottom) {
+            recordSetup
+        }
+    }
+
+    // Record is one more input: the finished recording is saved to the output
+    // folder and then queued exactly like a dropped file.
+    private var recordSetup: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Record audio")
+                .font(.headline)
+
+            Picker("Source:", selection: $recorder.selectedAppID) {
+                Text("Microphone").tag(String?.none)
+                Divider()
+                ForEach(recorder.apps) { app in
+                    Text(app.name).tag(String?.some(app.id))
                 }
             }
-            .labelsHidden()
             .pickerStyle(.menu)
-            .controlSize(.small)
             .fixedSize()
 
-            if queue.waitingCount >= 2 {
-                Button("Apply to all") {
-                    queue.applyLocale(selectedLanguage.locale)
+            if recorder.selectedAppID != nil {
+                Toggle("Include microphone", isOn: $includesMicrophoneWithApp)
+                    .toggleStyle(.checkbox)
+            }
+
+            HStack {
+                Spacer()
+                Button("Cancel") {
+                    showsRecordSetup = false
                 }
-                .controlSize(.small)
-                .help("Set this language on every waiting item")
+                .keyboardShortcut(.cancelAction)
+
+                Button("Start Recording", action: startRecording)
+                    .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(16)
+        .frame(width: 320)
+    }
+
+    private func startRecording() {
+        showsRecordSetup = false
+        // Microphone as the source means microphone only.
+        recorder.includesMicrophone = recorder.selectedAppID == nil || includesMicrophoneWithApp
+        Task {
+            await recorder.record(to: queue.destination) { addRecording($0) }
+        }
+    }
+
+    // Stacked under the hero when the list is empty, one row above the queue otherwise.
+    @ViewBuilder
+    private func recordingStatus(compact: Bool) -> some View {
+        switch recorder.state {
+        case .idle:
+            EmptyView()
+        case .starting:
+            HStack(spacing: 8) {
+                ProgressView()
+                    .controlSize(.small)
+                Text("Starting recording…")
+                    .foregroundStyle(.secondary)
+            }
+        case .recording(let since):
+            let layout = compact
+                ? AnyLayout(HStackLayout(spacing: 12))
+                : AnyLayout(VStackLayout(spacing: 10))
+            layout {
+                HStack(spacing: 6) {
+                    Image(systemName: "circle.fill")
+                        .font(.system(size: 8))
+                        .foregroundStyle(.red)
+                        .accessibilityHidden(true)
+                    Text("Recording \(recorder.recordingLabel)")
+                }
+
+                Text(since, style: .timer)
+                    .font(compact ? .body.monospacedDigit() : .title2.monospacedDigit())
+                    .foregroundStyle(compact ? .secondary : .primary)
+
+                Button("Stop Recording") {
+                    Task { await recorder.stop() }
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+            }
+        case .finishing:
+            HStack(spacing: 8) {
+                ProgressView()
+                    .controlSize(.small)
+                Text("Saving recording…")
+                    .foregroundStyle(.secondary)
             }
         }
     }
 
-    private var destinationControl: some View {
+    @ViewBuilder
+    private var recorderMessages: some View {
+        if let warning = recorder.silenceWarning {
+            Text(warning)
+                .font(.caption)
+                .foregroundStyle(.orange)
+        }
+
+        if let error = recorder.error {
+            Text(error)
+                .font(.caption)
+                .foregroundStyle(.red)
+                .textSelection(.enabled)
+        }
+
+        if recorder.unsavedRecording != nil {
+            Button("Choose Folder and Save Recording…") {
+                recorder.chooseFolderAndSave()
+            }
+            .controlSize(.small)
+        }
+    }
+
+    private func addRecording(_ url: URL) {
+        _ = addDroppedFiles([url])
+        startQueue()
+    }
+
+    // Same path as a drop; the panel offers only the extensions a drop accepts.
+    private func chooseFiles() {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = true
+        panel.canChooseDirectories = false
+        panel.allowedContentTypes = supportedExtensions.compactMap { UTType(filenameExtension: $0) }
+        guard panel.runModal() == .OK else { return }
+        _ = addDroppedFiles(panel.urls)
+    }
+
+    // Status, not controls: language and destination read quietly here, and
+    // the secondary controls live in Options.
+    private var footer: some View {
+        HStack(spacing: 16) {
+            Text("New items: \(selectedLanguage.title)")
+                .help("Language given to newly added and recorded items")
+
+            Spacer()
+
+            destinationStatus
+
+            Spacer()
+
+            optionsMenu
+                .disabled(!recorder.isIdle)
+        }
+        .font(.subheadline)
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+    }
+
+    private var destinationStatus: some View {
         HStack(spacing: 6) {
             switch queue.destination.status {
             case .none:
@@ -201,36 +395,61 @@ struct ContentView: View {
                     queue.destination.choose()
                 }
                 .buttonStyle(.link)
+                .disabled(queue.isProcessing)
             case .ready(let url):
-                Text("Saves to: \(url.lastPathComponent)")
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                    .help(url.path(percentEncoded: false))
-                Button("Change…") {
-                    queue.destination.choose()
+                Button {
+                    NSWorkspace.shared.activateFileViewerSelecting([url])
+                } label: {
+                    Text("Saves to \(url.lastPathComponent)")
+                        .lineLimit(1)
+                        .truncationMode(.middle)
                 }
-                .buttonStyle(.link)
+                .buttonStyle(.plain)
+                .help("Show \(url.path(percentEncoded: false)) in Finder")
             case .unavailable(let message):
                 Text(message)
                     .foregroundStyle(.red)
-                    .lineLimit(2)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
                 Button("Choose…") {
                     queue.destination.choose()
                 }
                 .buttonStyle(.link)
+                .disabled(queue.isProcessing)
             }
         }
-        .font(.subheadline)
-        .disabled(queue.isProcessing)
     }
 
-    private var sourcePackageToggle: some View {
-        Toggle("Save YouTube links as source packages", isOn: $savesSourcePackages)
-            .toggleStyle(.checkbox)
-            .font(.subheadline)
+    // Queue-level language: new items inherit it (it is the persisted default).
+    // Existing jobs change only through Apply to all, and only while Waiting.
+    private var optionsMenu: some View {
+        Menu("Options") {
+            Picker("Language", selection: $selectedLanguage) {
+                ForEach(TranscriptionLanguage.allCases) { language in
+                    Text(language.title).tag(language)
+                }
+            }
+
+            if queue.waitingCount >= 2 {
+                Button("Apply Language to All Waiting") {
+                    queue.applyLocale(selectedLanguage.locale)
+                }
+            }
+
+            Divider()
+
+            Button("Change Output Folder…") {
+                queue.destination.choose()
+            }
             .disabled(queue.isProcessing)
-            .help("Each YouTube link gets a folder named after its video ID with audio.m4a, source.json and transcript.md. Local files are saved as before.")
+
+            if queue.hasYouTubeJobs {
+                Toggle("Save YouTube Links as Source Packages", isOn: $savesSourcePackages)
+                    .disabled(queue.isProcessing)
+            }
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
     }
 
     // No destination yet: ask once; cancelling starts nothing.
@@ -239,29 +458,24 @@ struct ContentView: View {
         queue.start()
     }
 
-    // Shown once any job has finished: counts, totals and where output goes.
+    // Shown once any job has finished: counts and totals, one quiet line.
     @ViewBuilder
     private var summaryView: some View {
         let summary = queue.summary
         if summary.hasFinishedJobs {
-            VStack(spacing: 2) {
-                Text(summaryText(for: summary))
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-
-                if case .ready(let folder) = queue.destination.status {
-                    Button("Show output folder: \(folder.lastPathComponent)") {
-                        NSWorkspace.shared.activateFileViewerSelecting([folder])
-                    }
-                    .buttonStyle(.link)
-                }
-            }
-            .font(.caption)
+            Text(summaryText(for: summary))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.tail)
         }
     }
 
     private func summaryText(for summary: BatchSummary) -> String {
-        var parts = ["\(summary.succeeded) succeeded", "\(summary.failed) failed"]
+        var parts = ["\(summary.succeeded) succeeded"]
+        if summary.failed > 0 {
+            parts.append("\(summary.failed) failed")
+        }
         if let media = MetricsFormat.mediaDuration(summary.mediaDuration) {
             parts.append("\(media) of media")
             parts.append("processed in \(MetricsFormat.processingDuration(summary.processingDuration))")

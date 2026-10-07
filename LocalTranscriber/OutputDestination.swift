@@ -28,9 +28,16 @@ final class OutputDestination {
     private static let bookmarkKey = "outputDestinationBookmark"
 
     private(set) var status: Status = .none
+    // Kept open while the folder is ready, so a recording saved there can be
+    // read back by the queue, also after a relaunch.
+    @ObservationIgnored private var accessedFolder: URL?
 
     init() {
         refresh()
+    }
+
+    isolated deinit {
+        accessedFolder?.stopAccessingSecurityScopedResource()
     }
 
     var isReady: Bool {
@@ -41,6 +48,7 @@ final class OutputDestination {
     // Re-resolves the persisted bookmark. Never falls back to another folder.
     func refresh() {
         guard let data = UserDefaults.standard.data(forKey: Self.bookmarkKey) else {
+            hold(nil)
             status = .none
             return
         }
@@ -56,16 +64,41 @@ final class OutputDestination {
             var isDirectory: ObjCBool = false
             guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory),
                   isDirectory.boolValue else {
+                hold(nil)
                 status = .unavailable("Output folder “\(url.lastPathComponent)” is unavailable.")
                 return
             }
             if isStale {
                 storeBookmark(for: url)
             }
+            hold(url)
             status = .ready(url)
         } catch {
+            hold(nil)
             status = .unavailable("Output folder is unavailable. Choose it again.")
         }
+    }
+
+    // Holds security-scoped access to `folder` and releases what was held
+    // before. A folder that is accessible without it (start returns false) is
+    // simply not held.
+    private func hold(_ folder: URL?) {
+        let didStart = folder?.startAccessingSecurityScopedResource() ?? false
+        accessedFolder?.stopAccessingSecurityScopedResource()
+        accessedFolder = didStart ? folder : nil
+    }
+
+    // An existing folder can still refuse files (read-only volume,
+    // permissions, lost sandbox access); only a real write proves it doesn't.
+    func checkWritable() throws {
+        guard case .ready(let folder) = status else { throw OutputError.notConfigured }
+
+        let didStart = folder.startAccessingSecurityScopedResource()
+        defer { if didStart { folder.stopAccessingSecurityScopedResource() } }
+
+        let probe = folder.appendingPathComponent(".LocalTranscriber-\(UUID().uuidString)")
+        try Data().write(to: probe, options: .withoutOverwriting)
+        try? FileManager.default.removeItem(at: probe)
     }
 
     // Folder-only picker. Returns true when a folder was chosen and remembered.
@@ -85,9 +118,11 @@ final class OutputDestination {
         guard panel.runModal() == .OK, let url = panel.url else { return false }
 
         if let error = storeBookmark(for: url) {
+            hold(nil)
             status = .unavailable("Couldn’t remember that folder: \(error.localizedDescription)")
             return false
         }
+        hold(url)
         status = .ready(url)
         return true
     }
@@ -95,18 +130,38 @@ final class OutputDestination {
     // Writes `<baseName>.md`, or `<baseName> 2.md`, `<baseName> 3.md`, … when
     // the name is taken. Existing files are never overwritten.
     func write(_ markdown: String, baseName: String) throws -> URL {
+        let data = Data(markdown.utf8)
+        return try placeWithoutOverwriting(baseName: baseName, pathExtension: "md") {
+            // Foundation traps if .withoutOverwriting is combined with .atomic.
+            try data.write(to: $0, options: .withoutOverwriting)
+        }
+    }
+
+    // Moves a finished recording out of app-local staging under the same
+    // naming rule. moveItem never replaces an existing file.
+    func saveRecording(_ stagedFile: URL, baseName: String) throws -> URL {
+        try placeWithoutOverwriting(baseName: baseName, pathExtension: stagedFile.pathExtension) {
+            try FileManager.default.moveItem(at: stagedFile, to: $0)
+        }
+    }
+
+    // Calls `place` with `<baseName>.<ext>`, then `<baseName> 2.<ext>`, … until
+    // it does not fail because the file already exists.
+    private func placeWithoutOverwriting(
+        baseName: String,
+        pathExtension: String,
+        _ place: (URL) throws -> Void
+    ) throws -> URL {
         guard case .ready(let folder) = status else { throw OutputError.notConfigured }
 
         let didStart = folder.startAccessingSecurityScopedResource()
         defer { if didStart { folder.stopAccessingSecurityScopedResource() } }
 
-        let data = Data(markdown.utf8)
         for attempt in 1...9999 {
-            let name = attempt == 1 ? "\(baseName).md" : "\(baseName) \(attempt).md"
-            let url = folder.appendingPathComponent(name)
+            let name = attempt == 1 ? baseName : "\(baseName) \(attempt)"
+            let url = folder.appendingPathComponent("\(name).\(pathExtension)")
             do {
-                // Foundation traps if .withoutOverwriting is combined with .atomic.
-                try data.write(to: url, options: .withoutOverwriting)
+                try place(url)
                 return url
             } catch let error as CocoaError where error.code == .fileWriteFileExists {
                 continue
