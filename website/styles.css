@@ -432,6 +432,10 @@ kbd {
   gap: 3rem;
 }
 .output-files { display: grid; gap: 1.25rem; min-width: 0; }
+/* On phones the long sourceURL line wraps instead of hiding behind a scroll. */
+@media (max-width: 600px) {
+  .output-files pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+}
 
 .tree {
   margin: 0;
@@ -569,19 +573,6 @@ kbd {
   text-wrap: pretty;
 }
 
-/* Closing note: a short personal epilogue, quieter than the sections above. */
-.closing { padding-top: 0; text-align: center; }
-.closing .wrap { max-width: calc(34rem + 2 * var(--gutter)); }
-.closing h2 {
-  font-size: clamp(1.6rem, 2.6vw, 2rem);
-  line-height: 1.05;
-  margin-bottom: 1rem;
-}
-.closing p { text-wrap: balance; }
-.closing p + p { margin-top: 0.75rem; color: var(--muted); }
-.closing a { color: var(--ink); }
-.closing a:hover { color: var(--wine); }
-
 /* Footer ---------------------------------------------------------------- */
 
 .footer {
@@ -601,11 +592,6 @@ kbd {
 /* Journal ---------------------------------------------------------------
    A ledger of decisions, written as prose: metadata on the left, the
    reading column on the right, separated by hairline rules. */
-
-.nav-tools [aria-current="page"] {
-  text-decoration: underline 2px var(--wine);
-  text-underline-offset: 0.35em;
-}
 
 @media (max-width: 480px) {
   .nav-inner { gap: 1rem; }

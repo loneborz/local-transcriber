@@ -3,18 +3,18 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>0.2.0: One file was no longer enough - Local Transcriber Journal</title>
-<meta name="description" content="Several recordings meant choosing the language, saving and starting over every time. 0.2 turned that routine into a queue that runs without me.">
+<title>0.4.0: Making its own media - Local Transcriber Journal</title>
+<meta name="description" content="Local Transcriber used to transcribe media that already existed. 0.4.0 lets it record its own and hands the recording to the same queue as everything else.">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" content="#f3f0ea" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#171214" media="(prefers-color-scheme: dark)">
-<link rel="canonical" href="https://transcribe.wavesweb.nl/journal/0.2.0/">
+<link rel="canonical" href="https://transcribe.wavesweb.nl/journal/0.4.0/">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="Local Transcriber">
 <meta property="og:locale" content="en_US">
-<meta property="og:url" content="https://transcribe.wavesweb.nl/journal/0.2.0/">
-<meta property="og:title" content="0.2.0: One file was no longer enough - Local Transcriber Journal">
-<meta property="og:description" content="Several recordings meant choosing the language, saving and starting over every time. 0.2 turned that routine into a queue that runs without me.">
+<meta property="og:url" content="https://transcribe.wavesweb.nl/journal/0.4.0/">
+<meta property="og:title" content="0.4.0: Making its own media - Local Transcriber Journal">
+<meta property="og:description" content="Local Transcriber used to transcribe media that already existed. 0.4.0 lets it record its own and hands the recording to the same queue as everything else.">
 <meta property="og:image" content="https://transcribe.wavesweb.nl/og.png">
 <meta property="og:image:type" content="image/png">
 <meta property="og:image:width" content="1200">
@@ -77,31 +77,29 @@
     <article class="journal-grid" id="top">
       <div>
         <a class="back" href="/journal/">&larr; Journal</a>
-        <p class="journal-meta">0.2.0<br>Sep 30 – Oct 1, 2026<br>Development milestone</p>
+        <p class="journal-meta">0.4.0<br>Oct 6–7, 2026<br>GitHub Release</p>
       </div>
       <div>
-        <h1>One file was no longer enough</h1>
-        <p class="lead">With several recordings, the work was in the repeats: choose the language again, save again, start the next one again.</p>
+        <h1>Making its own media</h1>
+        <p class="lead">Until 0.4.0 Local Transcriber only worked with media that already existed. This version lets it make that media itself, and stops there.</p>
         <div class="prose">
-          <h2>Five rounds of the same routine</h2>
-          <p>In 0.1.0, five files meant five rounds of drop, pick a language, transcribe, wait, save and start over. No single step was hard. Together they meant sitting next to the app for the whole batch. The goal for v0.2, worked on over September 30 and October 1, was to remove the steps I kept repeating.</p>
-          <h2>A queue that saves its own work</h2>
-          <p>The single-file screen became a queue. Jobs run one after another and each keeps its own language, so a Russian recording and an English one can share a batch. When a job fails, the rest keep going. You can remove a job that hasn't started yet and clear a finished batch without relaunching the app.</p>
-          <p>Saving stopped being a step. You pick an output folder and a default language once, and the app remembers both across launches. Each finished job goes straight into that folder and never overwrites anything: a second <code>beta.md</code> is saved as <code>beta 2.md</code>.</p>
-          <p>Using the queue also showed settings in the wrong place. The empty window asked for a language, an output folder and a YouTube option before anything was in it. Those moved into the queue, together with an Apply to all button that sets one language on every waiting job.</p>
-          <h2>Links in the same line</h2>
-          <p>YouTube links joined the queue next to files. The app downloads a link's audio only when its job starts, passes it to the same transcription code as everything else, and deletes the download when the job ends. For research and archive use, a link can instead be kept as a source package: a folder named after the video ID with the audio, a small <code>source.json</code> that the app defines itself, and the transcript.</p>
-          <aside class="note" aria-label="Technical note">
-            <p>Technical note</p>
-            <p>Downloads use a pinned yt-dlp on a bundled Python 3.13 helper. The helper runs inside the app's sandbox with only the <code>app-sandbox</code> and <code>inherit</code> entitlements, and it never updates itself.</p>
-          </aside>
-          <p>A summary line and per-job Retry finished the milestone. Its acceptance test was a short scene: paste five real YouTube links, choose English once, choose the output folder once, turn on source packages and walk away. It came back with five complete packages, and no Save dialog, Terminal command or typed filename along the way.</p>
-          <p>v0.2 was a development milestone. It never got a release of its own, and the app's version number still read 0.1.0.</p>
+          <h2>Why record at all</h2>
+          <p>Sometimes the thing to transcribe isn't a file yet: something said into the microphone, or audio playing in another app. Getting it in meant opening a different recorder, saving a file, finding it and dropping it onto the window. That is the same kind of repeated step 0.2 took out.</p>
+          <p>The obvious next step looks like a meeting assistant: listen all the time, transcribe live, separate the speakers, write a summary. I didn't want that. A recording had to become the same kind of media the app already handled, and nothing more.</p>
+          <h2>One more way in</h2>
+          <p>Record sits next to Add Files. It opens a small panel with two choices: the microphone, or one running app with the microphone as an option. Nothing is captured until you press Start Recording, and while it runs the window shows what is being recorded and for how long.</p>
+          <p>Stop saves one M4A file to your output folder, named after the time and the source, and adds it to the queue as if you had dropped it there. It is transcribed on the Mac like any other job, and the timestamped Markdown lands next to the recording, which stays as the source and is never deleted automatically.</p>
+          <h2>One app, not the whole Mac</h2>
+          <p>For app audio you choose one running app, and Local Transcriber asks macOS to capture that app only. Recording the whole system is not offered. A recording should stay tied to what you chose to record.</p>
+          <p>That choice decided how it was built. My first attempt used Core Audio process taps, but an app's sound often comes from a helper process: Safari, for example, plays through a WebKit helper. Recording "Safari" would have meant finding and following those helpers myself. ScreenCaptureKit already counts a helper's audio as part of its app, so it replaced the taps.</p>
+          <p>App audio uses the macOS Screen &amp; System Audio Recording permission, and the microphone uses its own. Each is requested the first time you use that kind of recording, not at launch. Local Transcriber does not save or retain video or screen recordings.</p>
+          <h2>Most of the work doesn't show</h2>
+          <p>Recording starts only once there is an output folder to save into. While it runs, nothing is written there: the audio stays in the app's own storage and moves to the folder only when it is complete and checked. If the folder disappears in the meantime, the app holds on to the recording and asks where to save it. If no sound arrives for ten seconds, the window says so, without guessing that a permission is missing; a denied permission is reported only when macOS reports it.</p>
+          <p>0.4.0 shipped signed and notarized, and the app from the final DMG transcribed a recording, a local file and a YouTube link.</p>
         </div>
         <nav aria-label="Journal">
           <a class="back" href="/journal/">&larr; Back to the Journal</a>
-          <a class="back" href="/journal/0.1.0/" rel="prev">Earlier story: 0.1.0</a>
-          <a class="back" href="/journal/0.3.0/" rel="next">Later story: 0.3.0</a>
+          <a class="back" href="/journal/0.3.0/" rel="prev">Earlier story: 0.3.0</a>
         </nav>
       </div>
     </article>

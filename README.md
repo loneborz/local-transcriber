@@ -2,18 +2,18 @@
 
 **Media in. Markdown out.**
 
-Local Transcriber is a native macOS app that turns audio, video and YouTube links into timestamped Markdown transcripts. Speech recognition runs on your Mac with Apple's on-device speech stack; there is no cloud transcription service, no account and no model picker.
+Local Transcriber is a native macOS app that turns audio, video, YouTube links and your own recordings into timestamped Markdown transcripts. Speech recognition runs on your Mac with Apple's on-device speech stack; there is no cloud transcription service, no account and no model picker.
 
-![Local Transcriber after a run: the language and output-folder controls, a summary line, and two completed jobs (a local audio file and a YouTube link) with their saved Markdown files](https://transcribe.wavesweb.nl/assets/queue.png)
+![Local Transcriber after a run: Add Files and Record buttons, a summary line, and three completed jobs (a local audio file, a YouTube link and an app-audio recording) with their saved Markdown files](https://transcribe.wavesweb.nl/assets/queue.png)
 
-*A finished queue: one local file and one YouTube link, transcribed in sequence and saved to the output folder.*
+*A finished queue: one local file, one YouTube link and one recording, transcribed in sequence and saved to the output folder.*
 
 ## What it does
 
-Drop in media files or paste YouTube links. Everything goes into one queue that runs one job at a time. Each finished transcript is written straight to a folder you chose once.
+Drop in media files, paste YouTube links or record audio. Everything goes into one queue that runs one job at a time. Each finished transcript is written straight to a folder you chose once.
 
 ```text
-media file or YouTube link
+media file, YouTube link or recording
         │
         ▼
    one queue  ──  per-job language, run sequentially
@@ -29,10 +29,11 @@ The product boundary is deliberate: `media or URL -> local transcript package`. 
 
 ## Inputs
 
-![Local Transcriber's empty state: a waveform mark, the tagline "Media in. Markdown out.", a drop target and a one-line list of supported inputs](https://transcribe.wavesweb.nl/assets/empty-state.png)
+![Local Transcriber's empty state: a waveform mark, the tagline "Media in. Markdown out.", a drop target that also opens the file picker, and a Record button](https://transcribe.wavesweb.nl/assets/empty-state.png)
 
 - **Local files:** MP4, MOV, M4A, MP3 and WAV. Audio files are transcribed directly; for video, AVFoundation first extracts the audio to a temporary M4A.
 - **YouTube links:** `youtube.com` (including `www.`, `m.` and `music.`) and `youtu.be` watch, shorts, live and embed links. Playlist parameters are dropped, so a link transcribes one video.
+- **Recordings:** **Record** captures the microphone, one running app's audio, or that app plus the microphone. Nothing is captured until you start it. Stop saves one M4A named `Recording <date> <time> (<source>).m4a` to the output folder and adds it to the queue like any dropped file, so its transcript is saved next to it. The recording is kept as source media and never deleted automatically. The microphone permission and, for app audio, Screen & System Audio Recording are requested at the first recording, not at launch. Whole-system audio is not offered, and Local Transcriber does not save or retain video or screen recordings.
 - **How to add them:** drag onto anywhere in the window, or copy and press ⌘V. Dropping a link from a browser's address bar works after selecting the URL first (observed in Safari only).
 
 Files with other extensions are ignored. A link that is not a supported YouTube link, or a video that cannot be fetched, fails only its own row and never stops the others.
@@ -112,6 +113,7 @@ An existing folder is never reused (a repeat becomes `jNQXAC9IVRw 2/`), and a pa
 | --- | --- |
 | Transcription (local files and YouTube audio alike) | On your Mac, with Apple's speech stack |
 | Audio extraction from video | On your Mac, with AVFoundation |
+| Recording (microphone or app audio) | On your Mac, saved to your output folder |
 | Reading and writing transcripts | On your Mac |
 | Downloading a YouTube link's audio | **Over the network**, from YouTube |
 | Apple language assets for a language you have not used yet | **Over the network**, managed by macOS |
@@ -124,12 +126,12 @@ YouTube audio is fetched by a small helper bundled in the app: a pinned [yt-dlp]
 
 ## Download
 
-[Download Local Transcriber 0.3.0](https://github.com/loneborz/local-transcriber/releases/download/v0.3.0/LocalTranscriber-0.3.0.dmg) (DMG, 15 MB) from the [v0.3.0 release](https://github.com/loneborz/local-transcriber/releases/tag/v0.3.0).
+[Download Local Transcriber 0.4.0](https://github.com/loneborz/local-transcriber/releases/download/v0.4.0/LocalTranscriber-0.4.0.dmg) (DMG, 15 MB) from the [v0.4.0 release](https://github.com/loneborz/local-transcriber/releases/tag/v0.4.0).
 
 - Requires macOS 26 or later on a Mac with Apple silicon. There is no Intel or universal build.
 - The DMG and the app are signed with Developer ID and notarized by Apple.
 - Open the DMG, drag Local Transcriber to Applications and open it from there. On first launch macOS asks you to confirm opening an app downloaded from the Internet.
-- SHA-256: `43607ae707deee0adc10b5b9b9c10f08135cb4c2ac96b760a4d8beb5a743e0c6`. Check it with `shasum -a 256 LocalTranscriber-0.3.0.dmg`; the release also has a `.sha256` file.
+- SHA-256: `314642e327446d05cf5a72aea4a9d755ce05acfac8d610bd18ae9515f15670fc`. Check it with `shasum -a 256 LocalTranscriber-0.4.0.dmg`; the release also has a `.sha256` file.
 
 ## Build and run
 
@@ -149,8 +151,8 @@ Or open `LocalTranscriber.xcodeproj` in Xcode and run the `LocalTranscriber` sch
 ## How it is built
 
 - **SwiftUI** app with an observable, sequential `BatchQueue`; the transcription engine only ever sees a local file and a locale.
-- **Apple Speech** (`SpeechAnalyzer`) for transcription and **AVFoundation** for audio extraction.
-- **App Sandbox** with user-selected read/write access (the output folder) and network client access (YouTube).
+- **Apple Speech** (`SpeechAnalyzer`) for transcription, **AVFoundation** for audio extraction and microphone recording, and **ScreenCaptureKit** for app audio.
+- **App Sandbox** with user-selected read/write access (the output folder), network client access (YouTube) and audio input (the microphone).
 - The YouTube helper is an isolated, sandbox-inheriting child process, kept separate from the transcription code.
 - Output folder, default language and the source-package option are remembered in `UserDefaults`.
 
@@ -163,7 +165,7 @@ Or open `LocalTranscriber.xcodeproj` in Xcode and run the `LocalTranscriber` sch
 - Only YouTube is supported as a link source: no other sites, playlists or channels. A single download is limited to 30 minutes.
 - Retrying a job that fails for a lasting reason (for example an unavailable video) simply fails again; there is no retry limit or backoff.
 - A failed write of a source package has been tested only for failure at folder creation, not later in the write.
-- No third-party notice is shown inside the app yet (see below).
+- Recording uses the system default microphone input. App audio is chosen per running app; recording the whole system is not offered. A recording that has not been saved yet (for example because the output folder was unavailable) is not recovered if the app quits or crashes.
 - There are no automated tests; behavior is checked by running the real app.
 
 ## Not in scope
@@ -172,14 +174,14 @@ Cloud transcription, accounts, summarization, search or retrieval over transcrip
 
 ## Status
 
-An early, working macOS project. The queue, language handling, automatic output, source packages, retry and the current interface are implemented and were verified by running the app. Version 0.3.0 is the first public release, distributed as a notarized DMG.
+An early, working macOS project. The queue, language handling, automatic output, source packages, retry, recording and the current interface are implemented and were verified by running the app. Version 0.4.0, which adds recording, is the current release, distributed as a notarized DMG; 0.3.0 was the first public release.
 
 ## Third-party components
 
 - [yt-dlp](https://github.com/yt-dlp/yt-dlp) (Unlicense; the zipapp also contains ISC- and MIT-licensed code).
 - [CPython](https://www.python.org/) 3.13 from [python-build-standalone](https://github.com/astral-sh/python-build-standalone) (Python Software Foundation licence), which statically links OpenSSL.
 
-The exact versions and checksums are listed in [`Vendor/YouTubeHelper/README.md`](Vendor/YouTubeHelper/README.md). The OpenSSL licence text and an in-app notice are not included yet, and are needed before any binary distribution.
+The exact versions and checksums are listed in [`Vendor/YouTubeHelper/README.md`](Vendor/YouTubeHelper/README.md). Their licence texts, including OpenSSL's, ship inside the app and appear in its About panel.
 
 ## License
 
