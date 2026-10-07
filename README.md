@@ -142,11 +142,13 @@ Requirements: a Mac running macOS 26 or later (the deployment target) and Xcode.
 ```bash
 git clone https://github.com/loneborz/local-transcriber.git
 cd local-transcriber
-xcodebuild -project LocalTranscriber.xcodeproj -scheme LocalTranscriber \
-  -destination 'platform=macOS' build
+scripts/dev.sh        # build only
+scripts/dev.sh run    # build, install and launch the development app
 ```
 
-Or open `LocalTranscriber.xcodeproj` in Xcode and run the `LocalTranscriber` scheme. Code signing is set to Automatic, so Xcode may ask you to pick your own development team under Signing & Capabilities. A build phase copies the helper into the app and signs it.
+`scripts/dev.sh` is the development workflow. It builds the Debug configuration, which is a separate app: **Local Transcriber Dev** (bundle id `nl.wavesweb.LocalTranscriberDev`, with a DEV icon), so it never replaces or shares settings and permissions with an installed Local Transcriber. The build goes to a per-checkout DerivedData folder ending in `.noindex` and is removed from Launch Services again, so builds don't pile up as duplicate apps. `run` installs the one development copy at `~/Applications/Local Transcriber Dev.app`, quits a running copy of it first and opens it. A build phase copies the YouTube helper into the app and signs it.
+
+Debug is signed manually with an Apple Development certificate of the project's team (`JZ9667QFWA`). Building it with a different team needs a matching Apple Development certificate and changes to the Debug signing settings (`DEVELOPMENT_TEAM`, `CODE_SIGN_IDENTITY`). Release builds for distribution use `scripts/release.sh` and Developer ID.
 
 ## How it is built
 
