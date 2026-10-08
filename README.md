@@ -4,7 +4,7 @@
 
 Local Transcriber is a native macOS app that turns audio, video, YouTube links and your own recordings into timestamped Markdown transcripts. Speech recognition runs on your Mac with Apple's on-device speech stack; there is no cloud transcription service, no account and no model picker.
 
-![Local Transcriber after a run: Add Files and Record buttons, a summary line, and three completed jobs (a local audio file, a YouTube link and an app-audio recording) with their saved Markdown files](https://transcribe.wavesweb.nl/assets/queue.png)
+![Local Transcriber after a run: an action bar with Add Files, an app-audio picker, a Mic checkbox and Record, a summary line with Clear Queue, and three completed jobs (a local audio file, a YouTube link and an app-audio recording) with their saved Markdown files](https://transcribe.wavesweb.nl/assets/queue.png)
 
 *A finished queue: one local file, one YouTube link and one recording, transcribed in sequence and saved to the output folder.*
 
@@ -29,7 +29,7 @@ The product boundary is deliberate: `media or URL -> local transcript package`. 
 
 ## Inputs
 
-![Local Transcriber's empty state: a waveform mark, the tagline "Media in. Markdown out.", a drop target that also opens the file picker, and a Record button](https://transcribe.wavesweb.nl/assets/empty-state.png)
+![Local Transcriber's empty workspace: a waveform mark and the tagline "Media in. Markdown out." above one surface with two zones: on the left a drop target that also opens the file picker and accepts a pasted YouTube link, on the right "Record audio" with an app-audio picker, a Mic checkbox and a Record button](https://transcribe.wavesweb.nl/assets/empty-state.png)
 
 - **Local files:** MP4, MOV, M4A, MP3 and WAV. Audio files are transcribed directly; for video, AVFoundation first extracts the audio to a temporary M4A.
 - **YouTube links:** `youtube.com` (including `www.`, `m.` and `music.`) and `youtu.be` watch, shorts, live and embed links. Playlist parameters are dropped, so a link transcribes one video.
@@ -41,8 +41,8 @@ Files with other extensions are ignored. A link that is not a supported YouTube 
 ## The queue
 
 - Jobs run sequentially: `Waiting → Downloading → Transcribing → Complete | Failed`. Downloading applies to YouTube links only.
-- **Language** is set per job. A queue-level selector sets the default for new jobs, and **Apply to all** changes every job that is still waiting. A job's language is fixed once it starts.
-- Waiting jobs can be removed, **Clear** empties an idle queue, and **Retry** puts a failed job back in line. A rejected link cannot be retried, and completed jobs are never touched.
+- **Language** is set per job. **Language** in the **Options** menu sets the default for new jobs, and **Apply Language to All Waiting** changes every job that is still waiting. A job's language is fixed once it starts.
+- Waiting jobs can be removed, **Clear Queue** empties an idle queue, and **Retry** puts a failed job back in line. A rejected link cannot be retried, and completed jobs are never touched.
 - A summary line shows succeeded and failed counts, total media duration, processing time and realtime speed.
 - If an automatic save fails, the job stays complete and offers **Save Transcript…** as a manual fallback.
 
@@ -77,7 +77,7 @@ YouTube links are saved as `<video title> [<video ID>].md`. In this flat form th
 
 ### Source packages
 
-Turn on **Save YouTube links as source packages** (shown only while the queue contains a YouTube link) and each link is saved as a folder named after its video ID instead of a single file:
+Turn on **Save YouTube Links as Source Packages** in the **Options** menu (shown only while the queue contains a YouTube link) and each link is saved as a folder named after its video ID instead of a single file:
 
 ```text
 <output folder>/
@@ -126,12 +126,12 @@ YouTube audio is fetched by a small helper bundled in the app: a pinned [yt-dlp]
 
 ## Download
 
-[Download Local Transcriber 0.4.0](https://github.com/loneborz/local-transcriber/releases/download/v0.4.0/LocalTranscriber-0.4.0.dmg) (DMG, 15 MB) from the [v0.4.0 release](https://github.com/loneborz/local-transcriber/releases/tag/v0.4.0).
+[Download Local Transcriber 0.5.0](https://github.com/loneborz/local-transcriber/releases/download/v0.5.0/LocalTranscriber-0.5.0.dmg) (DMG, 15 MB) from the [v0.5.0 release](https://github.com/loneborz/local-transcriber/releases/tag/v0.5.0).
 
 - Requires macOS 26 or later on a Mac with Apple silicon. There is no Intel or universal build.
 - The DMG and the app are signed with Developer ID and notarized by Apple.
 - Open the DMG, drag Local Transcriber to Applications and open it from there. On first launch macOS asks you to confirm opening an app downloaded from the Internet.
-- SHA-256: `314642e327446d05cf5a72aea4a9d755ce05acfac8d610bd18ae9515f15670fc`. Check it with `shasum -a 256 LocalTranscriber-0.4.0.dmg`; the release also has a `.sha256` file.
+- SHA-256: `98e7d3a24fcc90794c73f0b64bdd8c1338b389e4356e8a380a0e278d2b4ca07e`. Check it with `shasum -a 256 LocalTranscriber-0.5.0.dmg`; the release also has a `.sha256` file.
 
 ## Build and run
 
@@ -176,7 +176,7 @@ Cloud transcription, accounts, summarization, search or retrieval over transcrip
 
 ## Status
 
-An early, working macOS project. The queue, language handling, automatic output, source packages, retry, recording and the current interface are implemented and were verified by running the app. Version 0.4.0, which adds recording, is the current release, distributed as a notarized DMG; 0.3.0 was the first public release.
+An early, working macOS project. The queue, language handling, automatic output, source packages, retry, recording and the current interface are implemented and were verified by running the app. Version 0.5.0 is the current release, distributed as a notarized DMG. It gives the app its own visual identity and changes nothing about what it does; 0.4.0 added recording and 0.3.0 was the first public release.
 
 ## Third-party components
 

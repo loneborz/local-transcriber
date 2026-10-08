@@ -3,18 +3,18 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>0.4.0: Making its own media - Local Transcriber Journal</title>
-<meta name="description" content="Local Transcriber used to transcribe media that already existed. 0.4.0 lets it record its own and hands the recording to the same queue as everything else.">
+<title>0.5.0: The same tool, finished - Local Transcriber Journal</title>
+<meta name="description" content="0.5.0 keeps everything Local Transcriber could already do and refines how it looks, reads and is operated: the look and voice of the site it comes from, with the Mac's own controls.">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" content="#f3f0ea" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#171214" media="(prefers-color-scheme: dark)">
-<link rel="canonical" href="https://transcribe.wavesweb.nl/journal/0.4.0/">
+<link rel="canonical" href="https://transcribe.wavesweb.nl/journal/0.5.0/">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="Local Transcriber">
 <meta property="og:locale" content="en_US">
-<meta property="og:url" content="https://transcribe.wavesweb.nl/journal/0.4.0/">
-<meta property="og:title" content="0.4.0: Making its own media - Local Transcriber Journal">
-<meta property="og:description" content="Local Transcriber used to transcribe media that already existed. 0.4.0 lets it record its own and hands the recording to the same queue as everything else.">
+<meta property="og:url" content="https://transcribe.wavesweb.nl/journal/0.5.0/">
+<meta property="og:title" content="0.5.0: The same tool, finished - Local Transcriber Journal">
+<meta property="og:description" content="0.5.0 keeps everything Local Transcriber could already do and refines how it looks, reads and is operated: the look and voice of the site it comes from, with the Mac's own controls.">
 <meta property="og:image" content="https://transcribe.wavesweb.nl/og.png">
 <meta property="og:image:type" content="image/png">
 <meta property="og:image:width" content="1200">
@@ -77,30 +77,30 @@
     <article class="journal-grid" id="top">
       <div>
         <a class="back" href="/journal/">&larr; Journal</a>
-        <p class="journal-meta">0.4.0<br>Oct 6–7, 2026<br>GitHub Release</p>
+        <p class="journal-meta">0.5.0<br>Oct 7–8, 2026<br>GitHub Release</p>
       </div>
       <div>
-        <h1>Making its own media</h1>
-        <p class="lead">Until 0.4.0 Local Transcriber only worked with media that already existed. This version lets it make that media itself, and stops there.</p>
+        <h1>The same tool, finished</h1>
+        <p class="lead">0.5.0 can do everything 0.4.0 could, and nothing more. What changed is how that work is presented and operated: how the window is arranged, how recording is set up and how the app speaks. It now belongs to the same family as this site, and it still behaves like a Mac app.</p>
         <div class="prose">
-          <h2>Why record at all</h2>
-          <p>Sometimes the thing to transcribe isn't a file yet: something said into the microphone, or audio playing in another app. Getting it in meant opening a different recorder, saving a file, finding it and dropping it onto the window. That is the same kind of repeated step 0.2 took out.</p>
-          <p>The obvious next step looks like a meeting assistant: listen all the time, transcribe live, separate the speakers, write a summary. I didn't want that. A recording had to become the same kind of media the app already handled, and nothing more.</p>
-          <h2>One more way in</h2>
-          <p>Record sits next to Add Files. It opens a small panel with two choices: the microphone, or one running app with the microphone as an option. Nothing is captured until you press Start Recording, and while it runs the window shows what is being recorded and for how long.</p>
-          <p>Stop saves one M4A file to your output folder, named after the time and the source, and adds it to the queue as if you had dropped it there. It is transcribed on the Mac like any other job, and the timestamped Markdown lands next to the recording, which stays as the source and is never deleted automatically.</p>
-          <h2>One app, not the whole Mac</h2>
-          <p>For app audio you choose one running app, and Local Transcriber asks macOS to capture that app only. Recording the whole system is not offered. A recording should stay tied to what you chose to record.</p>
-          <p>That choice decided how it was built. My first attempt used Core Audio process taps, but an app's sound often comes from a helper process: Safari, for example, plays through a WebKit helper. Recording "Safari" would have meant finding and following those helpers myself. ScreenCaptureKit already counts a helper's audio as part of its app, so it replaced the taps.</p>
-          <p>App audio uses the macOS Screen &amp; System Audio Recording permission, and the microphone uses its own. Each is requested the first time you use that kind of recording, not at launch. Local Transcriber does not save or retain video or screen recordings.</p>
-          <h2>Most of the work doesn't show</h2>
-          <p>Recording starts only once there is an output folder to save into. While it runs, nothing is written there: the audio stays in the app's own storage and moves to the folder only when it is complete and checked. If the folder disappears in the meantime, the app holds on to the recording and asks where to save it. If no sound arrives for ten seconds, the window says so, without guessing that a permission is missing; a denied permission is reported only when macOS reports it.</p>
-          <p>0.4.0 shipped signed and notarized, and the app from the final DMG transcribed a recording, a local file and a YouTube link.</p>
+          <h2>Why a small utility needs an identity</h2>
+          <p>Until 0.4 the window grew one release at a time: a drop target, an Add Files button, a Record button that opened a popover, a Clear button that disappeared while the queue ran. Each piece was decided when its feature arrived, and each did its job. What the window never had was a pass over the whole, and next to the site it came from, with its warm paper, wine accent and seven-bar mark, it looked like a different product.</p>
+          <p>A tool I use every day deserved the same care in how it looks as in how it works. That didn't need new features. It needed the existing ones arranged, colored and worded together.</p>
+          <h2>Wavesweb DNA, native Mac grammar</h2>
+          <p>That was the rule for the whole release. Wavesweb supplies the character: the palette, the serif accent, the spacing, the mark and the way the app talks. macOS keeps the grammar: controls, keyboard and focus, windows and accessibility. The goal was never to turn a SwiftUI app into a web page.</p>
+          <p>Before any app code changed, the direction was written down as a contract and tried in throwaway SwiftUI prototypes at the 640 × 420 minimum window, in light, dark and Increase Contrast. Then it was applied. The window ground is the site's paper color in light and dark, continued under the title bar. The empty window is one surface with two zones: drop or choose media on the left, record on the right. The Record popover is gone, so the source you are about to record is always visible. Once there are jobs, Add Files, recording and Transcribe share one action bar, and Clear Queue lives in the queue header, disabled while a job runs instead of vanishing.</p>
+          <p>The voice changed with it. Messages say what happened, then what to do, and keep every fact. “Local Transcriber may not use the microphone. Allow it in …” became “Local Transcriber isn’t allowed to use the microphone. Turn it on in System Settings › Privacy &amp; Security › Microphone.”</p>
+          <h2>What I left alone</h2>
+          <p>Wine appears in two places: the fill of the main button and the checkboxes. Focus rings, pickers and menus keep the accent color you chose for your Mac. An accent only means something when it is rare. On the main action it says where to press; spread over pickers, menus and text it would compete with the system's own signals and be harder to read in dark mode.</p>
+          <p>Drag and drop, ⌘V, the file panels, the Options menu, Finder reveal and the window chrome are the system’s, unchanged. Light and dark follow macOS; there is no theme switch and no accent picker. The mark never moves, not even while recording, because a moving wave would pretend to be a level meter. The app icon is the same.</p>
+          <p>Staying native has a price I accepted. The app picker is a standard menu, so a long app name is cut off at the end rather than in the middle, as the design asked. A custom control would fix that and lose the native behavior; the full name is in the menu and its tooltip.</p>
+          <h2>Nothing new to do</h2>
+          <p>The queue, the recording sources, the permissions and the timestamped Markdown are the same as in 0.4.0; what changed is how you reach and read them. Keeping it that way took some restraint: a redesign is an easy moment to slip in a feature, and this release was meant to show that identity and voice can change without one.</p>
+          <p>0.5.0 shipped signed and notarized, and the app from the final DMG transcribed a local file, a YouTube link and a recording.</p>
         </div>
         <nav aria-label="Journal">
           <a class="back" href="/journal/">&larr; Back to the Journal</a>
-          <a class="back" href="/journal/0.3.0/" rel="prev">Earlier story: 0.3.0</a>
-          <a class="back" href="/journal/0.5.0/" rel="next">Later story: 0.5.0</a>
+          <a class="back" href="/journal/0.4.0/" rel="prev">Earlier story: 0.4.0</a>
         </nav>
       </div>
     </article>
