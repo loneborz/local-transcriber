@@ -5,9 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Local Transcriber - Media in. Markdown out.</title>
 <meta name="description" content="Local Transcriber is a native macOS app that turns audio, video, YouTube links and your own recordings into timestamped Markdown transcripts. Speech recognition runs on your Mac with Apple's on-device speech stack.">
-<meta name="color-scheme" content="light dark">
-<meta name="theme-color" content="#f3f0ea" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#171214" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f3f0ea">
 <link rel="canonical" href="https://transcribe.wavesweb.nl/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Local Transcriber">
@@ -30,13 +28,15 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="stylesheet" href="styles.css">
 <script>
-  // A saved choice wins; otherwise CSS follows the system preference.
+  // Light unless the visitor explicitly saved dark. The OS appearance is ignored.
   (function () {
     var root = document.documentElement;
     root.classList.add("js");
     try {
-      var saved = localStorage.getItem("lt-theme");
-      if (saved === "light" || saved === "dark") root.setAttribute("data-theme", saved);
+      if (localStorage.getItem("lt-theme") === "dark") {
+        root.setAttribute("data-theme", "dark");
+        document.querySelector('meta[name="theme-color"]').content = "#171214";
+      }
     } catch (e) {}
   })();
 </script>
@@ -309,20 +309,22 @@ Garden notes for the 1st week of October, the tomatoes are finished for the year
   (function () {
     var root = document.documentElement;
     var button = document.querySelector("[data-theme-toggle]");
-    var system = window.matchMedia("(prefers-color-scheme: dark)");
-    function current() {
-      return root.getAttribute("data-theme") || (system.matches ? "dark" : "light");
-    }
+    var meta = document.querySelector('meta[name="theme-color"]');
     function sync() {
-      button.setAttribute("aria-pressed", current() === "dark" ? "true" : "false");
+      var dark = root.getAttribute("data-theme") === "dark";
+      button.setAttribute("aria-pressed", dark ? "true" : "false");
+      meta.content = dark ? "#171214" : "#f3f0ea";
     }
     button.addEventListener("click", function () {
-      var next = current() === "dark" ? "light" : "dark";
+      var next = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
+      // Switch with transitions off, so the change lands at once.
+      root.classList.add("theme-switching");
       root.setAttribute("data-theme", next);
+      getComputedStyle(root).colorScheme;
+      root.classList.remove("theme-switching");
       try { localStorage.setItem("lt-theme", next); } catch (e) {}
       sync();
     });
-    system.addEventListener("change", sync);
     sync();
   })();
 </script>
