@@ -1,0 +1,1498 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Wavesweb Homepage Preview</title>
+    <meta name="color-scheme" content="light" />
+    <style>
+      :root {
+        --page-bg: #E8E2D9;
+        --page-bg-muted: rgb(188, 144, 148);
+        --surface-bg: #8F3D4E;
+        --surface-bg-muted: rgb(188, 144, 148);
+        --surface-border: #D4C9BD;
+        --surface-border-strong: rgb(206, 199, 192);
+        --surface-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08), 0 2px 2px rgba(0, 0, 0, 0.04), 0 8px 8px -8px rgba(0, 0, 0, 0.04);
+        --surface-shadow-soft: 0 0 0 1px #D4C9BD;
+        --ink: #2D2023;
+        --muted: #2D2023;
+        --subtle: rgb(146, 137, 133);
+        --accent: #762F3D;
+        --font-body: Aptos, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+        --font-display: Aptos, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+        --font-mono: ui-monospace, "SFMono-Regular", "SF Mono", Menlo, monospace;
+        --body-size: 16px;
+        --body-line: 24px;
+        --body-weight: 400;
+        --label-size: 12.16px;
+        --label-line: 16px;
+        --label-track: 0.14em;
+        --title-size: 32px;
+        --title-line: 38px;
+        --title-track: -0.03em;
+        --section-size: 32px;
+        --section-line: 40px;
+        --section-track: -0.03em;
+        --source-size: 13px;
+        --source-line: 24px;
+        --space-1: 4px;
+        --space-2: 6px;
+        --space-3: 8px;
+        --space-4: 12px;
+        --space-5: 16px;
+        --space-6: 20px;
+        --radius-panel: 10px;
+        --radius-card: 10px;
+        --radius-micro: 0px;
+        --radius-pill: 999px;
+        --button-height: 40px;
+        --button-font-size: 12.16px;
+        --button-weight: 500;
+        --button-radius: 999px;
+        --secondary-button-radius: 999px;
+        --layout-gap: 12px;
+        --page-padding: 12px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        min-width: 320px;
+        color: var(--ink);
+        font-family: var(--font-body);
+        font-size: var(--body-size);
+        font-weight: var(--body-weight);
+        line-height: var(--body-line);
+        background:
+          radial-gradient(circle at top, color-mix(in srgb, var(--accent) 8%, transparent), transparent 30%),
+          linear-gradient(180deg, var(--page-bg) 0%, var(--page-bg-muted) 100%);
+      }
+
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        z-index: -1;
+        pointer-events: none;
+        background-image:
+          linear-gradient(color-mix(in srgb, var(--surface-border) 56%, transparent) 1px, transparent 1px),
+          linear-gradient(90deg, color-mix(in srgb, var(--surface-border) 56%, transparent) 1px, transparent 1px);
+        background-size: 100% calc(24px), calc(24px) 100%;
+        mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.3), transparent 88%);
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      button {
+        font: inherit;
+      }
+
+      .shell {
+        width: min(1440px, calc(100vw - (var(--page-padding) * 2)));
+        margin: 0 auto;
+        padding: var(--page-padding) 0 calc(var(--page-padding) * 1.2);
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: minmax(340px, 0.92fr) minmax(420px, 1fr);
+        gap: var(--layout-gap);
+        align-items: start;
+      }
+
+      .stack {
+        display: grid;
+        gap: var(--space-4);
+      }
+
+      .panel {
+        overflow: hidden;
+        border: 1px solid var(--surface-border);
+        border-radius: var(--radius-panel);
+        background: linear-gradient(180deg, color-mix(in srgb, var(--surface-bg) 88%, white) 0%, var(--surface-bg) 100%);
+        box-shadow: var(--surface-shadow);
+      }
+
+      .panel-inner {
+        padding: var(--space-4);
+      }
+
+      .hero-card {
+        position: relative;
+      }
+
+      .hero-card::before {
+        content: "";
+        position: absolute;
+        left: var(--space-4);
+        right: var(--space-4);
+        top: 0;
+        height: 3px;
+        border-radius: 999px;
+        background: linear-gradient(90deg, #762F3D 0%, #8F3D4E 33%, #4A252E 67%, #E8E2D9 100%);
+      }
+
+      .eyebrow {
+        margin-bottom: var(--space-2);
+        color: var(--muted);
+        font-size: var(--label-size);
+        line-height: var(--label-line);
+        letter-spacing: var(--label-track);
+        text-transform: uppercase;
+      }
+
+      .site-title,
+      .section-title {
+        margin: 0;
+        color: var(--ink);
+        font-family: var(--font-display);
+        font-weight: 600;
+      }
+
+      .site-title {
+        font-size: var(--title-size);
+        line-height: var(--title-line);
+        letter-spacing: var(--title-track);
+      }
+
+      .descriptor {
+        margin: var(--space-2) 0 0;
+        max-width: 42ch;
+        color: var(--muted);
+        font-size: var(--body-size);
+        line-height: var(--body-line);
+      }
+
+      .summary {
+        margin: var(--space-3) 0 0;
+        max-width: 56ch;
+        color: var(--muted);
+        font-size: var(--body-size);
+        line-height: var(--body-line);
+      }
+
+      .chip-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-2);
+        margin: var(--space-3) 0 0;
+      }
+
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        min-height: calc(4px * 3);
+        padding: 0 var(--space-2);
+        border: 1px solid var(--surface-border);
+        border-radius: var(--radius-pill);
+        background: var(--surface-bg);
+        color: var(--ink);
+        font-size: var(--label-size);
+        line-height: var(--label-line);
+        box-shadow: var(--surface-shadow-soft);
+      }
+
+      .observed-link {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--space-2);
+        margin-top: var(--space-4);
+        padding-top: var(--space-3);
+        border-top: 1px solid var(--surface-border);
+        color: var(--muted);
+        font-size: var(--label-size);
+        overflow-wrap: anywhere;
+      }
+
+      .observed-link::before {
+        content: "";
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: var(--accent);
+        box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 16%, transparent);
+      }
+
+      .section-title {
+        font-size: var(--section-size);
+        line-height: var(--section-line);
+        letter-spacing: var(--section-track);
+      }
+
+      .section-subtitle {
+        margin: var(--space-2) 0 var(--space-4);
+        color: var(--muted);
+        font-size: var(--body-size);
+        line-height: var(--body-line);
+      }
+
+      .palette-grid,
+      .theme-mode-grid,
+      .type-list,
+      .component-card,
+      .prompt-list,
+      .mini-grid,
+      .token-table {
+        display: grid;
+        gap: var(--space-2);
+      }
+
+      .palette-row {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: var(--space-2);
+      }
+
+      .palette-row.neutral-row {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+
+      .theme-mode-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: var(--space-3);
+      }
+
+      .theme-mode-card {
+        display: grid;
+        gap: var(--space-2);
+        padding: var(--space-3);
+        border: 1px solid var(--surface-border);
+        border-radius: var(--radius-card);
+        background: color-mix(in srgb, var(--surface-bg) 92%, white);
+      }
+
+      .theme-mode-card.is-dark {
+        background: #111111;
+        color: #f4f4f4;
+        border-color: rgba(255, 255, 255, 0.12);
+      }
+
+      .theme-mode-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-2);
+      }
+
+      .theme-mode-label {
+        color: var(--subtle);
+        font-size: var(--label-size);
+        line-height: var(--label-line);
+        letter-spacing: var(--label-track);
+        text-transform: uppercase;
+      }
+
+      .theme-mode-card.is-dark .theme-mode-label {
+        color: rgba(255, 255, 255, 0.7);
+      }
+
+      .theme-mode-note {
+        margin: 0;
+        color: var(--muted);
+        font-size: calc(var(--body-size) - 1px);
+        line-height: calc(var(--body-line) - 4px);
+      }
+
+      .theme-mode-card.is-dark .theme-mode-note {
+        color: rgba(255, 255, 255, 0.82);
+      }
+
+      .theme-swatch-row {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: var(--space-2);
+      }
+
+      .theme-swatch {
+        display: grid;
+        gap: 6px;
+      }
+
+      .theme-swatch-box {
+        height: 72px;
+        border-radius: calc(var(--radius-card) - 4px);
+        border: 1px solid color-mix(in srgb, var(--surface-border-strong) 75%, transparent);
+      }
+
+      .theme-mode-card.is-dark .theme-swatch-box {
+        border-color: rgba(255, 255, 255, 0.14);
+      }
+
+      .theme-swatch-name {
+        color: inherit;
+        font-size: 12px;
+        line-height: 1.3;
+      }
+
+      .theme-swatch-value {
+        color: var(--subtle);
+        font-size: 11px;
+        line-height: 1.3;
+      }
+
+      .theme-mode-card.is-dark .theme-swatch-value {
+        color: rgba(255, 255, 255, 0.62);
+      }
+
+      .swatch {
+        display: grid;
+        gap: var(--space-2);
+      }
+
+      .swatch-box {
+        min-height: calc(4px * 12);
+        border-radius: var(--radius-card);
+        border: 1px solid color-mix(in srgb, var(--surface-border-strong) 75%, transparent);
+        box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 4%, transparent);
+      }
+
+      .swatch-label,
+      .token-heading,
+      .prompt-card strong,
+      .card-preview h4 {
+        color: var(--ink);
+        font-family: var(--font-display);
+        font-size: var(--body-size);
+        line-height: var(--body-line);
+        font-weight: 600;
+      }
+
+      .swatch-meta,
+      .type-metrics,
+      .mini-label,
+      .copy-state,
+      .file-tab,
+      .ghost-button,
+      .segmented button {
+        color: var(--muted);
+        font-size: var(--label-size);
+        line-height: var(--label-line);
+      }
+
+      .type-row {
+        display: grid;
+        grid-template-columns: 72px minmax(0, 1fr) auto;
+        gap: var(--space-2);
+        align-items: baseline;
+        padding: var(--space-2) 0;
+        border-top: 1px solid var(--surface-border);
+      }
+
+      .type-row:first-child,
+      .mini-row:first-child,
+      .token-row:first-child {
+        border-top: 0;
+        padding-top: 0;
+      }
+
+      .type-role {
+        color: var(--muted);
+        font-size: var(--label-size);
+        line-height: var(--label-line);
+        letter-spacing: var(--label-track);
+        text-transform: uppercase;
+      }
+
+      .type-sample {
+        color: var(--ink);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .split-card {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: var(--space-4);
+      }
+
+      .token-row,
+      .mini-row {
+        display: grid;
+        gap: var(--space-2);
+        align-items: start;
+        padding-top: var(--space-2);
+        border-top: 1px solid var(--surface-border);
+      }
+
+      .token-row {
+        grid-template-columns: 1fr auto;
+      }
+
+      .mini-row {
+        grid-template-columns: 88px minmax(0, 1fr);
+      }
+
+      .mini-content,
+      .prompt-card p,
+      .card-preview p {
+        color: var(--muted);
+        font-size: var(--body-size);
+        line-height: var(--body-line);
+      }
+
+      .radius-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: var(--space-2);
+      }
+
+      .radius-card,
+      .prompt-card {
+        padding: var(--space-3);
+        border: 1px solid var(--surface-border);
+        border-radius: var(--radius-card);
+        background: var(--surface-bg-muted);
+        box-shadow: var(--surface-shadow-soft);
+      }
+
+      .radius-demo {
+        aspect-ratio: 1;
+        width: 100%;
+        border: 1px solid var(--surface-border-strong);
+        background: var(--surface-bg);
+      }
+
+      .radius-name {
+        margin-top: var(--space-2);
+        color: var(--ink);
+        font-size: var(--body-size);
+        line-height: var(--body-line);
+        font-weight: 600;
+      }
+
+      .radius-value {
+        margin-top: 4px;
+        color: var(--muted);
+        font-size: var(--label-size);
+      }
+
+      .button-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-2);
+      }
+
+      .cta {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: var(--button-height);
+        padding: 0 var(--space-3);
+        border-radius: var(--button-radius);
+        font-family: var(--font-body);
+        font-size: var(--button-font-size);
+        font-weight: var(--button-weight);
+        line-height: 1;
+        letter-spacing: normal;
+      }
+
+      .cta-primary {
+        border: 1px solid transparent;
+        background: #171717;
+        color: #ffffff;
+        border-radius: 999px;
+      }
+
+      .cta-secondary {
+        border: 1px solid #171717;
+        background: #ffffff;
+        color: #171717;
+        border-radius: 999px;
+        box-shadow: var(--surface-shadow-soft);
+      }
+
+      .card-preview {
+        padding: 8px;
+        border-radius: 10px;
+        border: 1px solid color-mix(in srgb, var(--surface-border-strong) 72%, transparent);
+        background: var(--surface-bg);
+        color: var(--ink);
+        box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08), 0 2px 2px rgba(0, 0, 0, 0.04), 0 8px 8px -8px rgba(0, 0, 0, 0.04);
+      }
+
+      .card-preview h4 {
+        margin: 0 0 var(--space-1);
+      }
+
+      .source-shell {
+        position: sticky;
+        top: var(--page-padding);
+      }
+
+      .source-header {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-2);
+        padding: var(--space-3) var(--space-4) var(--space-2);
+        border-bottom: 1px solid var(--surface-border);
+      }
+
+      .file-tabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 2px var(--space-3);
+      }
+
+      .file-tab {
+        padding: 0 0 var(--space-2);
+        border-bottom: 2px solid transparent;
+      }
+
+      .file-tab.active {
+        color: var(--ink);
+        border-bottom-color: var(--ink);
+        font-weight: 600;
+      }
+
+      .source-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--space-2);
+        padding: var(--space-2) var(--space-4);
+        border-bottom: 1px solid var(--surface-border);
+      }
+
+      .segmented {
+        display: inline-flex;
+        padding: 3px;
+        border: 1px solid var(--surface-border);
+        border-radius: var(--radius-pill);
+        background: var(--surface-bg-muted);
+      }
+
+      .segmented button {
+        border: 0;
+        border-radius: var(--radius-pill);
+        background: transparent;
+        padding: 6px 12px;
+        cursor: pointer;
+      }
+
+      .segmented button.is-active {
+        background: var(--surface-bg);
+        color: var(--ink);
+        box-shadow: var(--surface-shadow-soft);
+      }
+
+      .toolbar-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-2);
+        margin-left: auto;
+      }
+
+      .ghost-button {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 12px;
+        border: 1px solid var(--surface-border);
+        border-radius: 0px;
+        background: var(--surface-bg);
+        box-shadow: var(--surface-shadow-soft);
+        cursor: pointer;
+      }
+
+      .source-body {
+        max-height: calc(100vh - (var(--page-padding) * 2) - 120px);
+        overflow: auto;
+      }
+
+      .source-view,
+      .rendered-view {
+        margin: 0;
+        padding: var(--space-4);
+      }
+
+      .source-view {
+        color: var(--ink);
+        font-family: var(--font-mono);
+        font-size: var(--source-size);
+        line-height: var(--source-line);
+        white-space: pre-wrap;
+        word-break: break-word;
+        background: var(--surface-bg);
+      }
+
+      .rendered-view {
+        color: var(--ink);
+        font-family: var(--font-body);
+        font-size: var(--body-size);
+        line-height: var(--body-line);
+        background: var(--surface-bg);
+      }
+
+      .rendered-view[hidden],
+      .source-view[hidden] {
+        display: none;
+      }
+
+      .rendered-view h2,
+      .rendered-view h3 {
+        margin: var(--space-4) 0 var(--space-2);
+        color: var(--ink);
+        font-family: var(--font-display);
+        font-weight: 600;
+      }
+
+      .rendered-view h2 {
+        font-size: var(--section-size);
+        line-height: var(--section-line);
+        letter-spacing: var(--section-track);
+      }
+
+      .rendered-view h2:first-child {
+        margin-top: 0;
+      }
+
+      .rendered-view h3 {
+        color: var(--muted);
+        font-size: calc(32px - 4px);
+        line-height: calc(38px - 4px);
+      }
+
+      .rendered-view p,
+      .rendered-view li {
+        color: var(--muted);
+      }
+
+      .rendered-view ul,
+      .rendered-view ol {
+        margin: 0 0 var(--space-3) 20px;
+        padding: 0;
+      }
+
+      .rendered-view table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: var(--space-2) 0 var(--space-4);
+      }
+
+      .rendered-view th,
+      .rendered-view td {
+        padding: var(--space-2) var(--space-2);
+        border: 1px solid var(--surface-border);
+        text-align: left;
+        vertical-align: top;
+        font-size: var(--label-size);
+        line-height: var(--label-line);
+      }
+
+      .rendered-view th {
+        color: var(--ink);
+        background: var(--surface-bg-muted);
+      }
+
+      .rendered-view code {
+        padding: 0.14em 0.4em;
+        border-radius: 0px;
+        background: var(--surface-bg-muted);
+        color: var(--ink);
+        font-family: var(--font-mono);
+        font-size: 0.92em;
+      }
+
+      @media (max-width: 1120px) {
+        .layout {
+          grid-template-columns: 1fr;
+        }
+
+        .source-shell {
+          position: relative;
+          top: 0;
+        }
+
+        .source-body {
+          max-height: none;
+        }
+      }
+
+      @media (max-width: 760px) {
+        .shell {
+          width: min(100vw - (6px * 2), 100%);
+          padding-top: 6px;
+        }
+
+        .panel-inner,
+        .source-view,
+        .rendered-view {
+          padding-left: var(--space-3);
+          padding-right: var(--space-3);
+        }
+
+        .palette-row,
+        .palette-row.neutral-row,
+        .theme-mode-grid,
+        .theme-swatch-row,
+        .split-card,
+        .radius-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .type-row,
+        .mini-row {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <div class="layout">
+        <section class="stack">
+          <article class="panel hero-card">
+            <div class="panel-inner">
+              <div class="eyebrow">Design Preview</div>
+              <h1 class="site-title">Wavesweb Homepage</h1>
+              <p class="descriptor">Wavesweb feels like a thoughtful independent studio: warm paper, dark wine, quiet gray, and...</p>
+              <div class="chip-row"><span class="chip">Pair soft cream and dusty pink w...</span><span class="chip">Treat typography and section col...</span><span class="chip">Put concrete labels, numbers, st...</span><span class="chip">Use italics sparingly to give on...</span><span class="chip">Keep the mood warm in both appea...</span></div>
+              <p class="summary">Wavesweb feels like a thoughtful independent studio: warm paper, dark wine, quiet gray, and large editorial type create a calm surface for fairly technical work. The layout has generous breathing room, but its content is not vague or decorative. It explains a problem, names an approach, then backs up the claim with structured evidence and small project artifacts. Section changes rely on color and composition more than boxes. The hero is centered and expressive; the situations ledger is analytical; the evidence area is a contrasting wine field; the Labs area is a compact project catalog; and the footer closes with an oversized editorial statement.</p>
+              <a class="observed-link" href="https://wavesweb.nl/" target="_blank" rel="noreferrer">https://wavesweb.nl/</a>
+            </div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-inner">
+              <h2 class="section-title">Palette</h2>
+              <p class="section-subtitle">Roles and neutrals rendered using the extracted design system rather than a separate display theme.</p>
+              <div class="palette-grid"><div class="palette-row"><div class="swatch">
+    <div class="swatch-box" style="background:#762F3D;"></div>
+    <div class="swatch-label">Wine</div>
+    <div class="swatch-meta">
+      <span>#762F3D</span>
+      <span>Primary action, light</span>
+    </div>
+  </div><div class="swatch">
+    <div class="swatch-box" style="background:#8F3D4E;"></div>
+    <div class="swatch-label">Berry</div>
+    <div class="swatch-meta">
+      <span>#8F3D4E</span>
+      <span>Primary action, dark</span>
+    </div>
+  </div><div class="swatch">
+    <div class="swatch-box" style="background:#4A252E;"></div>
+    <div class="swatch-label">Wine shadow</div>
+    <div class="swatch-meta">
+      <span>#4A252E</span>
+      <span>Deep accent</span>
+    </div>
+  </div></div><div class="palette-row neutral-row"><div class="swatch">
+    <div class="swatch-box" style="background:#E8E2D9;"></div>
+    <div class="swatch-label">Warm stone</div>
+    <div class="swatch-meta">
+      <span>#E8E2D9</span>
+      <span>Page background, light</span>
+    </div>
+  </div><div class="swatch">
+    <div class="swatch-box" style="background:#1C1618;"></div>
+    <div class="swatch-label">Deep paper</div>
+    <div class="swatch-meta">
+      <span>#1C1618</span>
+      <span>Page background, dark</span>
+    </div>
+  </div><div class="swatch">
+    <div class="swatch-box" style="background:#F3F0EA;"></div>
+    <div class="swatch-label">Paper</div>
+    <div class="swatch-meta">
+      <span>#F3F0EA</span>
+      <span>Base paper, light</span>
+    </div>
+  </div><div class="swatch">
+    <div class="swatch-box" style="background:#171214;"></div>
+    <div class="swatch-label">Night paper</div>
+    <div class="swatch-meta">
+      <span>#171214</span>
+      <span>Base paper, dark</span>
+    </div>
+  </div></div></div>
+            </div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-inner">
+              <h2 class="section-title">Theme Modes</h2>
+              <p class="section-subtitle">If the product supports light and dark themes, both modes should stay visible in the exported design system and preview.</p>
+              <div class="theme-mode-grid"><div class="theme-mode-card ">
+    <div class="theme-mode-head">
+      <strong>Light Mode</strong>
+      <span class="theme-mode-label">Light</span>
+    </div>
+    
+    <div class="theme-swatch-row"><div class="theme-swatch">
+        <div class="theme-swatch-box" style="background:#E8E2D9;"></div>
+        <div class="theme-swatch-name">Background</div>
+        <div class="theme-swatch-value">#E8E2D9</div>
+      </div><div class="theme-swatch">
+        <div class="theme-swatch-box" style="background:#F7F1E7;"></div>
+        <div class="theme-swatch-name">Surface</div>
+        <div class="theme-swatch-value">#F7F1E7</div>
+      </div><div class="theme-swatch">
+        <div class="theme-swatch-box" style="background:#2D2023;"></div>
+        <div class="theme-swatch-name">Text</div>
+        <div class="theme-swatch-value">#2D2023</div>
+      </div><div class="theme-swatch">
+        <div class="theme-swatch-box" style="background:#762F3D;"></div>
+        <div class="theme-swatch-name">Accent</div>
+        <div class="theme-swatch-value">#762F3D</div>
+      </div></div>
+  </div><div class="theme-mode-card is-dark">
+    <div class="theme-mode-head">
+      <strong>Dark Mode</strong>
+      <span class="theme-mode-label">Dark</span>
+    </div>
+    
+    <div class="theme-swatch-row"><div class="theme-swatch">
+        <div class="theme-swatch-box" style="background:#1C1618;"></div>
+        <div class="theme-swatch-name">Background</div>
+        <div class="theme-swatch-value">#1C1618</div>
+      </div><div class="theme-swatch">
+        <div class="theme-swatch-box" style="background:#251E20;"></div>
+        <div class="theme-swatch-name">Surface</div>
+        <div class="theme-swatch-value">#251E20</div>
+      </div><div class="theme-swatch">
+        <div class="theme-swatch-box" style="background:#EBE5DC;"></div>
+        <div class="theme-swatch-name">Text</div>
+        <div class="theme-swatch-value">#EBE5DC</div>
+      </div><div class="theme-swatch">
+        <div class="theme-swatch-box" style="background:#D7A3AD;"></div>
+        <div class="theme-swatch-name">Accent</div>
+        <div class="theme-swatch-value">#D7A3AD</div>
+      </div></div>
+  </div></div>
+            </div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-inner">
+              <h2 class="section-title">Typography</h2>
+              <p class="section-subtitle">The preview shell itself now uses the extracted typography stack, sizes, line heights, and tracking.</p>
+              <div class="type-list"><div class="type-row">
+        <div class="type-role">Hero headline</div>
+        <div
+          class="type-sample"
+          style="font-size:48px; line-height:56px; font-weight:500; letter-spacing:-0.035em; font-family:Aptos, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Arial, sans-serif;"
+        >
+          The quick brown fox jumps
+        </div>
+        <div class="type-metrics">70.16px at 1440px; 45px at 360px • 750 • 65.95px desktop; 42.75px at 360px</div>
+      </div><div class="type-row">
+        <div class="type-role">Section heading</div>
+        <div
+          class="type-sample"
+          style="font-size:44.64px; line-height:44.64px; font-weight:500; letter-spacing:-0.03em; font-family:Aptos, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Arial, sans-serif;"
+        >
+          The quick brown fox jumps
+        </div>
+        <div class="type-metrics">44.64px • 750 • 43.75px</div>
+      </div><div class="type-row">
+        <div class="type-role">Project title</div>
+        <div
+          class="type-sample"
+          style="font-size:21.6px; line-height:24.19px; font-weight:500; letter-spacing:-0.025em; font-family:Aptos, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Arial, sans-serif;"
+        >
+          The quick brown fox jumps
+        </div>
+        <div class="type-metrics">21.6px • 750 • 24.19px</div>
+      </div><div class="type-row">
+        <div class="type-role">Body</div>
+        <div
+          class="type-sample"
+          style="font-size:16px; line-height:24px; font-weight:400; letter-spacing:normal; font-family:Aptos, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Arial, sans-serif;"
+        >
+          The quick brown fox jumps
+        </div>
+        <div class="type-metrics">16px; hero support 17.28px desktop • 400 • 24px; hero support 28.51px desktop</div>
+      </div><div class="type-row">
+        <div class="type-role">Label / Eyebrow</div>
+        <div
+          class="type-sample"
+          style="font-size:12.16px; line-height:14.59px; font-weight:700; letter-spacing:0.14em; font-family:Aptos, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Arial, sans-serif;"
+        >
+          The quick brown fox jumps
+        </div>
+        <div class="type-metrics">12.16px • 800 • 14.59px</div>
+      </div><div class="type-row">
+        <div class="type-role">CTA</div>
+        <div
+          class="type-sample"
+          style="font-size:16px; line-height:24px; font-weight:700; letter-spacing:normal; font-family:Aptos, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Arial, sans-serif;"
+        >
+          The quick brown fox jumps
+        </div>
+        <div class="type-metrics">16px • 800 • 24px</div>
+      </div><div class="type-row">
+        <div class="type-role">Footer statement</div>
+        <div
+          class="type-sample"
+          style="font-size:48px; line-height:53.31px; font-weight:500; letter-spacing:-0.035em; font-family:Aptos, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Arial, sans-serif;"
+        >
+          The quick brown fox jumps
+        </div>
+        <div class="type-metrics">54.4px • 760 • 53.31px</div>
+      </div><div class="type-row">
+        <div class="type-role">Evidence index</div>
+        <div
+          class="type-sample"
+          style="font-size:14.4px; line-height:21.6px; font-weight:400; letter-spacing:normal; font-family:Aptos, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Arial, sans-serif;"
+        >
+          The quick brown fox jumps
+        </div>
+        <div class="type-metrics">14.4px • 400 • 21.6px</div>
+      </div></div>
+            </div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-inner">
+              <h2 class="section-title">Spacing &amp; Shape</h2>
+              <p class="section-subtitle">Spacing, panel padding, and radius tokens are mapped directly from the layout rules in the markdown.</p>
+              <div class="split-card">
+    <div>
+      <h3 class="token-heading">Spacing</h3>
+      <div class="token-table"><div class="token-row">
+        <span>Base unit</span>
+        <span>4px</span>
+      </div><div class="token-row">
+        <span>Step 2</span>
+        <span>6px</span>
+      </div><div class="token-row">
+        <span>Step 3</span>
+        <span>8px</span>
+      </div><div class="token-row">
+        <span>Step 4</span>
+        <span>12px</span>
+      </div><div class="token-row">
+        <span>Step 5</span>
+        <span>16px</span>
+      </div></div>
+    </div>
+    <div>
+      <h3 class="token-heading">Border Radius</h3>
+      <div class="radius-grid"><div class="radius-card">
+        <div class="radius-demo" style="border-radius:0px;"></div>
+        <div class="radius-name">Micro utility</div>
+        <div class="radius-value">0px</div>
+      </div><div class="radius-card">
+        <div class="radius-demo" style="border-radius:10px;"></div>
+        <div class="radius-name">Standard module</div>
+        <div class="radius-value">10px</div>
+      </div><div class="radius-card">
+        <div class="radius-demo" style="border-radius:999px;"></div>
+        <div class="radius-name">Category rail</div>
+        <div class="radius-value">999px</div>
+      </div><div class="radius-card">
+        <div class="radius-demo" style="border-radius:999px;"></div>
+        <div class="radius-name">CTA pill</div>
+        <div class="radius-value">999px</div>
+      </div></div>
+    </div>
+  </div>
+            </div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-inner">
+              <h2 class="section-title">Components</h2>
+              <p class="section-subtitle">Buttons and cards use the documented height, weight, radius, colors, and surface treatment.</p>
+              <div class="component-card">
+    <div class="button-row">
+      <span class="cta cta-primary">Start Deploying</span>
+      <span class="cta cta-secondary">Get a Demo</span>
+    </div>
+    <div class="card-preview">
+      <h4>System Card Preview</h4>
+      <p>matte cream in light mode and dark plum-charcoal in dark mode.</p>
+    </div>
+  </div>
+            </div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-inner">
+              <h2 class="section-title">System Notes</h2>
+              <p class="section-subtitle">Responsive behavior and depth rules stay visible while keeping the overall proportions calm and readable.</p>
+              <div class="split-card">
+    <div>
+      <h3 class="token-heading">Breakpoints</h3>
+      <div class="mini-grid"><div class="mini-row">
+            <div class="mini-label">Narrow phone</div>
+            <div class="mini-content"><strong>360px and below</strong><br />Hero type and spacing compress; title measure is capped to about 11ch; the wave field is shortened</div>
+          </div><div class="mini-row">
+            <div class="mini-label">Mobile</div>
+            <div class="mini-content"><strong>620px and below</strong><br />Page gutters become 18px; desktop nav becomes a full-width expandable pill with menu button; hero and evidence spacing tighten</div>
+          </div><div class="mini-row">
+            <div class="mini-label">Tablet</div>
+            <div class="mini-content"><strong>621px to 900px</strong><br />Page gutters are 24px; desktop navigation remains; situations stack below 1100px; Labs cards become a single column below 859px</div>
+          </div><div class="mini-row">
+            <div class="mini-label">Desktop</div>
+            <div class="mini-content"><strong>901px and above</strong><br />Wide editorial spacing returns; at 1392px and above, Labs projects use four columns</div>
+          </div></div>
+    </div>
+    <div>
+      <h3 class="token-heading">Elevation</h3>
+      <div class="mini-grid"><div class="mini-row">
+            <div class="mini-label">Flat</div>
+            <div class="mini-content"><strong>Matte section background with no shadow</strong><br />Main page regions and text-led sections</div>
+          </div><div class="mini-row">
+            <div class="mini-label">Ring</div>
+            <div class="mini-content"><strong>Thin inset rule or visible outline</strong><br />Project cards, selected tabs, and keyboard focus</div>
+          </div><div class="mini-row">
+            <div class="mini-label">Card</div>
+            <div class="mini-content"><strong>Soft 1px inset border plus a low-opacity 6px / 18px shadow</strong><br />Labs project cards</div>
+          </div><div class="mini-row">
+            <div class="mini-label">Focus</div>
+            <div class="mini-content"><strong>2px outline with 3px offset on key navigation and footer links</strong><br />Keyboard navigation</div>
+          </div></div>
+    </div>
+  </div>
+            </div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-inner">
+              <h2 class="section-title">Prompt Guide</h2>
+              <p class="section-subtitle">Prompt snippets are shown in the same typography and spacing language as the extracted design system.</p>
+              <div class="prompt-list"><div class="prompt-card"><strong>Quick Summary</strong><p>Wavesweb is a warm editorial studio site with a measured, evidence-first layout. Use the paper, wine, and dusty-pink palette with separate light and dark tokens. Set large, tightly tracked sans-serif headlines and reserve Georgia italics for small emphasis. Keep the navigation in a floating pill on desktop and an expandable, full-width pill on mobile. Use structured ledgers, selectable evidence panels, and evidence-rich Labs cards. Use whitespace and section backgrounds for hierarchy; keep borders and shadows restrained.</p></div><div class="prompt-card">
+            <strong>Hero</strong>
+            <p>Center a short, two-line Aptos display headline at a fluid 62px to 70px desktop scale, with tight leading and one Georgia italic word. Keep the supporting copy near 46ch, place a filled wine CTA beside a transparent underlined action, then add a low-contrast five-line wave SVG.</p>
+          </div><div class="prompt-card">
+            <strong>Card</strong>
+            <p>Build a 16px-radius Labs card with a fine inset border, faint 6px / 18px shadow, uppercase status, 01 / 04 index, 22px title, concise explanation, compact evidence artifact, and a text link. Use four columns on wide screens and one column below 859px.</p>
+          </div><div class="prompt-card">
+            <strong>Navigation</strong>
+            <p>Make a centered fixed pill with a subtle translucent surface, one-pixel border, inset highlight, soft layered shadow, wordmark wave, three 44px links, and theme control. Below 620px, replace links with a 44px menu toggle and an expanding panel.</p>
+          </div><div class="prompt-card">
+            <strong>Button</strong>
+            <p>Use a 10px-radius filled CTA with 16px bold Aptos text, 51px height, and 18px horizontal padding. Keep hover color shift and shadow transition near 0.18s; use a transparent underlined style for the secondary action.</p>
+          </div><div class="prompt-card"><strong>Ready-to-Use Prompt</strong><p>Create a Wavesweb-style homepage in a warm editorial design language. Use the two-theme paper and wine palette, Aptos with a small Georgia italic accent, a centered display hero, a floating navigation pill, a numbered situations ledger, a selectable evidence band, and restrained evidence-rich project cards. Keep a 1360px max-width container with 40px desktop gutters, 24px tablet gutters, and 18px mobile gutters. Add the compact menu below 620px and maintain accessible 44px controls. Use quiet transitions, soft borders, minimal shadows, and direct Dutch copy that names a real situation, approach, or evidence source.</p></div></div>
+              <div class="split-card" style="margin-top:var(--space-4);">
+    <div>
+      <h3 class="token-heading">Do</h3>
+      <div class="mini-grid"><div class="mini-row"><div class="mini-label">Do</div><div class="mini-content">Keep the warm paper, wine, and dusty-pink relationship in both theme modes.</div></div><div class="mini-row"><div class="mini-label">Do</div><div class="mini-content">Give the hero one clear sentence and a concise pair of actions.</div></div><div class="mini-row"><div class="mini-label">Do</div><div class="mini-content">Use measured, concrete problem and evidence language inside ledgers and cards.</div></div><div class="mini-row"><div class="mini-label">Do</div><div class="mini-content">Preserve the serif italic accent as a small contrast against sans-serif typography.</div></div></div>
+    </div>
+    <div>
+      <h3 class="token-heading">Don't</h3>
+      <div class="mini-grid"><div class="mini-row"><div class="mini-label">Don't</div><div class="mini-content">Do not add a bright blue or multicolor accent palette.</div></div><div class="mini-row"><div class="mini-label">Don't</div><div class="mini-content">Do not turn every content block into a rounded card; several sections are intentionally flat.</div></div><div class="mini-row"><div class="mini-label">Don't</div><div class="mini-content">Do not use large dark shadows, glass treatment on every surface, or decorative stock imagery.</div></div><div class="mini-row"><div class="mini-label">Don't</div><div class="mini-content">Do not use italics for long copy or make every heading oversized.</div></div></div>
+    </div>
+  </div>
+            </div>
+          </article>
+        </section>
+
+        <section class="source-shell">
+          <article class="panel">
+            <div class="source-header">
+              <div class="file-tabs">
+                <span class="file-tab">design-system.md</span>
+                <span class="file-tab active">design.md</span>
+                <span class="file-tab">Design JSON</span>
+                <span class="file-tab">CSS Variables</span>
+                <span class="file-tab">Design Tokens</span>
+              </div>
+            </div>
+            <div class="source-toolbar">
+              <div class="segmented" role="tablist" aria-label="View Switcher">
+                <button class="is-active" data-view="source" type="button">Source</button>
+                <button data-view="preview" type="button">Preview</button>
+              </div>
+              <div class="toolbar-actions">
+                <button class="ghost-button" id="copyButton" type="button">Copy</button>
+                <a class="ghost-button" href="design.md" download>Open .md</a>
+                <span class="copy-state" id="copyState"></span>
+              </div>
+            </div>
+            <div class="source-body">
+              <pre class="source-view" id="sourceView"># Design System: Wavesweb Homepage
+
+Source: [wavesweb.nl homepage](https://wavesweb.nl/). This guide records the homepage as rendered during a live browser inspection. Values labeled as measured come from computed browser styles at the viewport widths listed in Responsive Behavior. Other pages linked from the homepage were not inspected.
+
+## 1. Visual Theme &amp; Atmosphere
+
+Wavesweb feels like a thoughtful independent studio: warm paper, dark wine, quiet gray, and large editorial type create a calm surface for fairly technical work. The layout has generous breathing room, but its content is not vague or decorative. It explains a problem, names an approach, then backs up the claim with structured evidence and small project artifacts. Section changes rely on color and composition more than boxes. The hero is centered and expressive; the situations ledger is analytical; the evidence area is a contrasting wine field; the Labs area is a compact project catalog; and the footer closes with an oversized editorial statement.
+
+- Overall feeling: warm, assured, investigative, and human.
+- Visual density: sparse in the hero, information-dense in evidence and project cards, with strong spacing between sections.
+- Brand posture: personal and first-person, with proof of work in place of broad promotional claims.
+- Signature motifs: wine-colored sections and actions, oversized type, italic Georgia emphasis, numbered evidence, a floating translucent navigation pill, and an animated five-line wave signal.
+
+### Key Characteristics
+
+- Pair soft cream and dusty pink with deep burgundy, then keep other accent colors out of the main interface.
+- Treat typography and section color as the main hierarchy. Use cards when content needs an inspectable boundary.
+- Put concrete labels, numbers, states, and artifacts inside project cards so they read as evidence rather than generic feature tiles.
+- Use italics sparingly to give one phrase in a headline a literary accent.
+- Keep the mood warm in both appearance modes. Dark mode uses brown-black and wine rather than pure black.
+
+## 2. Color Palette &amp; Roles
+
+The website exposes separate light and dark tokens on the root element. Values below are taken from computed CSS variables or computed component styles. `#F7F1E7` is the observed light Labs card surface; the other named palette values are root tokens or sampled section and control colors.
+
+| Role | Semantic Name | Value | Usage |
+| --- | --- | --- | --- |
+| Primary action, light | Wine | `#762F3D` | Filled CTA, active links, active markers, and the light-theme accent |
+| Primary action, dark | Berry | `#8F3D4E` | Filled CTA with white label; the dark-theme CTA uses a deeper berry than the dusty-pink accent |
+| Deep accent | Wine shadow | `#4A252E` | Light-theme evidence section, secondary action text, and CTA hover |
+| Page background, light | Warm stone | `#E8E2D9` | Main homepage ground in light mode |
+| Page background, dark | Deep paper | `#1C1618` | Main homepage ground in dark mode |
+| Base paper, light | Paper | `#F3F0EA` | Primary light surface and light-mode hover surface |
+| Base paper, dark | Night paper | `#171214` | Deepest dark surface and footer ground |
+| Main text, light | Dark ink | `#2D2023` | Body copy and section headings in light mode |
+| Main text, dark | Warm ink | `#EBE5DC` | Body copy in dark mode |
+| Display text, dark | Warm white | `#F3F0EA` | High-contrast display headings and footer brand |
+| Card surface, light | Cream card | `#F7F1E7` | Raised Labs project cards and the light evidence panel text field |
+| Card surface, dark | Charcoal plum | `#251E20` | Raised Labs project cards in dark mode |
+| Muted text, light | Muted brown | `#695D5C` | Supporting copy and secondary information |
+| Muted text, dark | Warm gray | `#A89D96` | Secondary copy and mid-tone wave traces |
+| Border, light | Warm border | `#D4C9BD` | Inset card outline and restrained dividers |
+| Border, dark | Charcoal border | `#373131` | Dark card inset outline |
+| Rule, light | Stone rule | `#A89D96` | Fine separators and muted details |
+| Rule, dark | Dim rule | `#605855` | Low-contrast separators and outer wave traces |
+| Active detail | Rose | `#D7A3AD` | Selected evidence-tab rule and the core hero wave |
+
+### Primary
+
+- Light-theme actions use wine `#762F3D` with white text.
+- Dark-theme filled CTAs use berry `#8F3D4E` with white text. Dusty pink `#D7A3AD` remains the accent for selected markers, the wave core, and evidence rules.
+- The evidence band stays deep wine in both modes: `#4A252E` in light mode and `#36222B` in dark mode.
+
+### Interactive
+
+- Active navigation and selected states use the current theme&#39;s accent.
+- Light CTA hover moves to `#4A252E`; dark CTA hover moves to `#9C4A5B`.
+- Navigation links shift toward the deeper wine on hover. Focus-visible navigation and brand links use a 2px wine outline with a 3px offset. Footer links use a 2px dusty-pink outline with a 3px offset.
+- Transitions are short and restrained: CTA color, shadow, and transform transition over 0.18 seconds; theme surfaces transition over 0.24 seconds.
+
+### Neutral Scale
+
+- Light mode moves from paper `#F3F0EA` through warm stone `#E8E2D9` to ink `#2D2023`.
+- Dark mode moves from deep paper `#171214` through page ground `#1C1618` and card ground `#251E20` to warm ink `#EBE5DC`.
+- Gray tokens stay warm rather than blue. Use `#A89D96` for secondary detail and `#605855` for low-contrast dark rules.
+
+### Surface &amp; Overlay
+
+- Main homepage ground: `#E8E2D9` in light mode, `#1C1618` in dark mode.
+- Raised project cards: `#F7F1E7` in light mode, `#251E20` in dark mode.
+- Footer: `#2D2023` in light mode, `#120E10` in dark mode.
+- The floating navigation pill uses a translucent surface, a subtle warm border, an inset highlight, and a soft shadow. It is the one glass-like surface; keep other sections matte.
+
+## Theme Modes
+
+The page provides explicit light and dark choices. Changing modes recolors surfaces, text, borders, card shadows, the navigation pill, and the filled CTA. The wine family changes role while pink remains the prominent dark-mode accent. The evidence band remains a strong contrast block in both modes.
+
+### Light Mode
+
+- Background: homepage ground `#E8E2D9`; base paper `#F3F0EA`.
+- Surface: cream cards `#F7F1E7`; light footer `#2D2023`.
+- Text: ink `#2D2023`, with display white `#F3F0EA` where placed on dark surfaces.
+- Accent: wine `#762F3D`; deep wine `#4A252E`; active pink `#D7A3AD`.
+- Notes: the evidence section is a solid deep-wine block with warm-white text. Light cards use a restrained inset border and soft shadow.
+
+### Dark Mode
+
+- Background: homepage ground `#1C1618`; deepest paper `#171214`.
+- Surface: cards `#251E20`; evidence band `#36222B`; footer `#120E10`.
+- Text: warm ink `#EBE5DC`; display headings `#F3F0EA`.
+- Accent: dusty rose `#D7A3AD`; pale rose `#E4C6C8`. Filled CTA: berry `#8F3D4E` with white text; hover: brighter berry `#9C4A5B`.
+- Notes: borders and rules recede into plum-gray. Card depth is mostly an inset border with a very soft shadow, not a large floating elevation.
+
+### Shadows &amp; Depth
+
+- Light card shadow token: `0 12px 28px #30202312`; the sampled project card uses a 1px inset border plus `0 6px 18px` at 5% opacity.
+- Dark card outline: 1px inset `#373131`, with the same soft `0 6px 18px` shadow scale. The dark CTA shadow token is `0 8px 18px #00000052`.
+- Light CTA shadow token: `0 8px 18px #4A252E24`; the sampled CTA uses a subtle 14% wine shadow.
+- The navigation pill uses a three-part shadow: inset top highlight, soft 12px/30px lift, and a faint 1px/2px contact shadow.
+- Focus is an outline or small underline, not a glow.
+
+## 3. Typography Rules
+
+Use a clean system sans for most content and Georgia for selected italic phrases and small editorial indices. The effect comes from the contrast between precise, closely tracked sans-serif display text and a few quiet serif accents. Keep copy widths controlled and line lengths readable.
+
+### Font Family
+
+- Primary: `Aptos, &quot;Segoe UI&quot;, sans-serif` as declared and computed by the page. The actual rendered face depends on the visitor&#39;s installed fonts.
+- Serif accent: `Georgia, &quot;Times New Roman&quot;, serif`, used for italic emphasis and numbered evidence indices.
+- Monospace: system monospace stack for technical artifacts where needed; it is not a dominant homepage typeface.
+- OpenType Features: no custom feature settings were observed.
+
+### Hierarchy
+
+Sizes below are measured at 1440px unless the note says otherwise. Fluid CSS tokens compress the same hierarchy on smaller screens.
+
+| Role | Font | Size | Weight | Line Height | Letter Spacing | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| Hero headline | Aptos stack | 70.16px at 1440px; 45px at 360px | 750 | 65.95px desktop; 42.75px at 360px | -0.035em | Centered, tightly led, usually split across deliberate lines; the emphasized word is Georgia italic |
+| Section heading | Aptos stack | 44.64px | 750 | 43.75px | -0.03em | Large but smaller than the hero; one phrase may switch to Georgia italic |
+| Project title | Aptos stack | 21.6px | 750 | 24.19px | -0.025em | Clear card title, not a display headline |
+| Body | Aptos stack | 16px; hero support 17.28px desktop | 400 | 24px; hero support 28.51px desktop | Normal | Main copy stays readable and conversational; hero copy is held to about 46ch |
+| Label / Eyebrow | Aptos stack | 12.16px | 800 | 14.59px | 0.14em | Uppercase, compact, and widely tracked |
+| CTA | Aptos stack | 16px | 800 | 24px | Normal | Bold and verb-led |
+| Footer statement | Aptos stack | 54.4px | 760 | 53.31px | -0.035em | Large two-line sign-off |
+| Evidence index | Georgia italic | 14.4px | 400 | 21.6px | Normal | Small editorial counter before a tab label |
+
+### Principles
+
+- Use a compact leading ratio for display text: about 0.94 for the hero and 0.98 for section headings.
+- Set display tracking tightly, then use normal tracking for body copy.
+- Use Georgia italics for a selected word or index, not for whole paragraphs.
+- Keep labels uppercase with generous tracking, while keeping body copy in sentence case.
+- Let a smaller viewport reduce the display size and adjust the line breaks; do not simply scale the desktop headline without checking its measure.
+
+## 4. Component Stylings
+
+### Buttons and Links
+
+- Primary CTA: light fill `#762F3D`; dark fill `#8F3D4E`; white label in both modes; 10px radius; 51px measured height; padding of about 13.6px by 18.4px. Use 800 weight and a small soft shadow.
+- Secondary CTA: transparent background, bold wine-colored text, and a fine underline rule. It sits beside the primary action without competing for fill or weight.
+- Text links: mainly plain text, with accent or muted color shifts on hover. Navigation links use a 44px high hit area on desktop.
+- Hover and active feel: the primary CTA darkens in light mode or lightens in dark mode, and its shadow grows slightly over 0.18 seconds. The evidence selection gains a 3px inset pink rule at the top. No button lift was observed.
+- Focus: retain the visible focus treatments on navigation and footer links. Mobile menu and theme controls have 44px minimum dimensions.
+
+### Cards and Containers
+
+- Surface style: matte cream in light mode and dark plum-charcoal in dark mode.
+- Radius: 16px for project cards; 10px for CTA buttons.
+- Border: a subtle 1px inset border, which gives the card a precise edge without a strong box outline.
+- Shadow or elevation: low, soft separation. Avoid a large floating-card shadow.
+- Internal spacing: roughly 18px around card content on desktop, with tighter horizontal padding at narrow widths.
+- Labs cards combine category, counter, title, a short explanation, focus and approach labels, a compact evidence artifact, and a secondary link. The small artifact is part of the card&#39;s information design, not a decorative image.
+
+### Inputs and Interactive Controls
+
+- No text form was present on the inspected homepage.
+- The evidence selector uses real radio inputs inside labeled tabs, grouped as Product / Growbook, Gebruik / UserTesting, and Operatie / Enterprise IT.
+- Selecting a radio changes the visible evidence panel. The selected tab is marked by a pink 3px top inset rule and brighter text in the dark evidence band.
+- The theme control offers separate Licht and Donker choices in the mobile menu. On desktop it is a 44px icon button with an accessible name and pressed state.
+
+### Navigation
+
+- Structure: a centered, fixed pill around the wordmark, three primary links, and a theme control. The wordmark includes a three-stroke wave mark.
+- Background treatment: translucent paper or charcoal, a subtle 1px border, inset highlight, soft layered shadow, and full pill radius on desktop.
+- Link style: plain text, 44px high links, 700 weight for the current page, and a short accent underline under the active desktop link.
+- Sticky or scroll behavior: the header is fixed and can slide above the viewport while scrolling down. It is visible at the page top. The transform transition is 0.48 seconds with an eased curve.
+- Mobile: at 620px and below, replace the desktop links with a 44px menu button. The pill becomes nearly full-width with a 24.8px radius and the open panel expands below it. The panel contains the three links and explicit light and dark theme buttons.
+
+### Image Treatment
+
+- No stock photography or raster illustration was observed on the homepage.
+- The hero uses a decorative, aria-hidden SVG wave field with five long traces in a 1200 by 220 viewBox. The center trace is dusty pink, with gray traces around it. SVG path data morphs on an 8-second infinite loop.
+- Project cards use small, structured diagrams and artifact-like information blocks. Keep them diagrammatic and readable rather than replacing them with generic screenshots.
+- Keep corners consistent with the 10px CTA and 16px card radii; the navigation is the full-pill exception.
+
+### Distinctive Components
+
+- Situations ledger: a large heading beside three numbered rows, each pairing a concrete situation with an approach. Fine rules separate rows; the index and two text columns give the list an operational feel.
+- Evidence band: a full-width deep-wine section with three radio-style evidence tabs and a changing content panel. The panel pairs a short explanation with a compact evidence list.
+- Labs project cards: four numbered project cards with explicit status, focus, approach, and embedded evidence artifact.
+- Hero signal: a wide, slowly morphing five-trace SVG under the CTA row, used as a quiet signature graphic rather than a loud illustration.
+
+## 5. Layout Principles
+
+### Spacing System
+
+- Base unit: 4px, matching the root CSS `--spacing: .25rem` value.
+- Repeated spacing values: use a 4px rhythm, with common practical steps around 8px, 12px, 16px, 24px, 32px, 48px, and 72px. This list is an implementation inference from the observed measurements, not a separate named token scale.
+- Keep section spacing generous. The desktop hero uses about 54px above and below its main content; the narrow-phone layout deliberately tightens this spacing.
+
+### Grid &amp; Container
+
+- Grid logic: centered max-width page container; editorial two-column situations ledger; three-column evidence tabs and evidence content on wider screens; four project columns on wide desktop.
+- Max content width: 1360px, measured at 1440px with 40px outer margins.
+- Tablet page width: 720px at a 768px viewport, leaving 24px gutters.
+- Mobile page width: 354px at 390px and 324px at 360px, leaving 18px gutters.
+- Section spacing: distinguish major sections with vertical room and full-width background shifts, not a stack of bordered boxes.
+
+### Whitespace Philosophy
+
+- Whitespace philosophy: let the claim breathe, then compress the proof into labeled rows and cards.
+- Alignment tendencies: centered hero; left-aligned section headings and evidence; project grid aligned to the same page container.
+- Content width behavior: keep explanatory copy narrow, while evidence bands and project collections can span the full container.
+
+### Border Radius Scale
+
+- Micro: 0px or a small line treatment for rules and underlines.
+- Standard: 10px for primary CTA; 16px for project surfaces.
+- Large: around 25px for the expanded mobile navigation pill.
+- Pill: 999px for desktop navigation and fully rounded small controls.
+
+## 6. Depth &amp; Elevation
+
+| Level | Treatment | Use |
+| --- | --- | --- |
+| Flat | Matte section background with no shadow | Main page regions and text-led sections |
+| Ring | Thin inset rule or visible outline | Project cards, selected tabs, and keyboard focus |
+| Card | Soft 1px inset border plus a low-opacity 6px / 18px shadow | Labs project cards |
+| Focus | 2px outline with 3px offset on key navigation and footer links | Keyboard navigation |
+
+### Depth Principles
+
+- Surface hierarchy: page ground first, wine evidence band second, cards and floating navigation as the only lifted surfaces.
+- Shadow language: short and diffuse. The edge should remain more legible than the shadow.
+- Blur, glass, or overlay behavior: translucency and a small inset highlight belong to the navigation pill; other regions stay matte.
+- When depth is used versus avoided: use depth for a clickable navigation capsule and discrete project cards. Do not shadow every section.
+
+## 7. Do&#39;s and Don&#39;ts
+
+### Do
+
+- Keep the warm paper, wine, and dusty-pink relationship in both theme modes.
+- Give the hero one clear sentence and a concise pair of actions.
+- Use measured, concrete problem and evidence language inside ledgers and cards.
+- Preserve the serif italic accent as a small contrast against sans-serif typography.
+- Maintain strong page gutters, a visible 44px mobile menu target, and useful focus indicators.
+
+### Don&#39;t
+
+- Do not add a bright blue or multicolor accent palette.
+- Do not turn every content block into a rounded card; several sections are intentionally flat.
+- Do not use large dark shadows, glass treatment on every surface, or decorative stock imagery.
+- Do not use italics for long copy or make every heading oversized.
+- Do not remove status labels, counters, or small evidence artifacts from the project cards; they carry the proof structure.
+
+## 8. Responsive Behavior
+
+Viewport inspection was performed at 1440px, 768px, 390px, and 360px. The breakpoint values below were also read from the live stylesheet.
+
+### Breakpoints
+
+| Name | Width | Key Changes |
+| --- | --- | --- |
+| Narrow phone | 360px and below | Hero type and spacing compress; title measure is capped to about 11ch; the wave field is shortened |
+| Mobile | 620px and below | Page gutters become 18px; desktop nav becomes a full-width expandable pill with menu button; hero and evidence spacing tighten |
+| Tablet | 621px to 900px | Page gutters are 24px; desktop navigation remains; situations stack below 1100px; Labs cards become a single column below 859px |
+| Desktop | 901px and above | Wide editorial spacing returns; at 1392px and above, Labs projects use four columns |
+
+Additional observed stylesheet thresholds: the situations ledger changes to one column at 1100px; evidence tabs and their content restructure at 700px; the Labs card layout is single-column below 859px. At 700px to 859px the cards use a more horizontal internal arrangement.
+
+### Touch Targets
+
+- Keep the mobile navigation button and desktop theme icon at 44px minimum size.
+- Mobile navigation rows are about 48px high; primary CTA height is about 51px.
+- Keep the evidence radio label area wide enough to work as a touch target, not just as a tiny radio circle.
+
+### Collapsing Strategy
+
+- Desktop behavior: hero and page container remain centered; situations use a heading column and a two-part evidence ledger; projects sit in up to four columns on wide screens.
+- Tablet behavior: situations stack their heading above the rows; project cards reflow into one column as width drops below 859px.
+- Mobile behavior: replace top navigation with a menu control; preserve three evidence choices across the width; stack the evidence panel and wrap its evidence list.
+- Breakpoint-driven component changes: at 700px the evidence tabs become compact stacked labels and the details list wraps; at 620px the nav changes; at 360px the hero uses the narrow display size and less vertical spacing.
+- Touch target and spacing adjustments: retain 44px controls while reducing gutters and section spacing; avoid shrinking controls to make the layout fit.
+
+## 9. Agent Prompt Guide
+
+### Quick Color Reference
+
+- Primary CTA: light `#762F3D`, dark `#8F3D4E`. Accent pink: `#D7A3AD`.
+- Background: light `#E8E2D9`, dark `#1C1618`.
+- Heading text: light `#2D2023`, dark `#F3F0EA` for display headings.
+- Body text: light `#2D2023`, dark `#EBE5DC`.
+- Border or ring: light `#D4C9BD`, dark `#373131`; selected evidence rule `#D7A3AD`.
+- Accent: wine and dusty pink, with deep-wine evidence bands in both modes.
+
+### Quick Summary
+
+Wavesweb is a warm editorial studio site with a measured, evidence-first layout.
+Use the paper, wine, and dusty-pink palette with separate light and dark tokens.
+Set large, tightly tracked sans-serif headlines and reserve Georgia italics for small emphasis.
+Keep the navigation in a floating pill on desktop and an expandable, full-width pill on mobile.
+Use structured ledgers, selectable evidence panels, and evidence-rich Labs cards.
+Use whitespace and section backgrounds for hierarchy; keep borders and shadows restrained.
+
+### Example Component Prompts
+
+- Hero: Center a short, two-line Aptos display headline at a fluid 62px to 70px desktop scale, with tight leading and one Georgia italic word. Keep the supporting copy near 46ch, place a filled wine CTA beside a transparent underlined action, then add a low-contrast five-line wave SVG.
+- Card: Build a 16px-radius Labs card with a fine inset border, faint 6px / 18px shadow, uppercase status, 01 / 04 index, 22px title, concise explanation, compact evidence artifact, and a text link. Use four columns on wide screens and one column below 859px.
+- Navigation: Make a centered fixed pill with a subtle translucent surface, one-pixel border, inset highlight, soft layered shadow, wordmark wave, three 44px links, and theme control. Below 620px, replace links with a 44px menu toggle and an expanding panel.
+- Button: Use a 10px-radius filled CTA with 16px bold Aptos text, 51px height, and 18px horizontal padding. Keep hover color shift and shadow transition near 0.18s; use a transparent underlined style for the secondary action.
+
+### Ready-to-Use Prompt
+
+Create a Wavesweb-style homepage in a warm editorial design language. Use the two-theme paper and wine palette, Aptos with a small Georgia italic accent, a centered display hero, a floating navigation pill, a numbered situations ledger, a selectable evidence band, and restrained evidence-rich project cards. Keep a 1360px max-width container with 40px desktop gutters, 24px tablet gutters, and 18px mobile gutters. Add the compact menu below 620px and maintain accessible 44px controls. Use quiet transitions, soft borders, minimal shadows, and direct Dutch copy that names a real situation, approach, or evidence source.
+
+### Iteration Guide
+
+1. Check the page in both theme modes and preserve each mode&#39;s background, surface, and accent roles.
+2. Compare desktop and phone composition, especially the hero measure, navigation menu, evidence tabs, and card layout.
+3. Keep emphasis selective: one italic phrase, one primary action, and clear labels before adding extra decoration.
+
+## Optional Appendix: Interaction Patterns
+
+- Scroll behavior: the fixed header can slide out of view as the page scrolls down and is shown again at the page top. The 0.48-second easing keeps the motion soft.
+- Hover behavior: primary CTA changes to the deeper wine in light mode and brighter berry in dark mode, with a slightly stronger shadow. Labs cards shift from `#F7F1E7` to `#F3F0EA` in light mode and from `#251E20` to `#2B2326` in dark mode. Navigation links change to the deeper theme accent.
+- Click behavior: theme control changes the root theme and corresponding colors. Selecting a Product, Gebruik, or Operatie radio switches the visible evidence panel. The mobile menu expands and collapses below the fixed pill.
+- Animation tone: the decorative hero signal morphs its SVG paths over 8 seconds and repeats indefinitely. The site uses short 0.18 to 0.24 second control and surface transitions. The navigation hide/show transition is 0.48 seconds.
+
+## Optional Appendix: Content &amp; Messaging Patterns
+
+- Headline pattern: a plain statement with a purposeful break and one italic phrase, such as “Van complex vraagstuk / naar werkbare verandering.”
+- CTA language: direct action phrases such as “Neem contact op” and “Zie hoe ik werk.”
+- Trust signal pattern: labeled situations, approach descriptions, dates, counts, status, and live project links instead of generic claims.
+- Voice and tone: first-person, direct Dutch, curious and practical. Copy explains what is being examined, where the friction lies, and what will change.
+
+## Optional Appendix: Observed Pages
+
+- [Wavesweb homepage](https://wavesweb.nl/): only page inspected; it supplied the palette, typography, navigation, responsive rules, interaction patterns, project cards, and content voice.
+
+## Optional Appendix: Evidence Notes
+
+- Observed in the live homepage: two theme modes; a fixed navigation pill; a 1360px desktop content width; a 44.64px measured desktop section heading; a 70.16px measured desktop hero heading; 10px CTA radius; 16px card radius; a mobile navigation breakpoint at 620px; a narrow-phone adjustment at 360px; a selector that changes evidence panels; and an 8-second SVG path animation.
+- Inferred from the live layout: the practical 4px spacing rhythm and the recommendation to use the observed patterns as a reusable system on pages that were not inspected.
+- Not inspected: linked internal routes, form pages, and every keyboard interaction. Focus-visible declarations were read from the live stylesheet, while the interactive tests covered the theme control, evidence selector, mobile navigation, hover CTA, and card hover.
+</pre>
+              <article class="rendered-view" id="previewView" hidden><section><h2>1. Visual Theme &amp; Atmosphere</h2><p>Wavesweb feels like a thoughtful independent studio: warm paper, dark wine, quiet gray, and large editorial type create a calm surface for fairly technical work. The layout has generous breathing room, but its content is not vague or decorative. It explains a problem, names an approach, then backs up the claim with structured evidence and small project artifacts. Section changes rely on color and composition more than boxes. The hero is centered and expressive; the situations ledger is analytical; the evidence area is a contrasting wine field; the Labs area is a compact project catalog; and the footer closes with an oversized editorial statement.</p><ul><li>Overall feeling: warm, assured, investigative, and human.</li><li>Visual density: sparse in the hero, information-dense in evidence and project cards, with strong spacing between sections.</li><li>Brand posture: personal and first-person, with proof of work in place of broad promotional claims.</li><li>Signature motifs: wine-colored sections and actions, oversized type, italic Georgia emphasis, numbered evidence, a floating translucent navigation pill, and an animated five-line wave signal.</li></ul><h3>Key Characteristics</h3><ul><li>Pair soft cream and dusty pink with deep burgundy, then keep other accent colors out of the main interface.</li><li>Treat typography and section color as the main hierarchy. Use cards when content needs an inspectable boundary.</li><li>Put concrete labels, numbers, states, and artifacts inside project cards so they read as evidence rather than generic feature tiles.</li><li>Use italics sparingly to give one phrase in a headline a literary accent.</li><li>Keep the mood warm in both appearance modes. Dark mode uses brown-black and wine rather than pure black.</li></ul></section><section><h2>2. Color Palette &amp; Roles</h2><p>The website exposes separate light and dark tokens on the root element. Values below are taken from computed CSS variables or computed component styles. <code>#F7F1E7</code> is the observed light Labs card surface; the other named palette values are root tokens or sampled section and control colors.</p><table><thead><tr><th>Role</th><th>Semantic Name</th><th>Value</th><th>Usage</th></tr></thead><tbody><tr><td>Primary action, light</td><td>Wine</td><td><code>#762F3D</code></td><td>Filled CTA, active links, active markers, and the light-theme accent</td></tr><tr><td>Primary action, dark</td><td>Berry</td><td><code>#8F3D4E</code></td><td>Filled CTA with white label; the dark-theme CTA uses a deeper berry than the dusty-pink accent</td></tr><tr><td>Deep accent</td><td>Wine shadow</td><td><code>#4A252E</code></td><td>Light-theme evidence section, secondary action text, and CTA hover</td></tr><tr><td>Page background, light</td><td>Warm stone</td><td><code>#E8E2D9</code></td><td>Main homepage ground in light mode</td></tr><tr><td>Page background, dark</td><td>Deep paper</td><td><code>#1C1618</code></td><td>Main homepage ground in dark mode</td></tr><tr><td>Base paper, light</td><td>Paper</td><td><code>#F3F0EA</code></td><td>Primary light surface and light-mode hover surface</td></tr><tr><td>Base paper, dark</td><td>Night paper</td><td><code>#171214</code></td><td>Deepest dark surface and footer ground</td></tr><tr><td>Main text, light</td><td>Dark ink</td><td><code>#2D2023</code></td><td>Body copy and section headings in light mode</td></tr><tr><td>Main text, dark</td><td>Warm ink</td><td><code>#EBE5DC</code></td><td>Body copy in dark mode</td></tr><tr><td>Display text, dark</td><td>Warm white</td><td><code>#F3F0EA</code></td><td>High-contrast display headings and footer brand</td></tr><tr><td>Card surface, light</td><td>Cream card</td><td><code>#F7F1E7</code></td><td>Raised Labs project cards and the light evidence panel text field</td></tr><tr><td>Card surface, dark</td><td>Charcoal plum</td><td><code>#251E20</code></td><td>Raised Labs project cards in dark mode</td></tr><tr><td>Muted text, light</td><td>Muted brown</td><td><code>#695D5C</code></td><td>Supporting copy and secondary information</td></tr><tr><td>Muted text, dark</td><td>Warm gray</td><td><code>#A89D96</code></td><td>Secondary copy and mid-tone wave traces</td></tr><tr><td>Border, light</td><td>Warm border</td><td><code>#D4C9BD</code></td><td>Inset card outline and restrained dividers</td></tr><tr><td>Border, dark</td><td>Charcoal border</td><td><code>#373131</code></td><td>Dark card inset outline</td></tr><tr><td>Rule, light</td><td>Stone rule</td><td><code>#A89D96</code></td><td>Fine separators and muted details</td></tr><tr><td>Rule, dark</td><td>Dim rule</td><td><code>#605855</code></td><td>Low-contrast separators and outer wave traces</td></tr><tr><td>Active detail</td><td>Rose</td><td><code>#D7A3AD</code></td><td>Selected evidence-tab rule and the core hero wave</td></tr></tbody></table><h3>Primary</h3><ul><li>Light-theme actions use wine <code>#762F3D</code> with white text.</li><li>Dark-theme filled CTAs use berry <code>#8F3D4E</code> with white text. Dusty pink <code>#D7A3AD</code> remains the accent for selected markers, the wave core, and evidence rules.</li><li>The evidence band stays deep wine in both modes: <code>#4A252E</code> in light mode and <code>#36222B</code> in dark mode.</li></ul><h3>Interactive</h3><ul><li>Active navigation and selected states use the current theme&#39;s accent.</li><li>Light CTA hover moves to <code>#4A252E</code>; dark CTA hover moves to <code>#9C4A5B</code>.</li><li>Navigation links shift toward the deeper wine on hover. Focus-visible navigation and brand links use a 2px wine outline with a 3px offset. Footer links use a 2px dusty-pink outline with a 3px offset.</li><li>Transitions are short and restrained: CTA color, shadow, and transform transition over 0.18 seconds; theme surfaces transition over 0.24 seconds.</li></ul><h3>Neutral Scale</h3><ul><li>Light mode moves from paper <code>#F3F0EA</code> through warm stone <code>#E8E2D9</code> to ink <code>#2D2023</code>.</li><li>Dark mode moves from deep paper <code>#171214</code> through page ground <code>#1C1618</code> and card ground <code>#251E20</code> to warm ink <code>#EBE5DC</code>.</li><li>Gray tokens stay warm rather than blue. Use <code>#A89D96</code> for secondary detail and <code>#605855</code> for low-contrast dark rules.</li></ul><h3>Surface &amp; Overlay</h3><ul><li>Main homepage ground: <code>#E8E2D9</code> in light mode, <code>#1C1618</code> in dark mode.</li><li>Raised project cards: <code>#F7F1E7</code> in light mode, <code>#251E20</code> in dark mode.</li><li>Footer: <code>#2D2023</code> in light mode, <code>#120E10</code> in dark mode.</li><li>The floating navigation pill uses a translucent surface, a subtle warm border, an inset highlight, and a soft shadow. It is the one glass-like surface; keep other sections matte.</li></ul></section><section><h2>Theme Modes</h2><p>The page provides explicit light and dark choices. Changing modes recolors surfaces, text, borders, card shadows, the navigation pill, and the filled CTA. The wine family changes role while pink remains the prominent dark-mode accent. The evidence band remains a strong contrast block in both modes.</p><h3>Light Mode</h3><ul><li>Background: homepage ground <code>#E8E2D9</code>; base paper <code>#F3F0EA</code>.</li><li>Surface: cream cards <code>#F7F1E7</code>; light footer <code>#2D2023</code>.</li><li>Text: ink <code>#2D2023</code>, with display white <code>#F3F0EA</code> where placed on dark surfaces.</li><li>Accent: wine <code>#762F3D</code>; deep wine <code>#4A252E</code>; active pink <code>#D7A3AD</code>.</li><li>Notes: the evidence section is a solid deep-wine block with warm-white text. Light cards use a restrained inset border and soft shadow.</li></ul><h3>Dark Mode</h3><ul><li>Background: homepage ground <code>#1C1618</code>; deepest paper <code>#171214</code>.</li><li>Surface: cards <code>#251E20</code>; evidence band <code>#36222B</code>; footer <code>#120E10</code>.</li><li>Text: warm ink <code>#EBE5DC</code>; display headings <code>#F3F0EA</code>.</li><li>Accent: dusty rose <code>#D7A3AD</code>; pale rose <code>#E4C6C8</code>. Filled CTA: berry <code>#8F3D4E</code> with white text; hover: brighter berry <code>#9C4A5B</code>.</li><li>Notes: borders and rules recede into plum-gray. Card depth is mostly an inset border with a very soft shadow, not a large floating elevation.</li></ul><h3>Shadows &amp; Depth</h3><ul><li>Light card shadow token: <code>0 12px 28px #30202312</code>; the sampled project card uses a 1px inset border plus <code>0 6px 18px</code> at 5% opacity.</li><li>Dark card outline: 1px inset <code>#373131</code>, with the same soft <code>0 6px 18px</code> shadow scale. The dark CTA shadow token is <code>0 8px 18px #00000052</code>.</li><li>Light CTA shadow token: <code>0 8px 18px #4A252E24</code>; the sampled CTA uses a subtle 14% wine shadow.</li><li>The navigation pill uses a three-part shadow: inset top highlight, soft 12px/30px lift, and a faint 1px/2px contact shadow.</li><li>Focus is an outline or small underline, not a glow.</li></ul></section><section><h2>3. Typography Rules</h2><p>Use a clean system sans for most content and Georgia for selected italic phrases and small editorial indices. The effect comes from the contrast between precise, closely tracked sans-serif display text and a few quiet serif accents. Keep copy widths controlled and line lengths readable.</p><h3>Font Family</h3><ul><li>Primary: <code>Aptos, &quot;Segoe UI&quot;, sans-serif</code> as declared and computed by the page. The actual rendered face depends on the visitor&#39;s installed fonts.</li><li>Serif accent: <code>Georgia, &quot;Times New Roman&quot;, serif</code>, used for italic emphasis and numbered evidence indices.</li><li>Monospace: system monospace stack for technical artifacts where needed; it is not a dominant homepage typeface.</li><li>OpenType Features: no custom feature settings were observed.</li></ul><h3>Hierarchy</h3><p>Sizes below are measured at 1440px unless the note says otherwise. Fluid CSS tokens compress the same hierarchy on smaller screens.</p><table><thead><tr><th>Role</th><th>Font</th><th>Size</th><th>Weight</th><th>Line Height</th><th>Letter Spacing</th><th>Notes</th></tr></thead><tbody><tr><td>Hero headline</td><td>Aptos stack</td><td>70.16px at 1440px; 45px at 360px</td><td>750</td><td>65.95px desktop; 42.75px at 360px</td><td>-0.035em</td><td>Centered, tightly led, usually split across deliberate lines; the emphasized word is Georgia italic</td></tr><tr><td>Section heading</td><td>Aptos stack</td><td>44.64px</td><td>750</td><td>43.75px</td><td>-0.03em</td><td>Large but smaller than the hero; one phrase may switch to Georgia italic</td></tr><tr><td>Project title</td><td>Aptos stack</td><td>21.6px</td><td>750</td><td>24.19px</td><td>-0.025em</td><td>Clear card title, not a display headline</td></tr><tr><td>Body</td><td>Aptos stack</td><td>16px; hero support 17.28px desktop</td><td>400</td><td>24px; hero support 28.51px desktop</td><td>Normal</td><td>Main copy stays readable and conversational; hero copy is held to about 46ch</td></tr><tr><td>Label / Eyebrow</td><td>Aptos stack</td><td>12.16px</td><td>800</td><td>14.59px</td><td>0.14em</td><td>Uppercase, compact, and widely tracked</td></tr><tr><td>CTA</td><td>Aptos stack</td><td>16px</td><td>800</td><td>24px</td><td>Normal</td><td>Bold and verb-led</td></tr><tr><td>Footer statement</td><td>Aptos stack</td><td>54.4px</td><td>760</td><td>53.31px</td><td>-0.035em</td><td>Large two-line sign-off</td></tr><tr><td>Evidence index</td><td>Georgia italic</td><td>14.4px</td><td>400</td><td>21.6px</td><td>Normal</td><td>Small editorial counter before a tab label</td></tr></tbody></table><h3>Principles</h3><ul><li>Use a compact leading ratio for display text: about 0.94 for the hero and 0.98 for section headings.</li><li>Set display tracking tightly, then use normal tracking for body copy.</li><li>Use Georgia italics for a selected word or index, not for whole paragraphs.</li><li>Keep labels uppercase with generous tracking, while keeping body copy in sentence case.</li><li>Let a smaller viewport reduce the display size and adjust the line breaks; do not simply scale the desktop headline without checking its measure.</li></ul></section><section><h2>4. Component Stylings</h2><h3>Buttons and Links</h3><ul><li>Primary CTA: light fill <code>#762F3D</code>; dark fill <code>#8F3D4E</code>; white label in both modes; 10px radius; 51px measured height; padding of about 13.6px by 18.4px. Use 800 weight and a small soft shadow.</li><li>Secondary CTA: transparent background, bold wine-colored text, and a fine underline rule. It sits beside the primary action without competing for fill or weight.</li><li>Text links: mainly plain text, with accent or muted color shifts on hover. Navigation links use a 44px high hit area on desktop.</li><li>Hover and active feel: the primary CTA darkens in light mode or lightens in dark mode, and its shadow grows slightly over 0.18 seconds. The evidence selection gains a 3px inset pink rule at the top. No button lift was observed.</li><li>Focus: retain the visible focus treatments on navigation and footer links. Mobile menu and theme controls have 44px minimum dimensions.</li></ul><h3>Cards and Containers</h3><ul><li>Surface style: matte cream in light mode and dark plum-charcoal in dark mode.</li><li>Radius: 16px for project cards; 10px for CTA buttons.</li><li>Border: a subtle 1px inset border, which gives the card a precise edge without a strong box outline.</li><li>Shadow or elevation: low, soft separation. Avoid a large floating-card shadow.</li><li>Internal spacing: roughly 18px around card content on desktop, with tighter horizontal padding at narrow widths.</li><li>Labs cards combine category, counter, title, a short explanation, focus and approach labels, a compact evidence artifact, and a secondary link. The small artifact is part of the card&#39;s information design, not a decorative image.</li></ul><h3>Inputs and Interactive Controls</h3><ul><li>No text form was present on the inspected homepage.</li><li>The evidence selector uses real radio inputs inside labeled tabs, grouped as Product / Growbook, Gebruik / UserTesting, and Operatie / Enterprise IT.</li><li>Selecting a radio changes the visible evidence panel. The selected tab is marked by a pink 3px top inset rule and brighter text in the dark evidence band.</li><li>The theme control offers separate Licht and Donker choices in the mobile menu. On desktop it is a 44px icon button with an accessible name and pressed state.</li></ul><h3>Navigation</h3><ul><li>Structure: a centered, fixed pill around the wordmark, three primary links, and a theme control. The wordmark includes a three-stroke wave mark.</li><li>Background treatment: translucent paper or charcoal, a subtle 1px border, inset highlight, soft layered shadow, and full pill radius on desktop.</li><li>Link style: plain text, 44px high links, 700 weight for the current page, and a short accent underline under the active desktop link.</li><li>Sticky or scroll behavior: the header is fixed and can slide above the viewport while scrolling down. It is visible at the page top. The transform transition is 0.48 seconds with an eased curve.</li><li>Mobile: at 620px and below, replace the desktop links with a 44px menu button. The pill becomes nearly full-width with a 24.8px radius and the open panel expands below it. The panel contains the three links and explicit light and dark theme buttons.</li></ul><h3>Image Treatment</h3><ul><li>No stock photography or raster illustration was observed on the homepage.</li><li>The hero uses a decorative, aria-hidden SVG wave field with five long traces in a 1200 by 220 viewBox. The center trace is dusty pink, with gray traces around it. SVG path data morphs on an 8-second infinite loop.</li><li>Project cards use small, structured diagrams and artifact-like information blocks. Keep them diagrammatic and readable rather than replacing them with generic screenshots.</li><li>Keep corners consistent with the 10px CTA and 16px card radii; the navigation is the full-pill exception.</li></ul><h3>Distinctive Components</h3><ul><li>Situations ledger: a large heading beside three numbered rows, each pairing a concrete situation with an approach. Fine rules separate rows; the index and two text columns give the list an operational feel.</li><li>Evidence band: a full-width deep-wine section with three radio-style evidence tabs and a changing content panel. The panel pairs a short explanation with a compact evidence list.</li><li>Labs project cards: four numbered project cards with explicit status, focus, approach, and embedded evidence artifact.</li><li>Hero signal: a wide, slowly morphing five-trace SVG under the CTA row, used as a quiet signature graphic rather than a loud illustration.</li></ul></section><section><h2>5. Layout Principles</h2><h3>Spacing System</h3><ul><li>Base unit: 4px, matching the root CSS <code>--spacing: .25rem</code> value.</li><li>Repeated spacing values: use a 4px rhythm, with common practical steps around 8px, 12px, 16px, 24px, 32px, 48px, and 72px. This list is an implementation inference from the observed measurements, not a separate named token scale.</li><li>Keep section spacing generous. The desktop hero uses about 54px above and below its main content; the narrow-phone layout deliberately tightens this spacing.</li></ul><h3>Grid &amp; Container</h3><ul><li>Grid logic: centered max-width page container; editorial two-column situations ledger; three-column evidence tabs and evidence content on wider screens; four project columns on wide desktop.</li><li>Max content width: 1360px, measured at 1440px with 40px outer margins.</li><li>Tablet page width: 720px at a 768px viewport, leaving 24px gutters.</li><li>Mobile page width: 354px at 390px and 324px at 360px, leaving 18px gutters.</li><li>Section spacing: distinguish major sections with vertical room and full-width background shifts, not a stack of bordered boxes.</li></ul><h3>Whitespace Philosophy</h3><ul><li>Whitespace philosophy: let the claim breathe, then compress the proof into labeled rows and cards.</li><li>Alignment tendencies: centered hero; left-aligned section headings and evidence; project grid aligned to the same page container.</li><li>Content width behavior: keep explanatory copy narrow, while evidence bands and project collections can span the full container.</li></ul><h3>Border Radius Scale</h3><ul><li>Micro: 0px or a small line treatment for rules and underlines.</li><li>Standard: 10px for primary CTA; 16px for project surfaces.</li><li>Large: around 25px for the expanded mobile navigation pill.</li><li>Pill: 999px for desktop navigation and fully rounded small controls.</li></ul></section><section><h2>6. Depth &amp; Elevation</h2><table><thead><tr><th>Level</th><th>Treatment</th><th>Use</th></tr></thead><tbody><tr><td>Flat</td><td>Matte section background with no shadow</td><td>Main page regions and text-led sections</td></tr><tr><td>Ring</td><td>Thin inset rule or visible outline</td><td>Project cards, selected tabs, and keyboard focus</td></tr><tr><td>Card</td><td>Soft 1px inset border plus a low-opacity 6px / 18px shadow</td><td>Labs project cards</td></tr><tr><td>Focus</td><td>2px outline with 3px offset on key navigation and footer links</td><td>Keyboard navigation</td></tr></tbody></table><h3>Depth Principles</h3><ul><li>Surface hierarchy: page ground first, wine evidence band second, cards and floating navigation as the only lifted surfaces.</li><li>Shadow language: short and diffuse. The edge should remain more legible than the shadow.</li><li>Blur, glass, or overlay behavior: translucency and a small inset highlight belong to the navigation pill; other regions stay matte.</li><li>When depth is used versus avoided: use depth for a clickable navigation capsule and discrete project cards. Do not shadow every section.</li></ul></section><section><h2>7. Do&#39;s and Don&#39;ts</h2><h3>Do</h3><ul><li>Keep the warm paper, wine, and dusty-pink relationship in both theme modes.</li><li>Give the hero one clear sentence and a concise pair of actions.</li><li>Use measured, concrete problem and evidence language inside ledgers and cards.</li><li>Preserve the serif italic accent as a small contrast against sans-serif typography.</li><li>Maintain strong page gutters, a visible 44px mobile menu target, and useful focus indicators.</li></ul><h3>Don&#39;t</h3><ul><li>Do not add a bright blue or multicolor accent palette.</li><li>Do not turn every content block into a rounded card; several sections are intentionally flat.</li><li>Do not use large dark shadows, glass treatment on every surface, or decorative stock imagery.</li><li>Do not use italics for long copy or make every heading oversized.</li><li>Do not remove status labels, counters, or small evidence artifacts from the project cards; they carry the proof structure.</li></ul></section><section><h2>8. Responsive Behavior</h2><p>Viewport inspection was performed at 1440px, 768px, 390px, and 360px. The breakpoint values below were also read from the live stylesheet.</p><h3>Breakpoints</h3><table><thead><tr><th>Name</th><th>Width</th><th>Key Changes</th></tr></thead><tbody><tr><td>Narrow phone</td><td>360px and below</td><td>Hero type and spacing compress; title measure is capped to about 11ch; the wave field is shortened</td></tr><tr><td>Mobile</td><td>620px and below</td><td>Page gutters become 18px; desktop nav becomes a full-width expandable pill with menu button; hero and evidence spacing tighten</td></tr><tr><td>Tablet</td><td>621px to 900px</td><td>Page gutters are 24px; desktop navigation remains; situations stack below 1100px; Labs cards become a single column below 859px</td></tr><tr><td>Desktop</td><td>901px and above</td><td>Wide editorial spacing returns; at 1392px and above, Labs projects use four columns</td></tr></tbody></table><p>Additional observed stylesheet thresholds: the situations ledger changes to one column at 1100px; evidence tabs and their content restructure at 700px; the Labs card layout is single-column below 859px. At 700px to 859px the cards use a more horizontal internal arrangement.</p><h3>Touch Targets</h3><ul><li>Keep the mobile navigation button and desktop theme icon at 44px minimum size.</li><li>Mobile navigation rows are about 48px high; primary CTA height is about 51px.</li><li>Keep the evidence radio label area wide enough to work as a touch target, not just as a tiny radio circle.</li></ul><h3>Collapsing Strategy</h3><ul><li>Desktop behavior: hero and page container remain centered; situations use a heading column and a two-part evidence ledger; projects sit in up to four columns on wide screens.</li><li>Tablet behavior: situations stack their heading above the rows; project cards reflow into one column as width drops below 859px.</li><li>Mobile behavior: replace top navigation with a menu control; preserve three evidence choices across the width; stack the evidence panel and wrap its evidence list.</li><li>Breakpoint-driven component changes: at 700px the evidence tabs become compact stacked labels and the details list wraps; at 620px the nav changes; at 360px the hero uses the narrow display size and less vertical spacing.</li><li>Touch target and spacing adjustments: retain 44px controls while reducing gutters and section spacing; avoid shrinking controls to make the layout fit.</li></ul></section><section><h2>9. Agent Prompt Guide</h2><h3>Quick Color Reference</h3><ul><li>Primary CTA: light <code>#762F3D</code>, dark <code>#8F3D4E</code>. Accent pink: <code>#D7A3AD</code>.</li><li>Background: light <code>#E8E2D9</code>, dark <code>#1C1618</code>.</li><li>Heading text: light <code>#2D2023</code>, dark <code>#F3F0EA</code> for display headings.</li><li>Body text: light <code>#2D2023</code>, dark <code>#EBE5DC</code>.</li><li>Border or ring: light <code>#D4C9BD</code>, dark <code>#373131</code>; selected evidence rule <code>#D7A3AD</code>.</li><li>Accent: wine and dusty pink, with deep-wine evidence bands in both modes.</li></ul><h3>Quick Summary</h3><p>Wavesweb is a warm editorial studio site with a measured, evidence-first layout. Use the paper, wine, and dusty-pink palette with separate light and dark tokens. Set large, tightly tracked sans-serif headlines and reserve Georgia italics for small emphasis. Keep the navigation in a floating pill on desktop and an expandable, full-width pill on mobile. Use structured ledgers, selectable evidence panels, and evidence-rich Labs cards. Use whitespace and section backgrounds for hierarchy; keep borders and shadows restrained.</p><h3>Example Component Prompts</h3><ul><li>Hero: Center a short, two-line Aptos display headline at a fluid 62px to 70px desktop scale, with tight leading and one Georgia italic word. Keep the supporting copy near 46ch, place a filled wine CTA beside a transparent underlined action, then add a low-contrast five-line wave SVG.</li><li>Card: Build a 16px-radius Labs card with a fine inset border, faint 6px / 18px shadow, uppercase status, 01 / 04 index, 22px title, concise explanation, compact evidence artifact, and a text link. Use four columns on wide screens and one column below 859px.</li><li>Navigation: Make a centered fixed pill with a subtle translucent surface, one-pixel border, inset highlight, soft layered shadow, wordmark wave, three 44px links, and theme control. Below 620px, replace links with a 44px menu toggle and an expanding panel.</li><li>Button: Use a 10px-radius filled CTA with 16px bold Aptos text, 51px height, and 18px horizontal padding. Keep hover color shift and shadow transition near 0.18s; use a transparent underlined style for the secondary action.</li></ul><h3>Ready-to-Use Prompt</h3><p>Create a Wavesweb-style homepage in a warm editorial design language. Use the two-theme paper and wine palette, Aptos with a small Georgia italic accent, a centered display hero, a floating navigation pill, a numbered situations ledger, a selectable evidence band, and restrained evidence-rich project cards. Keep a 1360px max-width container with 40px desktop gutters, 24px tablet gutters, and 18px mobile gutters. Add the compact menu below 620px and maintain accessible 44px controls. Use quiet transitions, soft borders, minimal shadows, and direct Dutch copy that names a real situation, approach, or evidence source.</p><h3>Iteration Guide</h3><ol><li>Check the page in both theme modes and preserve each mode&#39;s background, surface, and accent roles.</li><li>Compare desktop and phone composition, especially the hero measure, navigation menu, evidence tabs, and card layout.</li><li>Keep emphasis selective: one italic phrase, one primary action, and clear labels before adding extra decoration.</li></ol></section><section><h2>Optional Appendix: Interaction Patterns</h2><ul><li>Scroll behavior: the fixed header can slide out of view as the page scrolls down and is shown again at the page top. The 0.48-second easing keeps the motion soft.</li><li>Hover behavior: primary CTA changes to the deeper wine in light mode and brighter berry in dark mode, with a slightly stronger shadow. Labs cards shift from <code>#F7F1E7</code> to <code>#F3F0EA</code> in light mode and from <code>#251E20</code> to <code>#2B2326</code> in dark mode. Navigation links change to the deeper theme accent.</li><li>Click behavior: theme control changes the root theme and corresponding colors. Selecting a Product, Gebruik, or Operatie radio switches the visible evidence panel. The mobile menu expands and collapses below the fixed pill.</li><li>Animation tone: the decorative hero signal morphs its SVG paths over 8 seconds and repeats indefinitely. The site uses short 0.18 to 0.24 second control and surface transitions. The navigation hide/show transition is 0.48 seconds.</li></ul></section><section><h2>Optional Appendix: Content &amp; Messaging Patterns</h2><ul><li>Headline pattern: a plain statement with a purposeful break and one italic phrase, such as “Van complex vraagstuk / naar werkbare verandering.”</li><li>CTA language: direct action phrases such as “Neem contact op” and “Zie hoe ik werk.”</li><li>Trust signal pattern: labeled situations, approach descriptions, dates, counts, status, and live project links instead of generic claims.</li><li>Voice and tone: first-person, direct Dutch, curious and practical. Copy explains what is being examined, where the friction lies, and what will change.</li></ul></section><section><h2>Optional Appendix: Observed Pages</h2><ul><li><a href="https://wavesweb.nl/" target="_blank" rel="noreferrer">Wavesweb homepage</a>: only page inspected; it supplied the palette, typography, navigation, responsive rules, interaction patterns, project cards, and content voice.</li></ul></section><section><h2>Optional Appendix: Evidence Notes</h2><ul><li>Observed in the live homepage: two theme modes; a fixed navigation pill; a 1360px desktop content width; a 44.64px measured desktop section heading; a 70.16px measured desktop hero heading; 10px CTA radius; 16px card radius; a mobile navigation breakpoint at 620px; a narrow-phone adjustment at 360px; a selector that changes evidence panels; and an 8-second SVG path animation.</li><li>Inferred from the live layout: the practical 4px spacing rhythm and the recommendation to use the observed patterns as a reusable system on pages that were not inspected.</li><li>Not inspected: linked internal routes, form pages, and every keyboard interaction. Focus-visible declarations were read from the live stylesheet, while the interactive tests covered the theme control, evidence selector, mobile navigation, hover CTA, and card hover.</li></ul></section></article>
+            </div>
+          </article>
+        </section>
+      </div>
+    </main>
+
+    <script>
+      const sourceView = document.getElementById("sourceView");
+      const previewView = document.getElementById("previewView");
+      const copyButton = document.getElementById("copyButton");
+      const copyState = document.getElementById("copyState");
+      const viewButtons = document.querySelectorAll("[data-view]");
+
+      function setActiveView(view) {
+        const showSource = view === "source";
+        sourceView.hidden = !showSource;
+        previewView.hidden = showSource;
+        viewButtons.forEach((button) => {
+          button.classList.toggle("is-active", button.dataset.view === view);
+        });
+      }
+
+      viewButtons.forEach((button) => {
+        button.addEventListener("click", () => setActiveView(button.dataset.view));
+      });
+
+      copyButton.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(sourceView.textContent || "");
+          copyState.textContent = "Copied";
+        } catch (error) {
+          copyState.textContent = "Clipboard unavailable";
+        }
+
+        setTimeout(() => {
+          copyState.textContent = "";
+        }, 1400);
+      });
+    </script>
+  </body>
+</html>
