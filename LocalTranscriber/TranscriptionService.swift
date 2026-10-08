@@ -266,11 +266,11 @@ private enum TranscriptionError: LocalizedError {
         case .unsupportedLocale(let locale):
             return "No on-device speech transcriber supports \(locale) on this Mac."
         case .unsupportedM4AExport:
-            return "This video's audio cannot be exported as an M4A file by AVFoundation."
+            return "This video's audio can’t be exported as an M4A file."
         case .exportSessionUnavailable:
-            return "AVFoundation could not create an M4A export session for this video."
+            return "No M4A export session could be created for this video."
         case .exportFailed(let reason):
-            return "AVFoundation could not export this video's audio: \(reason)"
+            return "This video's audio couldn’t be exported: \(reason)"
         case .invalidNormalizedDuration:
             return "The exported audio duration could not be determined."
         case .truncatedAudio(let expected, let actual):

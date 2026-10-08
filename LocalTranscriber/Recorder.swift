@@ -16,9 +16,9 @@ enum RecorderError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .microphoneDenied:
-            "Local Transcriber may not use the microphone. Allow it in System Settings › Privacy & Security › Microphone."
+            "Local Transcriber isn’t allowed to use the microphone. Turn it on in System Settings › Privacy & Security › Microphone."
         case .screenCaptureDenied:
-            "Local Transcriber may not record app audio. Allow it in System Settings › Privacy & Security › Screen & System Audio Recording."
+            "Local Transcriber isn’t allowed to record app audio. Turn it on in System Settings › Privacy & Security › Screen & System Audio Recording."
         case .appNotCapturable(let name):
             "\(name) can’t be recorded right now. Make sure it is running and has a window open."
         case .noDisplay: "No display is available for capturing app audio."
@@ -222,7 +222,7 @@ final class Recorder {
         } catch {
             guard id == session else { return }
             // The staged files are left alone, never enqueued.
-            self.error = "The recording failed and was not added to the queue: \(error.localizedDescription)"
+            self.error = "Recording failed and wasn’t queued: \(error.localizedDescription)"
         }
         state = .idle
         if unsavedRecording == nil {
@@ -268,9 +268,9 @@ final class Recorder {
             onSaved(saved)
             release()
         } catch OutputError.notConfigured {
-            self.error = "The output folder is unavailable, so the recording was not saved or queued yet. It is kept until you quit. Choose a folder to save it."
+            self.error = "The output folder is unavailable. The recording wasn’t saved or queued; it is kept until you quit."
         } catch {
-            self.error = "The recording couldn’t be saved to the output folder (\(error.localizedDescription)), so it was not queued yet. It is kept until you quit. Choose a folder to save it."
+            self.error = "The recording couldn’t be saved to the output folder (\(error.localizedDescription)). It wasn’t queued; it is kept until you quit."
         }
     }
 
@@ -397,7 +397,7 @@ final class Recorder {
         }
         let silentFor = Date.now.timeIntervalSince(lastSoundAt ?? startedAt)
         silenceWarning = silentFor >= Self.silenceWarningDelay
-            ? "No sound has been received for \(Int(silentFor)) seconds. Recording continues; check that \(recordingLabel) is producing sound."
+            ? "No sound from \(recordingLabel) for \(Int(silentFor)) seconds. Recording continues; check that \(recordingLabel) is playing sound."
             : nil
     }
 }

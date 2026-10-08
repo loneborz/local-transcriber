@@ -12,9 +12,7 @@ struct ContentView: View {
     @State private var recorder = Recorder()
     @State private var isTargeted = false
     @State private var isQueueTargeted = false
-    @State private var showsRecordSetup = false
-    // Include microphone for app recordings; kept for this session only.
-    @State private var includesMicrophoneWithApp = true
+    @FocusState private var isImportZoneFocused: Bool
     @AppStorage("defaultLanguage") private var selectedLanguage = TranscriptionLanguage.english
     @AppStorage(BatchQueue.sourcePackageModeKey) private var savesSourcePackages = false
     @State private var notice: String?
@@ -34,8 +32,9 @@ struct ContentView: View {
 
             footer
         }
-        .background(.ultraThinMaterial)
         .frame(minWidth: 640, minHeight: 420)
+        // The paper continues under the title bar.
+        .containerBackground(Theme.paper, for: .window)
         .contentShape(Rectangle())
         .dropDestination(for: URL.self) { urls, _ in
             addDroppedFiles(urls)
@@ -57,137 +56,94 @@ struct ContentView: View {
     @ViewBuilder
     private var content: some View {
         if queue.jobs.isEmpty {
-            // Three groups: mark + tagline, drop target, Record. The column is
-            // centered so a taller window does not leave a loose empty lower third.
+            // Mark and tagline above one surface with two inputs: import on the
+            // left, record on the right. Centered, so a taller window does not
+            // leave a loose empty lower third.
             VStack(spacing: 24) {
                 VStack(spacing: 12) {
-                    WaveformBars(isAnimating: false)
-
-                    Text("Media in. Markdown out.")
-                        .font(.title3.weight(.semibold))
+                    BrandMark()
+                    BrandLine()
                 }
 
-                VStack(spacing: 16) {
-                    // The drop target is also the file picker.
-                    Button(action: chooseFiles) {
-                        VStack(spacing: 4) {
-                            Text(isTargeted ? "Drop to add" : "Drop media here")
-                                .font(.callout)
-                            Text("or choose files… · ⌘V to paste a YouTube link")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        .frame(width: 330, height: 84)
-                        .background(
-                            isTargeted
-                                ? Color.accentColor.opacity(0.12)
-                                : Color.primary.opacity(0.045),
-                            in: RoundedRectangle(cornerRadius: 14)
-                        )
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 14)
-                                .strokeBorder(
-                                    isTargeted
-                                        ? Color.accentColor.opacity(0.8)
-                                        : Color.secondary.opacity(0.22),
-                                    lineWidth: isTargeted ? 1.5 : 0.5
-                                )
-                        }
-                        .contentShape(RoundedRectangle(cornerRadius: 14))
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(!recorder.isIdle)
-                    .scaleEffect(isTargeted ? 0.98 : 1)
-                    .animation(.easeOut(duration: 0.18), value: isTargeted)
+                HStack(spacing: 0) {
+                    importZone
+                    Theme.rule.frame(width: 1).accessibilityHidden(true)
+                    recordZone
+                        .frame(width: 260)
+                        .frame(maxHeight: .infinity)
+                        .background(Theme.raised)
+                }
+                .fixedSize(horizontal: false, vertical: true)
+                .surface()
 
-                    VStack(spacing: 8) {
-                        if recorder.isIdle {
-                            recordButton
-                                .controlSize(.large)
-                        } else {
-                            recordingStatus(compact: false)
-                        }
-
-                        recorderMessages
-
-                        if let notice {
-                            Text(notice)
-                                .font(.caption)
-                                .foregroundStyle(.red)
-                                .textSelection(.enabled)
-                        }
-                    }
+                if hasMessages {
+                    messages(alignment: .center)
+                        .multilineTextAlignment(.center)
                 }
             }
-            .multilineTextAlignment(.center)
-            .frame(maxWidth: 420, maxHeight: .infinity)
+            .frame(maxWidth: 560, maxHeight: .infinity)
             .padding(40)
         } else {
             VStack(alignment: .leading, spacing: 8) {
-                queueActionBar
+                actionBar
 
-                recorderMessages
-
-                if let notice {
-                    Text(notice)
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                        .textSelection(.enabled)
+                if hasMessages {
+                    messages(alignment: .leading)
+                        .padding(.horizontal, 4)
                 }
 
-                VStack(spacing: 6) {
-                    // Clear belongs to the queue, so it heads the queue with the summary.
-                    HStack(alignment: .firstTextBaseline) {
-                        summaryView
-                        Spacer()
-                        if queue.canClear {
-                            Button("Clear") {
-                                queue.clear()
-                                notice = nil
-                            }
-                            .buttonStyle(.borderless)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        }
+                // Clear belongs to the queue, so it heads the queue with the summary.
+                // It stays visible while a job runs, disabled, so the header never jumps.
+                HStack(spacing: 10) {
+                    summaryView
+                    Spacer(minLength: 8)
+                    Button("Clear Queue") {
+                        queue.clear()
+                        notice = nil
                     }
-                    .padding(.horizontal, 4)
-                    .frame(minHeight: 16)
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .disabled(!queue.canClear)
+                    .help("Remove all items from the queue. Saved transcripts and media stay in place.")
+                }
+                .padding(.horizontal, 4)
+                .frame(minHeight: 24)
 
-                    ScrollView {
-                        VStack(spacing: 0) {
-                            ForEach(queue.jobs) { job in
-                                JobRow(job: job, onSave: {
-                                    if case .complete(let transcript, _) = job.state {
-                                        saveTranscript(transcript, for: job)
-                                    }
-                                }, onRemove: {
-                                    queue.remove(job)
-                                }, onRetry: {
-                                    queue.retry(job)
-                                    startQueue()
-                                })
-
-                                if job.id != queue.jobs.last?.id {
-                                    Divider()
+                ScrollView {
+                    VStack(spacing: 0) {
+                        ForEach(queue.jobs) { job in
+                            JobRow(job: job, onSave: {
+                                if case .complete(let transcript, _) = job.state {
+                                    saveTranscript(transcript, for: job)
                                 }
+                            }, onRemove: {
+                                queue.remove(job)
+                            }, onRetry: {
+                                queue.retry(job)
+                                startQueue()
+                            })
+
+                            if job.id != queue.jobs.last?.id {
+                                Theme.rule.frame(height: 1).accessibilityHidden(true)
                             }
                         }
                     }
-                    .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 8))
-                    .overlay {
-                        if isTargeted || isQueueTargeted {
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(Color.accentColor.opacity(0.65), lineWidth: 1)
-                        }
+                }
+                .background(Theme.raised)
+                .surface()
+                .overlay {
+                    if isTargeted || isQueueTargeted {
+                        RoundedRectangle(cornerRadius: 16)
+                            .strokeBorder(Color.accentColor.opacity(0.65), lineWidth: 1.5)
                     }
-                    // ScrollView is a platform view and does not pass drops up to the
-                    // window-level destination, so it is a drop target itself.
-                    .contentShape(Rectangle())
-                    .dropDestination(for: URL.self) { urls, _ in
-                        addDroppedFiles(urls)
-                    } isTargeted: { targeted in
-                        isQueueTargeted = targeted
-                    }
+                }
+                // ScrollView is a platform view and does not pass drops up to the
+                // window-level destination, so it is a drop target itself.
+                .contentShape(Rectangle())
+                .dropDestination(for: URL.self) { urls, _ in
+                    addDroppedFiles(urls)
+                } isTargeted: { targeted in
+                    isQueueTargeted = targeted
                 }
             }
             .frame(maxWidth: 720, maxHeight: .infinity)
@@ -196,92 +152,225 @@ struct ContentView: View {
         }
     }
 
-    // Inputs on the left, Transcribe on the right so it can come and go
-    // without moving them. A running recording replaces the whole row.
-    private var queueActionBar: some View {
-        HStack(spacing: 8) {
-            WaveformBars(isAnimating: queue.isProcessing)
-                .scaleEffect(0.55)
-                .frame(width: 38, height: 28)
-                .padding(.trailing, 4)
-
-            if recorder.isIdle {
-                Button("Add Files", action: chooseFiles)
-                recordButton
-
-                Spacer()
-
-                if !queue.isProcessing && queue.waitingCount > 0 {
-                    Button("Transcribe \(queue.waitingCount)", action: startQueue)
-                        .buttonStyle(.borderedProminent)
-                }
-            } else {
-                recordingStatus(compact: true)
-                Spacer()
-            }
-        }
-        .controlSize(.large)
-        .frame(minHeight: 28)
+    private var hasMessages: Bool {
+        recorder.silenceWarning != nil || recorder.error != nil || recorder.unsavedRecording != nil || notice != nil
     }
 
-    private var recordButton: some View {
-        Button("Record") {
-            recorder.refreshApps()
-            showsRecordSetup = true
+    // Recorder messages and the notice read as one group below the inputs.
+    private func messages(alignment: HorizontalAlignment) -> some View {
+        VStack(alignment: alignment, spacing: 6) {
+            recorderMessages
+
+            if let notice {
+                Text(notice)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
-        .disabled(recorder.unsavedRecording != nil)
-        .popover(isPresented: $showsRecordSetup, arrowEdge: .bottom) {
-            recordSetup
+    }
+
+    // The drop target is also the file picker.
+    private var importZone: some View {
+        Button(action: chooseFiles) {
+            VStack(spacing: 6) {
+                Text(isTargeted ? "Drop to add" : "Drop media")
+                    .font(.headline)
+                Text("or click to choose files")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text("⌘V pastes a YouTube link")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(isTargeted ? AnyShapeStyle(Color.accentColor.opacity(0.12)) : AnyShapeStyle(Theme.recessed))
+            .contentShape(Rectangle())
         }
+        // The system ring is drawn on the button's rectangle and would stick out
+        // past the surface's rounded corners, so the zone draws it on its own shape.
+        .focusEffectDisabled()
+        .focused($isImportZoneFocused)
+        .overlay {
+            if isImportZoneFocused {
+                UnevenRoundedRectangle(topLeadingRadius: 16, bottomLeadingRadius: 16)
+                    .strokeBorder(Color(nsColor: .keyboardFocusIndicatorColor), lineWidth: 3)
+                    .allowsHitTesting(false)
+            }
+        }
+        .buttonStyle(.plain)
+        .disabled(!recorder.isIdle)
+        .accessibilityLabel("Choose files")
+        .accessibilityHint("Or drop media, or press Command V to paste a YouTube link")
     }
 
     // Record is one more input: the finished recording is saved to the output
-    // folder and then queued exactly like a dropped file.
-    private var recordSetup: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("Record audio")
-                .font(.headline)
-
-            Picker("Source:", selection: $recorder.selectedAppID) {
-                Text("Microphone").tag(String?.none)
-                Divider()
-                ForEach(recorder.apps) { app in
-                    Text(app.name).tag(String?.some(app.id))
+    // folder and then queued exactly like a dropped file. The choice is made
+    // inline; nothing is captured or requested before Record.
+    @ViewBuilder
+    private var recordZone: some View {
+        Group {
+            if recorder.isIdle {
+                VStack(spacing: 10) {
+                    Text("Record audio")
+                        .font(.headline)
+                        .accessibilityAddTraits(.isHeader)
+                    appPicker(maxWidth: 200)
+                    micToggle
+                    recordButton
+                        .controlSize(.large)
+                        .padding(.top, 2)
                 }
-            }
-            .pickerStyle(.menu)
-            .fixedSize()
-
-            if recorder.selectedAppID != nil {
-                Toggle("Include microphone", isOn: $includesMicrophoneWithApp)
-                    .toggleStyle(.checkbox)
-            }
-
-            HStack {
-                Spacer()
-                Button("Cancel") {
-                    showsRecordSetup = false
-                }
-                .keyboardShortcut(.cancelAction)
-
-                Button("Start Recording", action: startRecording)
-                    .keyboardShortcut(.defaultAction)
+                .accessibilityElement(children: .contain)
+            } else {
+                recordingStatus(compact: false)
             }
         }
         .padding(16)
-        .frame(width: 320)
+        // The idle controls' height, so the surface keeps its size while
+        // starting, recording and saving.
+        .frame(minHeight: 148)
     }
 
+    private func appPicker(maxWidth: CGFloat) -> some View {
+        Picker("App audio", selection: $recorder.selectedAppID) {
+            Text("No app audio").tag(String?.none)
+            Divider()
+            ForEach(recorder.apps) { app in
+                Text(app.name).tag(String?.some(app.id))
+            }
+        }
+        .labelsHidden()
+        .pickerStyle(.menu)
+        .frame(maxWidth: maxWidth)
+        // The full name of a selected app, which the picker may truncate.
+        .help(recorder.apps.first { $0.id == recorder.selectedAppID }?.name ?? "")
+    }
+
+    private var micToggle: some View {
+        Toggle("Mic", isOn: $recorder.includesMicrophone)
+            .toggleStyle(.checkbox)
+            .tint(Theme.wineFill)
+            .fixedSize()
+            .accessibilityLabel("Include microphone")
+    }
+
+    private var recordButton: some View {
+        Button("Record", action: startRecording)
+            .disabled(!recorder.canRecord)
+    }
+
+    @ViewBuilder
+    private var transcribeButton: some View {
+        if recorder.isIdle && !queue.isProcessing && queue.waitingCount > 0 {
+            Button("Transcribe \(queue.waitingCount)", action: startQueue)
+                .buttonStyle(.borderedProminent)
+                .tint(Theme.wineFill)
+        }
+    }
+
+    // Inputs on the left (recessed), recording and Transcribe on the right
+    // (raised). A running recording replaces the record segment. When one row
+    // does not fit, the bar falls back to two rows.
+    private var actionBar: some View {
+        Group {
+            if recorder.isIdle {
+                ViewThatFits(in: .horizontal) {
+                    actionBarOneRow
+                    actionBarTwoRows
+                }
+            } else {
+                HStack(spacing: 0) {
+                    addFilesSegment
+                    Theme.rule.frame(width: 1).accessibilityHidden(true)
+                    recordingStatus(compact: true)
+                        .padding(.horizontal, 12)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                        .background(Theme.raised)
+                        .overlay(Color.red.opacity(0.07).allowsHitTesting(false).accessibilityHidden(true))
+                }
+                .frame(height: 44)
+            }
+        }
+        .surface()
+        .controlSize(.large)
+    }
+
+    private var addFilesSegment: some View {
+        Button("Add Files", action: chooseFiles)
+            .disabled(!recorder.isIdle)
+            .padding(.horizontal, 12)
+            .frame(maxHeight: .infinity)
+            .background(Theme.recessed)
+            .fixedSize(horizontal: true, vertical: false)
+    }
+
+    private var actionBarOneRow: some View {
+        HStack(spacing: 0) {
+            addFilesSegment
+            Theme.rule.frame(width: 1).accessibilityHidden(true)
+            HStack(spacing: 12) {
+                HStack(spacing: 12) {
+                    appPicker(maxWidth: 150)
+                    micToggle
+                    recordButton
+                }
+                .accessibilityElement(children: .contain)
+                .accessibilityLabel("Record audio")
+
+                transcribeButton
+            }
+            .padding(.horizontal, 12)
+            .fixedSize(horizontal: true, vertical: false)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            .background(Theme.raised)
+        }
+        .frame(height: 44)
+    }
+
+    private var actionBarTwoRows: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 8) {
+                Button("Add Files", action: chooseFiles)
+                Spacer()
+                Text("⌘V pastes a YouTube link")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 12)
+            .frame(height: 44)
+            .background(Theme.recessed)
+
+            Theme.rule.frame(height: 1).accessibilityHidden(true)
+
+            HStack(spacing: 12) {
+                HStack(spacing: 12) {
+                    appPicker(maxWidth: 260)
+                    micToggle
+                    Spacer(minLength: 8)
+                    recordButton
+                }
+                .accessibilityElement(children: .contain)
+                .accessibilityLabel("Record audio")
+
+                transcribeButton
+            }
+            .padding(.horizontal, 12)
+            .frame(height: 44)
+            .background(Theme.raised)
+        }
+    }
+
+    // Starts from the visible selection; the app list is kept current by the
+    // launch and termination notifications.
     private func startRecording() {
-        showsRecordSetup = false
-        // Microphone as the source means microphone only.
-        recorder.includesMicrophone = recorder.selectedAppID == nil || includesMicrophoneWithApp
         Task {
             await recorder.record(to: queue.destination) { addRecording($0) }
         }
     }
 
-    // Stacked under the hero when the list is empty, one row above the queue otherwise.
+    // Stacked in the record zone when the list is empty, one row in the action bar otherwise.
     @ViewBuilder
     private func recordingStatus(compact: Bool) -> some View {
         switch recorder.state {
@@ -291,31 +380,47 @@ struct ContentView: View {
             HStack(spacing: 8) {
                 ProgressView()
                     .controlSize(.small)
-                Text("Starting recording…")
+                Text("Starting…")
                     .foregroundStyle(.secondary)
             }
         case .recording(let since):
-            let layout = compact
-                ? AnyLayout(HStackLayout(spacing: 12))
-                : AnyLayout(VStackLayout(spacing: 10))
-            layout {
-                HStack(spacing: 6) {
+            if compact {
+                HStack(spacing: 10) {
                     Image(systemName: "circle.fill")
                         .font(.system(size: 8))
                         .foregroundStyle(.red)
                         .accessibilityHidden(true)
-                    Text("Recording \(recorder.recordingLabel)")
+                    Text("Recording · \(recorder.recordingLabel)")
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Spacer(minLength: 8)
+                    Text(since, style: .timer)
+                        .font(.title3.monospacedDigit())
+                    stopButton
                 }
-
-                Text(since, style: .timer)
-                    .font(compact ? .body.monospacedDigit() : .title2.monospacedDigit())
-                    .foregroundStyle(compact ? .secondary : .primary)
-
-                Button("Stop Recording") {
-                    Task { await recorder.stop() }
+                .accessibilityElement(children: .contain)
+                .accessibilityLabel("Recording")
+            } else {
+                VStack(spacing: 8) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "circle.fill")
+                            .font(.system(size: 8))
+                            .foregroundStyle(.red)
+                            .accessibilityHidden(true)
+                        Text("Recording")
+                            .font(.headline)
+                    }
+                    Text(recorder.recordingLabel)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Text(since, style: .timer)
+                        .font(.title2.monospacedDigit())
+                    stopButton
+                        .controlSize(.large)
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
+                .accessibilityElement(children: .contain)
+                .accessibilityLabel("Recording")
             }
         case .finishing:
             HStack(spacing: 8) {
@@ -324,6 +429,12 @@ struct ContentView: View {
                 Text("Saving recording…")
                     .foregroundStyle(.secondary)
             }
+        }
+    }
+
+    private var stopButton: some View {
+        Button("Stop Recording") {
+            Task { await recorder.stop() }
         }
     }
 
@@ -506,7 +617,7 @@ struct ContentView: View {
 
         guard !sources.isEmpty else {
             if hasUnsupportedItem {
-                notice = "Drop a supported media file or a YouTube link."
+                notice = "Not supported. Drop an MP4, MOV, M4A, MP3 or WAV file, or a YouTube link."
             }
             return false
         }
@@ -639,6 +750,7 @@ private struct JobRow: View {
         HStack(alignment: .center, spacing: 10) {
             statusIcon
                 .frame(width: 16, height: 16)
+                .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -646,13 +758,13 @@ private struct JobRow: View {
 
                     if let metadata = job.metadata {
                         Text(metadata.detailText)
-                            .font(.caption)
+                            .font(.caption.monospacedDigit())
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                             .fixedSize()
                     } else if let mediaInfo = job.mediaInfo {
                         Text("\(mediaInfo.type) · \(mediaInfo.duration) · \(mediaInfo.fileSize)")
-                            .font(.caption)
+                            .font(.caption.monospacedDigit())
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                             .fixedSize()
@@ -677,27 +789,39 @@ private struct JobRow: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
 
-                        Button(savedTranscriptURL.lastPathComponent) {
+                        Button {
                             NSWorkspace.shared.activateFileViewerSelecting([savedTranscriptURL])
+                        } label: {
+                            Text(savedTranscriptURL.lastPathComponent)
+                                .font(.caption.monospaced())
+                                .underline(true, color: Theme.emphasis.opacity(0.55))
+                                .lineLimit(1)
+                                .truncationMode(.middle)
                         }
-                        .font(.caption)
                         .buttonStyle(.plain)
-                        .foregroundStyle(.tint)
+                        .pointerStyle(.link)
+                        .help("Show in Finder")
                     }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            Picker("Language", selection: language) {
-                ForEach(TranscriptionLanguage.allCases) { language in
-                    Text(language.title).tag(language)
+            // The language can only change while the job waits; afterwards it is shown as text.
+            if job.isWaiting {
+                Picker("Language", selection: language) {
+                    ForEach(TranscriptionLanguage.allCases) { language in
+                        Text(language.title).tag(language)
+                    }
                 }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .controlSize(.small)
+                .fixedSize()
+            } else {
+                Text(language.wrappedValue.title)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
-            .labelsHidden()
-            .pickerStyle(.menu)
-            .controlSize(.small)
-            .fixedSize()
-            .disabled(!job.isWaiting)
 
             if case .complete = job.state, job.saveError != nil, job.savedTranscriptURL == nil {
                 Button("Save Transcript…", action: onSave)
@@ -715,12 +839,11 @@ private struct JobRow: View {
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
-                .help("Remove from queue")
                 .accessibilityLabel("Remove from queue")
             }
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
     }
 
     // Local files reveal in Finder; YouTube jobs open the video; a rejected link is plain text.
@@ -731,17 +854,19 @@ private struct JobRow: View {
             Button {
                 NSWorkspace.shared.activateFileViewerSelecting([url])
             } label: {
-                nameLabel(foreground: .tint)
+                nameLabel(foreground: .primary)
             }
             .buttonStyle(.plain)
+            .pointerStyle(.link)
             .help("Reveal original file in Finder")
         case .youtube(_, let url):
             Button {
                 NSWorkspace.shared.open(url)
             } label: {
-                nameLabel(foreground: .tint)
+                nameLabel(foreground: .primary)
             }
             .buttonStyle(.plain)
+            .pointerStyle(.link)
             .help("Open on YouTube")
         case .invalid:
             nameLabel(foreground: .secondary)
@@ -891,37 +1016,29 @@ private enum MetricsFormat {
     }
 }
 
-private struct WaveformBars: View {
-    let isAnimating: Bool
-
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    private let barHeights: [CGFloat] = [14, 23, 34, 46, 35, 24, 14]
+// The brand mark: the website's seven-bar geometry. Static and decorative.
+private struct BrandMark: View {
+    private let barHeights: [CGFloat] = [14, 26, 38, 52, 38, 26, 14]
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 60, paused: !isAnimating || reduceMotion)) { timeline in
-            HStack(alignment: .center, spacing: 5) {
-                ForEach(barHeights.indices, id: \.self) { index in
-                    Capsule()
-                        .fill(.primary)
-                        .frame(width: 5, height: barHeights[index])
-                        .scaleEffect(
-                            y: barScale(at: index, time: timeline.date.timeIntervalSinceReferenceDate),
-                            anchor: .center
-                        )
-                }
+        HStack(spacing: 4) {
+            ForEach(barHeights.indices, id: \.self) { index in
+                Capsule()
+                    .fill(.primary)
+                    .frame(width: 6, height: barHeights[index])
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .frame(width: 68, height: 52)
+        .frame(width: 66, height: 52)
         .accessibilityHidden(true)
     }
+}
 
-    private func barScale(at index: Int, time: TimeInterval) -> CGFloat {
-        guard isAnimating, !reduceMotion else { return 1 }
-
-        let wave = (sin(time * 1.2 + Double(index) * 1.15) + 1) / 2
-        return 0.45 + 0.55 * CGFloat(wave)
+// "Media in. Markdown out." with the one serif italic word.
+private struct BrandLine: View {
+    var body: some View {
+        Text("Media in. \(Text("Markdown").font(.custom("Georgia-Italic", size: 18)).foregroundStyle(Theme.emphasis)) out.")
+            .font(.title3.bold())
+            .tracking(-0.3)
     }
 }
 
