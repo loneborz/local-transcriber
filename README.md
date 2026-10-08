@@ -174,6 +174,22 @@ Debug is signed manually with an Apple Development certificate of the project's 
 
 Cloud transcription, accounts, summarization, search or retrieval over transcripts, a knowledge-base layer, automatic correction or rewriting of transcript text, a model picker, a transcript editor, and downloads from sites other than YouTube.
 
+## Project philosophy
+
+Local Transcriber is a free, open-source Wavesweb Labs project, independently developed and maintained.
+
+It started with a practical need: turning media into local Markdown transcripts without unnecessary complexity. That remains its purpose.
+
+Development follows practical needs and available time, rather than a fixed roadmap or release schedule. The project deliberately stays focused on what it does well.
+
+## Feedback and feature requests
+
+Bug reports, ideas, and feature requests are always welcome. I do my best to review them as time allows, but I can't guarantee response times or that every request will be implemented.
+
+New features are considered only when they add meaningful value and fit the project's existing scope. For the project's current boundaries, see [Not in scope](#not-in-scope).
+
+Local Transcriber is provided under the MIT License, without guaranteed support or service-level commitments.
+
 ## Status
 
 An early, working macOS project. The queue, language handling, automatic output, source packages, retry, recording and the current interface are implemented and were verified by running the app. Version 0.5.0 is the current release, distributed as a notarized DMG. It gives the app its own visual identity and changes nothing about what it does; 0.4.0 added recording and 0.3.0 was the first public release.
