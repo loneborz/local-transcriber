@@ -116,6 +116,8 @@ struct ContentView: View {
                                 if case .complete(let transcript, _) = job.state {
                                     saveTranscript(transcript, for: job)
                                 }
+                            }, onCopy: {
+                                copyMarkdown(for: job)
                             }, onRemove: {
                                 queue.remove(job)
                             }, onRetry: {
@@ -711,6 +713,23 @@ struct ContentView: View {
         )
     }
 
+    // Read-only: puts the job's Markdown on the pasteboard. The result tells
+    // the row whether it may show "Copied".
+    private static let copyFailedNotice = "Could not copy the transcript to the clipboard."
+
+    private func copyMarkdown(for job: TranscriptionJob) -> Bool {
+        guard case .complete(let transcript, _) = job.state else { return false }
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        guard pasteboard.setString(job.markdown(for: transcript), forType: .string) else {
+            notice = Self.copyFailedNotice
+            return false
+        }
+        // A success clears only this action's own earlier error, never another notice.
+        if notice == Self.copyFailedNotice { notice = nil }
+        return true
+    }
+
     private func saveTranscript(_ transcript: Transcript, for job: TranscriptionJob) {
         let panel = NSSavePanel()
         guard let markdownType = UTType(filenameExtension: "md") else {
@@ -726,7 +745,7 @@ struct ContentView: View {
         }
 
         do {
-            try TranscriptMarkdownRenderer.render(transcript).write(
+            try job.markdown(for: transcript).write(
                 to: destination,
                 atomically: true,
                 encoding: .utf8
@@ -743,8 +762,15 @@ struct ContentView: View {
 private struct JobRow: View {
     let job: TranscriptionJob
     let onSave: () -> Void
+    // Returns whether the pasteboard accepted the text.
+    let onCopy: () -> Bool
     let onRemove: () -> Void
     let onRetry: () -> Void
+
+    // Confirmation lives only in this row. Every click bumps `copyClicks`,
+    // which restarts the reset task; the task is cancelled with the row.
+    @State private var copied = false
+    @State private var copyClicks = 0
 
     var body: some View {
         HStack(alignment: .center, spacing: 10) {
@@ -821,6 +847,28 @@ private struct JobRow: View {
                 Text(language.wrappedValue.title)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+
+            if case .complete = job.state {
+                Button {
+                    copied = onCopy()
+                    copyClicks += 1
+                } label: {
+                    // The hidden "Copied" reserves its width so the row does not shift.
+                    ZStack {
+                        Text("Copied").hidden()
+                        Text(copied ? "Copied" : "Copy")
+                    }
+                }
+                .controlSize(.small)
+                .help("Copy transcript as Markdown")
+                .accessibilityLabel("Copy transcript as Markdown")
+                .accessibilityValue(copied ? "Copied" : "")
+                .task(id: copyClicks) {
+                    guard copied else { return }
+                    try? await Task.sleep(for: .milliseconds(1500))
+                    if !Task.isCancelled { copied = false }
+                }
             }
 
             if case .complete = job.state, job.saveError != nil, job.savedTranscriptURL == nil {

@@ -36,6 +36,10 @@ final class TranscriptionJob: Identifiable {
     var savedTranscriptURL: URL?
     // Set when transcription succeeded but the automatic save did not.
     var saveError: String?
+    // Whether the automatic save used the source-package presentation. Fixed
+    // when the save is attempted, so later changes to the preference cannot
+    // change what Copy or the manual Save writes for this job.
+    var exportedAsPackage = false
 
     init(source: JobSource, locale: Locale) {
         self.source = source
@@ -56,6 +60,12 @@ final class TranscriptionJob: Identifiable {
     var isWaiting: Bool {
         if case .waiting = state { return true }
         return false
+    }
+
+    // The one place that decides how this job's transcript is presented:
+    // automatic save, manual Save and Copy all use it.
+    func markdown(for transcript: Transcript) -> String {
+        TranscriptMarkdownRenderer.render(transcript, source: exportedAsPackage ? metadata : nil)
     }
 
     // A rejected link fails the same way every time, so only failures of a
@@ -144,6 +154,7 @@ final class BatchQueue {
         guard job.canRetry else { return }
         job.metadata = nil
         job.saveError = nil
+        job.exportedAsPackage = false
         job.state = .waiting
     }
 
@@ -217,24 +228,31 @@ final class BatchQueue {
     // A failed save never fails the job: it stays Complete with its transcript
     // in memory, and the error is recorded for the manual Save fallback.
     private func save(_ transcript: Transcript, for job: TranscriptionJob, mediaURL: URL) {
+        // Decided before the write, so it is also set when the write fails.
+        var package: (videoID: String, metadata: SourceMetadata)?
+        if UserDefaults.standard.bool(forKey: Self.sourcePackageModeKey),
+           case .youtube(let videoID, _) = job.source,
+           let metadata = job.metadata {
+            package = (videoID, metadata)
+        }
+        job.exportedAsPackage = package != nil
+
         do {
-            if UserDefaults.standard.bool(forKey: Self.sourcePackageModeKey),
-               case .youtube(let videoID, _) = job.source,
-               let metadata = job.metadata {
+            if let package {
                 // Source package: only for YouTube jobs. The audio is copied out
                 // of the temporary directory before the caller removes it.
                 job.savedTranscriptURL = try destination.writePackage(
-                    videoID: videoID,
+                    videoID: package.videoID,
                     audio: mediaURL,
                     manifest: SourcePackageManifest(
-                        metadata: metadata,
+                        metadata: package.metadata,
                         transcriptionLocale: transcript.localeIdentifier
                     ).encoded(),
-                    transcript: TranscriptMarkdownRenderer.render(transcript, source: metadata)
+                    transcript: job.markdown(for: transcript)
                 )
             } else {
                 job.savedTranscriptURL = try destination.write(
-                    TranscriptMarkdownRenderer.render(transcript),
+                    job.markdown(for: transcript),
                     baseName: mediaURL.deletingPathExtension().lastPathComponent
                 )
             }
