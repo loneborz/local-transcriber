@@ -36,6 +36,9 @@ final class TranscriptionJob: Identifiable {
     var savedTranscriptURL: URL?
     // Set when transcription succeeded but the automatic save did not.
     var saveError: String?
+    // Set when the Markdown was saved but its timing sidecar was not. The job
+    // and the Markdown are unaffected; this is only a notice.
+    var sidecarWarning: String?
     // Whether the automatic save used the source-package presentation. Fixed
     // when the save is attempted, so later changes to the preference cannot
     // change what Copy or the manual Save writes for this job.
@@ -154,6 +157,7 @@ final class BatchQueue {
         guard job.canRetry else { return }
         job.metadata = nil
         job.saveError = nil
+        job.sidecarWarning = nil
         job.exportedAsPackage = false
         job.state = .waiting
     }
@@ -237,26 +241,40 @@ final class BatchQueue {
         }
         job.exportedAsPackage = package != nil
 
+        job.sidecarWarning = nil
+
         do {
-            if let package {
-                // Source package: only for YouTube jobs. The audio is copied out
-                // of the temporary directory before the caller removes it.
-                job.savedTranscriptURL = try destination.writePackage(
-                    videoID: package.videoID,
-                    audio: mediaURL,
-                    manifest: SourcePackageManifest(
-                        metadata: package.metadata,
-                        transcriptionLocale: transcript.localeIdentifier
-                    ).encoded(),
-                    transcript: job.markdown(for: transcript)
-                )
-            } else {
-                job.savedTranscriptURL = try destination.write(
-                    job.markdown(for: transcript),
-                    baseName: mediaURL.deletingPathExtension().lastPathComponent
-                )
-            }
+            let saved = try TranscriptSidecar.saveWithSidecar(
+                transcript,
+                markdown: job.markdown(for: transcript),
+                writeMarkdown: { markdown in
+                    if let package {
+                        // Source package: only for YouTube jobs. The audio is copied out
+                        // of the temporary directory before the caller removes it.
+                        let packageURL = try destination.writePackage(
+                            videoID: package.videoID,
+                            audio: mediaURL,
+                            manifest: SourcePackageManifest(
+                                metadata: package.metadata,
+                                transcriptionLocale: transcript.localeIdentifier
+                            ).encoded(),
+                            transcript: markdown
+                        )
+                        job.savedTranscriptURL = packageURL
+                        return packageURL.appendingPathComponent(SourcePackageManifest.transcriptFilename)
+                    }
+                    let markdownURL = try destination.write(
+                        markdown,
+                        baseName: mediaURL.deletingPathExtension().lastPathComponent
+                    )
+                    job.savedTranscriptURL = markdownURL
+                    return markdownURL
+                },
+                // The sidecar goes next to the file actually written.
+                writeSidecar: { try destination.writeSidecar($0, besides: $1) }
+            )
             job.saveError = nil
+            job.sidecarWarning = saved.sidecarWarning
         } catch {
             job.saveError = error.localizedDescription
         }

@@ -1,0 +1,2 @@
+# Byte-exact renderer output: the Markdown hard line breaks (two trailing spaces) are the content.
+*.md -whitespace

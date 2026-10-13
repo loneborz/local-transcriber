@@ -15,11 +15,6 @@ enum TranscriptionPhase: Sendable {
     }
 }
 
-enum TranscriptTranscriber: String, Sendable {
-    case speechTranscriber = "SpeechTranscriber"
-    case dictationTranscriber = "DictationTranscriber"
-}
-
 enum TranscriptionService {
     static func transcribe(
         url: URL,
@@ -66,7 +61,7 @@ enum TranscriptionService {
 
         let transcriber: any SpeechModule
         let transcriptTranscriber: TranscriptTranscriber
-        let collectSegments: () async throws -> [TranscriptSegment]
+        let collectSegments: () async throws -> CollectedResults
         if let speechLocale {
             let speechTranscriber = SpeechTranscriber(
                 locale: speechLocale,
@@ -77,9 +72,7 @@ enum TranscriptionService {
             transcriber = speechTranscriber
             transcriptTranscriber = .speechTranscriber
             collectSegments = {
-                try await Self.collectSegments(from: speechTranscriber) {
-                    String($0.text.characters)
-                }
+                try await Self.collectSegments(from: speechTranscriber) { $0.text }
             }
         } else if let dictationLocale {
             // Punctuation is on deliberately (LTR-16): it adds sentences in nl-NL and
@@ -94,11 +87,10 @@ enum TranscriptionService {
             transcriber = dictationTranscriber
             transcriptTranscriber = .dictationTranscriber
             collectSegments = {
-                Self.reattachingLeadingPunctuation(
-                    try await Self.collectSegments(from: dictationTranscriber) {
-                        String($0.text.characters)
-                    }
-                )
+                var collected = try await Self.collectSegments(from: dictationTranscriber) { $0.text }
+                // Only the Markdown segments are adjusted; the raw recognition stays as emitted.
+                collected.segments = Self.reattachingLeadingPunctuation(collected.segments)
+                return collected
             }
         } else {
             throw TranscriptionError.unsupportedLocale(transcriptLocaleIdentifier)
@@ -126,12 +118,14 @@ enum TranscriptionService {
             ? Double(file.length) / sampleRate
             : nil
 
+        let collected = try await segments
         return Transcript(
             sourceURL: url,
             localeIdentifier: transcriptLocaleIdentifier,
             transcriber: transcriptTranscriber,
             duration: duration,
-            segments: try await segments
+            segments: collected.segments,
+            recognition: collected.recognition
         )
     }
 
@@ -147,20 +141,56 @@ enum TranscriptionService {
             : nil
     }
 
+    private struct CollectedResults {
+        var segments: [TranscriptSegment]
+        var recognition: TimedRecognition
+    }
+
     private static func collectSegments<Module: SpeechModule>(
         from module: Module,
-        text: (Module.Result) -> String
-    ) async throws -> [TranscriptSegment] {
-        try await module.results.reduce(into: []) { partialResult, result in
+        text: (Module.Result) -> AttributedString
+    ) async throws -> CollectedResults {
+        try await module.results.reduce(into: CollectedResults(segments: [], recognition: TimedRecognition())) { partialResult, result in
             let range = result.range
-            partialResult.append(
-                TranscriptSegment(
-                    startTime: CMTimeGetSeconds(range.start),
-                    endTime: CMTimeGetSeconds(CMTimeRangeGetEnd(range)),
-                    text: text(result)
-                )
+            let start = CMTimeGetSeconds(range.start)
+            let end = CMTimeGetSeconds(CMTimeRangeGetEnd(range))
+            let attributedText = text(result)
+            partialResult.segments.append(
+                TranscriptSegment(startTime: start, endTime: end, text: String(attributedText.characters))
+            )
+            partialResult.recognition.results.append(
+                recognitionResult(from: attributedText, start: start, end: end)
             )
         }
+    }
+
+    // The per-run timing the recognizer attaches to its text (audioTimeRange),
+    // kept as emitted. Runs without any timing are not split into units: the
+    // result then is segment-level data.
+    private static func recognitionResult(
+        from text: AttributedString,
+        start: Double,
+        end: Double
+    ) -> RecognitionResult {
+        let units = text.runs.map { run in
+            let runText = String(text[run.range].characters)
+            let range = run.audioTimeRange
+            return RecognitionUnit(
+                text: runText,
+                kind: RecognitionUnit.classify(runText),
+                start: range.map { CMTimeGetSeconds($0.start) },
+                end: range.map { CMTimeGetSeconds(CMTimeRangeGetEnd($0)) }
+            )
+        }
+        if units.contains(where: { $0.start != nil || $0.end != nil }) {
+            return RecognitionResult(start: start, end: end, units: units)
+        }
+        let whole = String(text.characters)
+        return RecognitionResult(
+            start: start,
+            end: end,
+            units: whole.isEmpty ? [] : [RecognitionUnit(text: whole, kind: .segment)]
+        )
     }
 
     // DictationTranscriber starts each result after the first with the previous
@@ -280,89 +310,5 @@ private enum TranscriptionError: LocalizedError {
                 expected
             )
         }
-    }
-}
-
-struct Transcript: Sendable {
-    let sourceURL: URL
-    let localeIdentifier: String
-    let transcriber: TranscriptTranscriber
-    let duration: TimeInterval?
-    let segments: [TranscriptSegment]
-
-    var characterCount: Int {
-        segments.reduce(0) { $0 + $1.text.count }
-    }
-}
-
-struct TranscriptSegment: Sendable {
-    let startTime: TimeInterval
-    let endTime: TimeInterval
-    let text: String
-}
-
-enum TranscriptMarkdownRenderer {
-    // `source` is given for source packages, where the transcript describes
-    // the video itself (title, link, channel, date) instead of the local file
-    // the audio happened to be downloaded into.
-    static func render(_ transcript: Transcript, source: SourceMetadata? = nil) -> String {
-        var metadata: [String]
-        var title: String
-        if let source {
-            title = source.title.split(whereSeparator: \.isNewline).joined(separator: " ")
-            metadata = ["**Source:** \(source.url.absoluteString)"]
-            if let channel = source.channel { metadata.append("**Channel:** \(channel)") }
-            if let published = source.uploadDate { metadata.append("**Published:** \(published)") }
-        } else {
-            title = transcript.sourceURL.deletingPathExtension().lastPathComponent
-            metadata = ["**Source:** `\(transcript.sourceURL.lastPathComponent)`"]
-        }
-
-        if let duration = transcript.duration {
-            metadata.append("**Duration:** \(timestamp(duration.rounded()))")
-        }
-
-        metadata.append("**Language:** \(transcript.localeIdentifier)")
-        metadata.append("**Engine:** Apple SpeechAnalyzer")
-        metadata.append("**Transcriber:** \(transcript.transcriber.rawValue)")
-
-        var markdown = "# \(title)\n\n"
-        markdown += metadata.joined(separator: "  \n")
-        markdown += "\n\n## Transcript"
-
-        var blocks: [(minute: Int, startTime: TimeInterval, text: String)] = []
-        let segments = transcript.segments.enumerated().sorted {
-            $0.element.startTime == $1.element.startTime
-                ? $0.offset < $1.offset
-                : $0.element.startTime < $1.element.startTime
-        }
-
-        for (_, segment) in segments {
-            let text = segment.text.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !text.isEmpty else { continue }
-
-            let minute = Int(max(0, segment.startTime) / 60)
-            if blocks.last?.minute == minute {
-                blocks[blocks.count - 1].text += " " + text
-            } else {
-                blocks.append((minute, segment.startTime, text))
-            }
-        }
-
-        for block in blocks {
-            markdown += "\n\n### \(timestamp(block.startTime))\n\n\(block.text)"
-        }
-
-        return markdown + "\n"
-    }
-
-    private static func timestamp(_ seconds: TimeInterval) -> String {
-        let totalSeconds = max(0, Int(seconds.rounded(.down)))
-        return String(
-            format: "%02d:%02d:%02d",
-            totalSeconds / 3600,
-            (totalSeconds % 3600) / 60,
-            totalSeconds % 60
-        )
     }
 }

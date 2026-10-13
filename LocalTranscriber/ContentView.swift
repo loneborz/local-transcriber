@@ -829,6 +829,15 @@ private struct JobRow: View {
                         .help("Show in Finder")
                     }
                 }
+
+                // The transcript is saved; only its timing file is not.
+                if case .complete = job.state, let sidecarWarning = job.sidecarWarning {
+                    Text(sidecarWarning)
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .textSelection(.enabled)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 

@@ -1,0 +1,193 @@
+[
+  {
+    "name": "flat-single-minute",
+    "sourcePath": "/Users/test/Audio/Interview One.m4a",
+    "locale": "en-US",
+    "transcriber": "SpeechTranscriber",
+    "duration": 75.4,
+    "segments": [
+      {
+        "start": 0.27,
+        "end": 4.1,
+        "text": "Hello and welcome."
+      },
+      {
+        "start": 4.1,
+        "end": 9.0,
+        "text": " This is a test. "
+      }
+    ]
+  },
+  {
+    "name": "flat-multi-minute-unsorted",
+    "sourcePath": "/Volumes/Media/talk.mov",
+    "locale": "nl-NL",
+    "transcriber": "DictationTranscriber",
+    "duration": 3725.6,
+    "segments": [
+      {
+        "start": 130.0,
+        "end": 140.0,
+        "text": "Derde blok."
+      },
+      {
+        "start": 0.0,
+        "end": 12.5,
+        "text": "Eerste zin."
+      },
+      {
+        "start": 61.2,
+        "end": 70.0,
+        "text": "Tweede blok begint hier."
+      },
+      {
+        "start": 61.2,
+        "end": 75.0,
+        "text": "Zelfde start, later in volgorde."
+      },
+      {
+        "start": 3700.0,
+        "end": 3725.0,
+        "text": "Laatste woorden."
+      }
+    ]
+  },
+  {
+    "name": "flat-empty-negative-and-no-duration",
+    "sourcePath": "/tmp/odd.wav",
+    "locale": "sv-SE",
+    "transcriber": "DictationTranscriber",
+    "duration": null,
+    "segments": [
+      {
+        "start": -3.0,
+        "end": 1.0,
+        "text": "Före noll."
+      },
+      {
+        "start": 5.0,
+        "end": 6.0,
+        "text": "   \n  "
+      },
+      {
+        "start": 7.0,
+        "end": 8.0,
+        "text": ""
+      },
+      {
+        "start": 59.99,
+        "end": 60.5,
+        "text": "Gränsen."
+      },
+      {
+        "start": 60.0,
+        "end": 61.0,
+        "text": "Ny minut."
+      }
+    ]
+  },
+  {
+    "name": "flat-no-segments",
+    "sourcePath": "/tmp/silence.m4a",
+    "locale": "en-US",
+    "transcriber": "SpeechTranscriber",
+    "duration": 12.0,
+    "segments": []
+  },
+  {
+    "name": "package-with-source",
+    "sourcePath": "/private/tmp/acq/Some Video [abc123XYZ_-].m4a",
+    "locale": "en-US",
+    "transcriber": "SpeechTranscriber",
+    "duration": 600.0,
+    "source": {
+      "sourceType": "youtube",
+      "url": "https://www.youtube.com/watch?v=abc123XYZ_-",
+      "videoID": "abc123XYZ_-",
+      "title": "A title\nwith a newline",
+      "channel": "Some Channel",
+      "uploadDate": "2024-05-06",
+      "duration": 600.0,
+      "audioFilename": "audio.m4a"
+    },
+    "segments": [
+      {
+        "start": 1.0,
+        "end": 20.0,
+        "text": "First minute text."
+      },
+      {
+        "start": 65.0,
+        "end": 80.0,
+        "text": "Second minute text."
+      }
+    ]
+  },
+  {
+    "name": "package-without-channel-and-date",
+    "sourcePath": "/private/tmp/acq/x.m4a",
+    "locale": "ru-RU",
+    "transcriber": "DictationTranscriber",
+    "duration": null,
+    "source": {
+      "sourceType": "youtube",
+      "url": "https://youtu.be/zzzzzzzzzzz",
+      "videoID": "zzzzzzzzzzz",
+      "title": "Untitled",
+      "channel": null,
+      "uploadDate": null,
+      "duration": null,
+      "audioFilename": "audio.m4a"
+    },
+    "segments": [
+      {
+        "start": 0.0,
+        "end": 2.0,
+        "text": "Привет, мир."
+      }
+    ]
+  },
+  {
+    "name": "flat-recording-named-file",
+    "sourcePath": "/Users/test/Music/Recording 2026-10-13 21.42.10 (Safari).m4a",
+    "locale": "en-US",
+    "transcriber": "SpeechTranscriber",
+    "duration": 125.0,
+    "segments": [
+      {
+        "start": 0.4,
+        "end": 30.0,
+        "text": "First recorded words."
+      },
+      {
+        "start": 61.0,
+        "end": 90.0,
+        "text": "After a minute."
+      },
+      {
+        "start": 121.0,
+        "end": 124.0,
+        "text": "Done."
+      }
+    ]
+  },
+  {
+    "name": "flat-youtube-named-file",
+    "sourcePath": "/private/tmp/acq/UUID/Some Video: The Title [abc123XYZ_-].m4a",
+    "locale": "nl-NL",
+    "transcriber": "DictationTranscriber",
+    "duration": 240.2,
+    "segments": [
+      {
+        "start": 2.0,
+        "end": 20.0,
+        "text": "Welkom bij deze video."
+      },
+      {
+        "start": 180.5,
+        "end": 200.0,
+        "text": "Tot ziens."
+      }
+    ]
+  }
+]

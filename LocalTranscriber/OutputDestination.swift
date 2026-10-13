@@ -137,6 +137,17 @@ final class OutputDestination {
         }
     }
 
+    // Writes the timing sidecar for a Markdown file this destination placed (see
+    // SidecarFile for the naming and the no-overwrite rule). Never replaces a file.
+    func writeSidecar(_ data: Data, besides markdownURL: URL) throws -> URL {
+        guard case .ready(let folder) = status else { throw OutputError.notConfigured }
+
+        let didStart = folder.startAccessingSecurityScopedResource()
+        defer { if didStart { folder.stopAccessingSecurityScopedResource() } }
+
+        return try SidecarFile.write(data, besides: markdownURL)
+    }
+
     // Moves a finished recording out of app-local staging under the same
     // naming rule. moveItem never replaces an existing file.
     func saveRecording(_ stagedFile: URL, baseName: String) throws -> URL {
