@@ -25,7 +25,7 @@ media file, YouTube link or recording
  timestamped Markdown in your output folder
 ```
 
-The product boundary is deliberate: `media or URL -> local transcript package`. The transcript is the artifact. The app does not summarize, index, search, rewrite or "clean up" what was said.
+The product boundary is deliberate: `media or URL -> local transcript package`. The transcript is the artifact. The app does not summarize, search, rewrite or "clean up" what was said. Completed transcripts are discovered by scanning the selected output folder and listed in the sidebar for review; where the recording was kept next to the transcript, it can be played from the timestamps. No database, persistent index or transcript search is used.
 
 ## Inputs
 
@@ -168,7 +168,7 @@ Debug is signed manually with an Apple Development certificate of the project's 
 - Retrying a job that fails for a lasting reason (for example an unavailable video) simply fails again; there is no retry limit or backoff.
 - A failed write of a source package has been tested only for failure at folder creation, not later in the write.
 - Recording uses the system default microphone input. App audio is chosen per running app; recording the whole system is not offered. A recording that has not been saved yet (for example because the output folder was unavailable) is not recovered if the app quits or crashes.
-- There are no automated tests; behavior is checked by running the real app.
+- Pure transcript, timing, sidecar, library and review logic has automated tests (`swift test` at the repository root builds no app). The app itself, including the views and audio playback, is checked by running the real app.
 
 ## Not in scope
 

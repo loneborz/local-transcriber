@@ -39,6 +39,9 @@ final class TranscriptionJob: Identifiable {
     // Set when the Markdown was saved but its timing sidecar was not. The job
     // and the Markdown are unaffected; this is only a notice.
     var sidecarWarning: String?
+    // Which batch added this job (see BatchQueue.enqueue). Only the queue view
+    // uses it, to keep earlier finished work out of the way.
+    var batch = 0
     // Whether the automatic save used the source-package presentation. Fixed
     // when the save is attempted, so later changes to the preference cannot
     // change what Copy or the manual Save writes for this job.
@@ -63,6 +66,14 @@ final class TranscriptionJob: Identifiable {
     var isWaiting: Bool {
         if case .waiting = state { return true }
         return false
+    }
+
+    // Waiting, downloading or transcribing.
+    var isUnfinished: Bool {
+        switch state {
+        case .waiting, .downloading, .transcribing: true
+        case .complete, .failed: false
+        }
     }
 
     // The one place that decides how this job's transcript is presented:
@@ -97,6 +108,9 @@ final class BatchQueue {
 
     let destination = OutputDestination()
     private var isRunning = false
+    private var batchCounter = 0
+    // The batch the newest jobs belong to; changes when a new batch begins.
+    var currentBatch: Int { batchCounter }
 
     var isProcessing: Bool { isRunning }
     var hasWaitingJobs: Bool { jobs.contains(where: \.isWaiting) }
@@ -121,6 +135,10 @@ final class BatchQueue {
     // is already running, its runner picks the new jobs up.
     func enqueue(_ sources: [JobSource], locale: Locale) -> [TranscriptionJob] {
         let newJobs = sources.map { TranscriptionJob(source: $0, locale: locale) }
+        // Files added while nothing is waiting or running begin a new batch; files
+        // added to unfinished work join it.
+        if !jobs.contains(where: \.isUnfinished) { batchCounter += 1 }
+        for job in newJobs { job.batch = batchCounter }
         jobs.append(contentsOf: newJobs)
         return newJobs
     }
@@ -134,7 +152,9 @@ final class BatchQueue {
 
     // Totals over the jobs currently in the queue. Duration and processing
     // time come from Complete jobs only; downloading is not processing.
-    var summary: BatchSummary {
+    var summary: BatchSummary { summary(of: jobs) }
+
+    func summary(of jobs: [TranscriptionJob]) -> BatchSummary {
         var summary = BatchSummary()
         for job in jobs {
             switch job.state {

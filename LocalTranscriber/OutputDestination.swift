@@ -45,6 +45,11 @@ final class OutputDestination {
         return false
     }
 
+    // The folder the library lists; nil unless the folder is ready.
+    var readyFolder: URL? {
+        if case .ready(let url) = status { url } else { nil }
+    }
+
     // Re-resolves the persisted bookmark. Never falls back to another folder.
     func refresh() {
         guard let data = UserDefaults.standard.data(forKey: Self.bookmarkKey) else {

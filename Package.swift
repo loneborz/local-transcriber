@@ -14,9 +14,10 @@ let package = Package(
             // YouTubeSource.swift is only here for SourceMetadata, which the
             // renderer takes for source packages.
             exclude: [
-                "Assets.xcassets", "BatchQueue.swift", "ContentView.swift", "Credits.rtf",
-                "MyApp.swift", "OutputDestination.swift", "Recorder.swift",
-                "SourcePackage.swift", "Theme.swift", "TranscriptionService.swift",
+                "Assets.xcassets", "AudioReviewPlayer.swift", "BatchQueue.swift", "ContentView.swift", "Credits.rtf",
+                "LibraryStore.swift", "MyApp.swift", "OutputDestination.swift", "Recorder.swift",
+                "SourcePackage.swift", "Theme.swift", "TranscriptReviewView.swift",
+                "TranscriptionService.swift", "WorkspaceSidebar.swift",
             ],
             sources: ["Transcript", "YouTubeSource.swift"],
             // Same as the app target (SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor).

@@ -16,6 +16,7 @@ import SwiftUI
     }
 
     @FocusedValue(\.pasteLinks) private var pasteLinks
+    @FocusedValue(\.refreshTranscripts) private var refreshTranscripts
 
     var body: some Scene {
         WindowGroup {
@@ -34,6 +35,14 @@ import SwiftUI
                 Button("Paste") { pasteLinks?() }
                     .keyboardShortcut("v")
                     .disabled(pasteLinks == nil)
+            }
+
+            // Looks for transcripts in the output folder again (also automatic
+            // on launch, folder change, save and app activation, and in Options).
+            CommandGroup(after: .toolbar) {
+                Button("Refresh Transcripts") { refreshTranscripts?() }
+                    .keyboardShortcut("r")
+                    .disabled(refreshTranscripts == nil)
             }
         }
     }

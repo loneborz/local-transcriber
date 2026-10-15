@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 
 extension FocusedValues {
     @Entry var pasteLinks: (() -> Void)?
+    @Entry var refreshTranscripts: (() -> Void)?
 }
 
 struct ContentView: View {
@@ -16,6 +17,20 @@ struct ContentView: View {
     @AppStorage("defaultLanguage") private var selectedLanguage = TranscriptionLanguage.english
     @AppStorage(BatchQueue.sourcePackageModeKey) private var savesSourcePackages = false
     @State private var notice: String?
+    @State private var library = LibraryStore()
+    @State private var selection: SidebarSelection? = .newTranscription
+    // Bumped when the List deselects the selected row, so it draws the selection again.
+    @State private var sidebarRefresh = 0
+    @State private var columnVisibility = NavigationSplitViewVisibility.all
+    // A finished single job whose transcript should open as soon as the library lists it.
+    @State private var pendingOpen: PendingOpen?
+    // Jobs whose save has already been looked at, so each save is considered once.
+    @State private var announcedSaves: Set<UUID> = []
+    // The New Transcription workspace shows the retained queue from this batch on
+    // (settled jobs of earlier batches are hidden, never deleted).
+    @State private var firstVisibleBatch = 0
+    // The window's only audio player (see AudioReviewPlayer).
+    @State private var player = AudioReviewPlayer()
 
     private let supportedExtensions = [
         "mp4",
@@ -26,13 +41,23 @@ struct ContentView: View {
     ]
 
     var body: some View {
-        VStack(spacing: 0) {
-            content
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        NavigationSplitView(columnVisibility: $columnVisibility) {
+            WorkspaceSidebar(
+                jobs: inProgressJobs,
+                library: library,
+                destination: queue.destination.status,
+                selection: sidebarSelection
+            )
+            .navigationSplitViewColumnWidth(min: 190, ideal: 230, max: 340)
+        } detail: {
+            VStack(spacing: 0) {
+                detail
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
 
-            footer
+                footer
+            }
+            .frame(minWidth: 640, minHeight: 368)
         }
-        .frame(minWidth: 640, minHeight: 420)
         // The paper continues under the title bar.
         .containerBackground(Theme.paper, for: .window)
         .contentShape(Rectangle())
@@ -42,20 +67,193 @@ struct ContentView: View {
             isTargeted = targeted
         }
         .focusedSceneValue(\.pasteLinks, pasteFromClipboard)
-        .onAppear { recorder.refreshApps() }
+        .focusedSceneValue(\.refreshTranscripts) { refreshLibrary() }
+        .onAppear {
+            recorder.refreshApps()
+            library.refresh(folder: queue.destination.readyFolder)
+        }
         // Closing the window must not leave a recording running unseen.
-        .onDisappear { recorder.cancel() }
+        .onDisappear {
+            recorder.cancel()
+            player.stop()
+        }
         .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didLaunchApplicationNotification)) { _ in
             recorder.refreshApps()
         }
         .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didTerminateApplicationNotification)) { _ in
             recorder.refreshApps()
         }
+        // The library follows the output folder, a saved job, and the app coming
+        // back to the front (files may have changed meanwhile).
+        .onChange(of: queue.destination.readyFolder) { _, folder in
+            library.refresh(folder: folder)
+        }
+        .onChange(of: queue.currentBatch) { _, batch in
+            firstVisibleBatch = QueueWorkspace.firstVisibleBatch(forNewBatch: batch)
+        }
+        .onChange(of: savedJobCount) { noteSavedJobs() }
+        // The scan that follows a save answers the pending open.
+        .onChange(of: library.revision) { resolvePendingOpen() }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            refreshLibrary()
+        }
+        // A selection that no longer exists (job joined to its library entry, item
+        // removed outside the app, folder changed) goes back to New Transcription.
+        .onChange(of: library.items) { selectionStillExists() }
+        // Audio belongs to the open transcript only: any other selection silences it.
+        .onChange(of: selection) { _, new in
+            if case .transcript(let id) = new, player.itemID == id { return }
+            player.stop()
+        }
+        .onChange(of: inProgressJobs.map(\.id)) { selectionStillExists() }
+    }
+
+    // The live jobs, failed jobs and Complete jobs whose save failed. A job that
+    // was saved into the listed output folder is shown once, as a library item.
+    private var inProgressJobs: [TranscriptionJob] {
+        queue.jobs.filter { job in
+            guard case .complete = job.state else { return true }
+            guard let url = job.savedTranscriptURL else { return true }
+            return LibraryJoin.isAwaitingEntry(savedURL: url, folder: library.folder, in: library.joinIndex)
+        }
+    }
+
+    private var savedJobCount: Int {
+        queue.jobs.count { $0.savedTranscriptURL != nil }
+    }
+
+    private func refreshLibrary(recheckFolder: Bool = true) {
+        // Re-resolves the folder so one that went away shows its unavailable status.
+        if recheckFolder && !queue.isProcessing && recorder.isIdle { queue.destination.refresh() }
+        library.refresh(folder: queue.destination.readyFolder)
+    }
+
+    private var isReviewingTranscript: Bool {
+        if case .transcript = selection { true } else { false }
+    }
+
+    // A saved job asks to open its transcript when it is the whole batch and the
+    // user is not reading another transcript. The request names the URL the save
+    // reported and waits for a scan that started after the save.
+    private func noteSavedJobs() {
+        let fresh = queue.jobs.filter { $0.savedTranscriptURL != nil && !announcedSaves.contains($0.id) }
+        announcedSaves.formUnion(fresh.map(\.id))
+        if fresh.count == 1, let job = fresh.first, let url = job.savedTranscriptURL,
+           AutoOpen.shouldRequest(
+               batchJobCount: queue.jobs.count { $0.batch == job.batch },
+               userIsReviewingTranscript: isReviewingTranscript) {
+            pendingOpen = PendingOpen(savedURL: url)
+        }
+        refreshLibrary(recheckFolder: false)
+    }
+
+    private func resolvePendingOpen() {
+        guard let pending = pendingOpen else { return }
+        pendingOpen = nil
+        if case .open(let item) = pending.resolve(in: library.joinIndex, userIsReviewingTranscript: isReviewingTranscript) {
+            selection = .transcript(item.id)
+        }
+    }
+
+    private func isSettled(_ job: TranscriptionJob) -> Bool {
+        if case .complete = job.state { job.savedTranscriptURL != nil } else { false }
+    }
+
+    private var queueEntries: [QueueEntry] {
+        queue.jobs.map {
+            QueueEntry(id: $0.id, batch: $0.batch, isSettled: isSettled($0), isUnfinished: $0.isUnfinished)
+        }
+    }
+
+    // What the New Transcription workspace shows: a window over the retained queue.
+    private var visibleJobs: [TranscriptionJob] {
+        let shown = Set(QueueWorkspace.visible(queueEntries, firstVisibleBatch: firstVisibleBatch))
+        return queue.jobs.filter { shown.contains($0.id) }
+    }
+
+    // Leaving a transcript for New Transcription starts a fresh workspace: finished
+    // batches are put behind the user (still in the queue, still in the library);
+    // a batch that is still running stays whole.
+    private func showNewTranscription() {
+        if isReviewingTranscript {
+            firstVisibleBatch = QueueWorkspace.firstVisibleBatch(afterStartingFresh: queueEntries)
+        }
+        selection = .newTranscription
+    }
+
+    // The sidebar's own selection goes through the same rule; moves made by the
+    // app (an automatic open, a vanished item) do not.
+    private var sidebarSelection: Binding<SidebarSelection?> {
+        Binding(
+            get: { _ = sidebarRefresh; return selection },
+            set: { newValue in
+                // A Command-click on the selected row asks the List to deselect it: there is always a selection.
+                // The selection did not change, so the List is told to show it again.
+                guard let chosen = SidebarSelectionRule.next(current: selection, proposed: newValue) else { return }
+                if newValue == nil { sidebarRefresh += 1 }
+                if chosen == .newTranscription { showNewTranscription() } else { selection = chosen }
+            })
+    }
+
+    private func jobRow(_ job: TranscriptionJob) -> some View {
+        let entry = job.savedTranscriptURL.flatMap { LibraryJoin.item(forSavedURL: $0, in: library.joinIndex) }
+        let awaiting = job.savedTranscriptURL.map {
+            LibraryJoin.isAwaitingEntry(savedURL: $0, folder: library.folder, in: library.joinIndex)
+        } ?? false
+        return JobRow(
+            job: job,
+            onOpen: entry.map { item in { selection = .transcript(item.id) } },
+            savedElsewhere: job.savedTranscriptURL != nil && entry == nil && !awaiting,
+            onSave: {
+                if case .complete(let transcript, _) = job.state {
+                    saveTranscript(transcript, for: job)
+                }
+            }, onCopy: {
+                copyMarkdown(for: job)
+            }, onRemove: {
+                queue.remove(job)
+            }, onRetry: {
+                queue.retry(job)
+                startQueue()
+            })
+    }
+
+    private var queueRows: some View {
+        let jobs = visibleJobs
+        return VStack(spacing: 0) {
+            ForEach(jobs) { job in
+                if job.id != jobs.first?.id {
+                    Theme.rule.frame(height: 1).accessibilityHidden(true)
+                }
+                jobRow(job)
+            }
+        }
+    }
+
+    private func selectionStillExists() {
+        switch selection {
+        case .job(let id) where !inProgressJobs.contains { $0.id == id }:
+            selection = .newTranscription
+        case .transcript(let id) where !library.items.contains { $0.id == id }:
+            selection = .newTranscription
+        default:
+            break
+        }
+    }
+
+    // New Transcription and a live job show the queue; a transcript opens inline.
+    @ViewBuilder
+    private var detail: some View {
+        if case .transcript(let id) = selection, let item = library.items.first(where: { $0.id == id }) {
+            TranscriptReviewView(item: item, player: player)
+        } else {
+            content
+        }
     }
 
     @ViewBuilder
     private var content: some View {
-        if queue.jobs.isEmpty {
+        if visibleJobs.isEmpty {
             // Mark and tagline above one surface with two inputs: import on the
             // left, record on the right. Centered, so a taller window does not
             // leave a loose empty lower third.
@@ -110,26 +308,7 @@ struct ContentView: View {
                 .frame(minHeight: 24)
 
                 ScrollView {
-                    VStack(spacing: 0) {
-                        ForEach(queue.jobs) { job in
-                            JobRow(job: job, onSave: {
-                                if case .complete(let transcript, _) = job.state {
-                                    saveTranscript(transcript, for: job)
-                                }
-                            }, onCopy: {
-                                copyMarkdown(for: job)
-                            }, onRemove: {
-                                queue.remove(job)
-                            }, onRetry: {
-                                queue.retry(job)
-                                startQueue()
-                            })
-
-                            if job.id != queue.jobs.last?.id {
-                                Theme.rule.frame(height: 1).accessibilityHidden(true)
-                            }
-                        }
-                    }
+                    queueRows
                 }
                 .background(Theme.raised)
                 .surface()
@@ -556,6 +735,8 @@ struct ContentView: View {
             }
             .disabled(queue.isProcessing)
 
+            Button("Refresh Transcripts") { refreshLibrary() }
+
             if queue.hasYouTubeJobs {
                 Toggle("Save YouTube Links as Source Packages", isOn: $savesSourcePackages)
                     .disabled(queue.isProcessing)
@@ -574,7 +755,7 @@ struct ContentView: View {
     // Shown once any job has finished: counts and totals, one quiet line.
     @ViewBuilder
     private var summaryView: some View {
-        let summary = queue.summary
+        let summary = queue.summary(of: visibleJobs)
         if summary.hasFinishedJobs {
             Text(summaryText(for: summary))
                 .font(.caption)
@@ -603,6 +784,8 @@ struct ContentView: View {
     }
 
     private func addDroppedFiles(_ urls: [URL]) -> Bool {
+        // Input and its notices live in the queue view.
+        showNewTranscription()
         var sources: [JobSource] = []
         var hasUnsupportedItem = false
         for url in urls {
@@ -644,6 +827,7 @@ struct ContentView: View {
     }
 
     private func pasteFromClipboard() {
+        showNewTranscription()
         let pasteboard = NSPasteboard.general
         var urls = (pasteboard.readObjects(forClasses: [NSURL.self]) as? [URL]) ?? []
         if urls.isEmpty, let text = pasteboard.string(forType: .string) {
@@ -761,6 +945,10 @@ struct ContentView: View {
 
 private struct JobRow: View {
     let job: TranscriptionJob
+    // Present when the job's transcript is listed in the library.
+    let onOpen: (() -> Void)?
+    // Saved, but not into the folder the library is listing.
+    let savedElsewhere: Bool
     let onSave: () -> Void
     // Returns whether the pasteboard accepted the text.
     let onCopy: () -> Bool
@@ -830,6 +1018,13 @@ private struct JobRow: View {
                     }
                 }
 
+                if savedElsewhere {
+                    Text("Not in the current library: saved to another output folder.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
                 // The transcript is saved; only its timing file is not.
                 if case .complete = job.state, let sidecarWarning = job.sidecarWarning {
                     Text(sidecarWarning)
@@ -856,6 +1051,13 @@ private struct JobRow: View {
                 Text(language.wrappedValue.title)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+
+            if let onOpen {
+                Button("Open", action: onOpen)
+                    .controlSize(.small)
+                    .help("Open this transcript")
+                    .accessibilityLabel("Open transcript")
             }
 
             if case .complete = job.state {
