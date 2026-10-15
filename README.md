@@ -4,9 +4,9 @@
 
 Local Transcriber is a native macOS app that turns audio, video, YouTube links and your own recordings into timestamped Markdown transcripts. Speech recognition runs on your Mac with Apple's on-device speech stack; there is no cloud transcription service, no account and no model picker.
 
-![Local Transcriber after a run: an action bar with Add Files, an app-audio picker, a Mic checkbox and Record, a summary line with Clear Queue, and three completed jobs (a local audio file, a YouTube link and an app-audio recording) with their saved Markdown files](https://transcribe.wavesweb.nl/assets/queue.png)
+![Local Transcriber after a finished batch: an action bar with Add Files, an app-audio picker, a Mic checkbox and Record; a summary line reading 4 succeeded and 8m of media, with Clear Queue beside it; four completed jobs (garden-notes.m4a, harbour-meeting.m4a, recipe-notes.m4a and workshop-session.m4a), each with Open and Copy buttons and its saved Markdown file; and a sidebar listing the four saved transcripts](https://transcribe.wavesweb.nl/assets/queue.png)
 
-*A finished queue: one local file, one YouTube link and one recording, transcribed in sequence and saved to the output folder.*
+*A finished batch: four local audio files transcribed in sequence and saved to the output folder, with the saved transcripts listed in the sidebar.*
 
 ## What it does
 
@@ -29,7 +29,7 @@ The product boundary is deliberate: `media or URL -> local transcript package`. 
 
 ## Inputs
 
-![Local Transcriber's empty workspace: a waveform mark and the tagline "Media in. Markdown out." above one surface with two zones: on the left a drop target that also opens the file picker and accepts a pasted YouTube link, on the right "Record audio" with an app-audio picker, a Mic checkbox and a Record button](https://transcribe.wavesweb.nl/assets/empty-state.png)
+![Local Transcriber's empty workspace: a sidebar with New Transcription and a note that transcripts saved in the output folder appear there; and in the main pane a waveform mark and the tagline "Media in. Markdown out." above one surface with two zones: on the left a drop target that also opens the file picker and accepts a pasted YouTube link, on the right "Record audio" with an app-audio picker, a Mic checkbox and a Record button](https://transcribe.wavesweb.nl/assets/empty-state.png)
 
 - **Local files:** MP4, MOV, M4A, MP3 and WAV. Audio files are transcribed directly; for video, AVFoundation first extracts the audio to a temporary M4A.
 - **YouTube links:** `youtube.com` (including `www.`, `m.` and `music.`) and `youtu.be` watch, shorts, live and embed links. Playlist parameters are dropped, so a link transcribes one video.
@@ -107,6 +107,16 @@ An existing folder is never reused (a repeat becomes `jNQXAC9IVRw 2/`), and a pa
 }
 ```
 
+## Library and review
+
+The sidebar lists the transcripts in your output folder, newest first, with the transcription in progress above them. It is a scan of the selected folder and of the source-package folders directly inside it, not of other nested folders. Nothing is imported and no database or index is created, so files you add or move appear in the list.
+
+Select a transcript to read it in the window. The Markdown file stays the source of truth, and **Copy** puts the whole Markdown on the clipboard.
+
+Each new transcript is saved with a `Name.timing.json` beside its Markdown (`transcript.timing.json` inside a source package) holding the recognizer's timing. The Markdown is unchanged. The timing is used only when it belongs to that Markdown, by its checksum and the text of its lines; otherwise the transcript opens as plain Markdown with a short note. Transcripts made before 0.6 have no timing file.
+
+When the recording sits next to its transcript, a player appears. Clicking a timestamp or any timed line jumps there and plays, the current line is highlighted, the view follows it, and **Jump to Playing** returns to it after you scroll away. The audio is the file named by the transcript's `Source` line in the same folder (or `audio.m4a` in a source package), and it must match the transcript's duration to within one second. Audio imported from elsewhere, and YouTube transcripts saved without their audio, open for reading without a player. Seek positions are only as exact as the recognizer's timing.
+
 ## Local versus network
 
 | Step | Where it happens |
@@ -126,12 +136,12 @@ YouTube audio is fetched by a small helper bundled in the app: a pinned [yt-dlp]
 
 ## Download
 
-[Download Local Transcriber 0.5.0](https://github.com/loneborz/local-transcriber/releases/download/v0.5.0/LocalTranscriber-0.5.0.dmg) (DMG, 15 MB) from the [v0.5.0 release](https://github.com/loneborz/local-transcriber/releases/tag/v0.5.0).
+[Download Local Transcriber 0.6.0](https://github.com/loneborz/local-transcriber/releases/download/v0.6.0/LocalTranscriber-0.6.0.dmg) (DMG, 15.7 MB) from the [v0.6.0 release](https://github.com/loneborz/local-transcriber/releases/tag/v0.6.0).
 
 - Requires macOS 26 or later on a Mac with Apple silicon. There is no Intel or universal build.
 - The DMG and the app are signed with Developer ID and notarized by Apple.
 - Open the DMG, drag Local Transcriber to Applications and open it from there. On first launch macOS asks you to confirm opening an app downloaded from the Internet.
-- SHA-256: `98e7d3a24fcc90794c73f0b64bdd8c1338b389e4356e8a380a0e278d2b4ca07e`. Check it with `shasum -a 256 LocalTranscriber-0.5.0.dmg`; the release also has a `.sha256` file.
+- SHA-256: `485470b681c64ef5261ef30155119fed7d6fd6a0f9c2fc22cd01d5dde958bac2`. Check it with `shasum -a 256 LocalTranscriber-0.6.0.dmg`; the release also has a `.sha256` file.
 
 ## Build and run
 
@@ -192,7 +202,7 @@ Local Transcriber is provided under the MIT License, without guaranteed support 
 
 ## Status
 
-An early, working macOS project. The queue, language handling, automatic output, source packages, retry, recording and the current interface are implemented and were verified by running the app. Version 0.5.0 is the current release, distributed as a notarized DMG. It gives the app its own visual identity and changes nothing about what it does; 0.4.0 added recording and 0.3.0 was the first public release.
+An early, working macOS project. The queue, language handling, automatic output, source packages, retry, recording, the transcript library, review and audio playback, and the current interface are implemented and were verified by running the app. Version 0.6.0 is the current release, distributed as a notarized DMG. It adds the library, in-window review, playback from the timestamps, Copy Markdown and the timing files; the speech recognition and the Markdown format are unchanged. 0.5.0 gave the app its visual identity, 0.4.0 added recording and 0.3.0 was the first public release.
 
 ## Third-party components
 

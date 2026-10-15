@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>0.6.0: Listening back - Local Transcriber Journal</title>
+<meta name="description" content="A Dutch transcript that came back almost empty led to a different problem: no easy way to check a transcript against the recording. 0.6.0 adds a library, a viewer and playback from the timestamps. The speech recognition is unchanged.">
+<meta name="theme-color" content="#f3f0ea">
+<link rel="canonical" href="https://transcribe.wavesweb.nl/journal/0.6.0/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Local Transcriber">
+<meta property="og:locale" content="en_US">
+<meta property="og:url" content="https://transcribe.wavesweb.nl/journal/0.6.0/">
+<meta property="og:title" content="0.6.0: Listening back - Local Transcriber Journal">
+<meta property="og:description" content="A Dutch transcript that came back almost empty led to a different problem: no easy way to check a transcript against the recording. 0.6.0 adds a library, a viewer and playback from the timestamps. The speech recognition is unchanged.">
+<meta property="og:image" content="https://transcribe.wavesweb.nl/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Local Transcriber: Media in. Markdown out. The app window playing back a transcript, with a sidebar of saved transcripts and the current line highlighted.">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="stylesheet" href="/styles.css">
+<script>
+  // Light unless the visitor explicitly saved dark. The OS appearance is ignored.
+  (function () {
+    var root = document.documentElement;
+    root.classList.add("js");
+    try {
+      if (localStorage.getItem("lt-theme") === "dark") {
+        root.setAttribute("data-theme", "dark");
+        document.querySelector('meta[name="theme-color"]').content = "#171214";
+      }
+    } catch (e) {}
+  })();
+</script>
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="nav">
+  <div class="wrap nav-inner">
+    <a class="brand" href="/">
+      <svg class="mark" viewBox="0 0 66 52" width="24" height="19" aria-hidden="true" focusable="false">
+        <rect x="0" y="19" width="6" height="14" rx="3"/>
+        <rect x="10" y="13" width="6" height="26" rx="3"/>
+        <rect x="20" y="7" width="6" height="38" rx="3"/>
+        <rect x="30" y="0" width="6" height="52" rx="3"/>
+        <rect x="40" y="7" width="6" height="38" rx="3"/>
+        <rect x="50" y="13" width="6" height="26" rx="3"/>
+        <rect x="60" y="19" width="6" height="14" rx="3"/>
+      </svg>
+      Local Transcriber
+    </a>
+    <nav class="nav-links" aria-label="Sections">
+      <a href="/#how">How it works</a>
+      <a href="/#output">Output</a>
+      <a href="/#local">Local and network</a>
+      <a href="/#download">Download</a>
+    </nav>
+    <div class="nav-tools">
+      <a class="nav-gh" href="/">Home</a>
+      <a class="nav-gh" href="https://github.com/loneborz/local-transcriber" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <button class="theme-toggle" type="button" data-theme-toggle aria-pressed="false" aria-label="Dark theme">
+        <svg class="icon-sun" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4"/><path d="M12 3.2v1.9M12 18.9v1.9M3.2 12h1.9M18.9 12h1.9M5.8 5.8l1.3 1.3M16.9 16.9l1.3 1.3M5.8 18.2l1.3-1.3M16.9 7.1l1.3-1.3"/></svg>
+        <svg class="icon-moon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M18.6 14.8A7.4 7.4 0 1 1 9.2 5.4a6 6 0 0 0 9.4 9.4z"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main id="main" class="section journal">
+  <div class="wrap">
+    <article class="journal-grid" id="top">
+      <div>
+        <a class="back" href="/journal/">&larr; Journal</a>
+        <p class="journal-meta">0.6.0<br>Oct 12–15, 2026<br>GitHub Release</p>
+      </div>
+      <div>
+        <h1>Listening back</h1>
+        <p class="lead">This release started with a Dutch transcript that came back almost empty, and it ended with a way to listen to any transcript while you read it. The speech recognition is the same as in 0.5.</p>
+        <div class="prose">
+          <h2>A Dutch recording that came back thin</h2>
+          <p>I gave the app a Dutch recording of about twelve minutes. The job finished without an error, and the Markdown it saved had fewer than two hundred words in it. Other apps got far more out of the same file, so the speech was there and could be decoded.</p>
+          <p>I wanted to know where the words were disappearing. The investigation eventually pointed back to Apple's recognizer. The app was saving what it received, but large parts of the recording simply weren't coming through: three results for the whole recording, with long stretches in the middle that had no words at all. A few settings I tried didn't bring the speech back. I still don't know why it does that, and I haven't fixed it.</p>
+          <h2>The other half of the problem</h2>
+          <p>The longer I looked at that transcript, the more the other half of the problem bothered me: I couldn't check it. The Markdown has a heading for every minute and the text underneath. To find out whether one sentence was right, I had to open the recording in another app, drag to roughly the right place and listen. I could read the result, but I couldn't easily compare it with what was actually said.</p>
+          <p>What I wanted was simple to describe. Read the transcript, click a sentence, hear it. The recognizer was already providing timing information, but I wasn't keeping it. I was reducing everything to minute headings in Markdown. So the first change was small and invisible: next to each new transcript, the app now saves a <code>Name.timing.json</code> with those times. The Markdown itself is untouched.</p>
+          <h2>Clicking a line</h2>
+          <p>With the times kept, I could build the part I actually wanted. A sidebar lists the transcripts in your output folder, newest first. It just scans the folder, so there is no database, and a file you add or move shows up. Select one and it opens in the window. If the recording sits next to it, there is a player: click a timestamp or any line and it jumps there and plays. The current line is highlighted and the view follows along, and Jump to Playing takes you back if you scroll away.</p>
+          <p>That only works where the audio already sits next to the transcript, like a recording the app made or a YouTube source package. Audio imported from somewhere else has no player, and a transcript from before 0.6 has no timing file, so it opens as plain Markdown. The Markdown is still the source of truth. The app doesn't edit, search or correct anything.</p>
+          <p>Dutch is still not fixed. Sometimes the recognizer just doesn't capture enough. But now I can listen back, jump to the relevant part of a recording and see where the transcript falls short. I started looking into this because of Dutch, and ended up with something useful for every language the app supports.</p>
+        </div>
+        <nav aria-label="Journal">
+          <a class="back" href="/journal/">&larr; Back to the Journal</a>
+          <a class="back" href="/journal/0.5.0/" rel="prev">Earlier story: 0.5.0</a>
+        </nav>
+      </div>
+    </article>
+  </div>
+</main>
+
+<footer class="footer">
+  <div class="wrap footer-inner">
+    <p>
+      Local Transcriber is open source under the
+      <a href="https://github.com/loneborz/local-transcriber/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT License</a>.
+      A <a href="https://wavesweb.nl/">Wavesweb</a> Labs project.
+    </p>
+    <nav aria-label="Footer">
+      <a href="/journal/">Journal</a>
+      <a href="https://github.com/loneborz/local-transcriber" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <a href="https://github.com/loneborz/local-transcriber#readme" target="_blank" rel="noopener noreferrer">README</a>
+      <a href="#top">Back to top</a>
+    </nav>
+  </div>
+</footer>
+
+<script>
+  (function () {
+    var root = document.documentElement;
+    var button = document.querySelector("[data-theme-toggle]");
+    var meta = document.querySelector('meta[name="theme-color"]');
+    function sync() {
+      var dark = root.getAttribute("data-theme") === "dark";
+      button.setAttribute("aria-pressed", dark ? "true" : "false");
+      meta.content = dark ? "#171214" : "#f3f0ea";
+    }
+    button.addEventListener("click", function () {
+      var next = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
+      // Switch with transitions off, so the change lands at once.
+      root.classList.add("theme-switching");
+      root.setAttribute("data-theme", next);
+      getComputedStyle(root).colorScheme;
+      root.classList.remove("theme-switching");
+      try { localStorage.setItem("lt-theme", next); } catch (e) {}
+      sync();
+    });
+    sync();
+  })();
+</script>
+
+</body>
+</html>
