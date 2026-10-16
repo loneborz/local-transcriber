@@ -2,11 +2,26 @@ import AppKit
 import SwiftUI
 
 // What the sidebar has selected. New Transcription and an In progress job both
-// show the queue; a transcript shows the Review view.
+// show the queue; a transcript shows the Review view. A pinned transcript is
+// listed twice (Pinned and its folder): the two rows are one transcript, and
+// `.pinned` only says which row carries the highlight.
 enum SidebarSelection: Hashable {
     case newTranscription
     case job(UUID)
     case transcript(LibraryTranscript.ID)
+    case pinned(LibraryTranscript.ID)
+
+    var transcriptID: LibraryTranscript.ID? {
+        switch self {
+        case .transcript(let id), .pinned(let id): id
+        case .newTranscription, .job: nil
+        }
+    }
+
+    // The same kind of row for another transcript (after a rename or move).
+    func replacingTranscript(with id: LibraryTranscript.ID) -> SidebarSelection {
+        if case .pinned = self { .pinned(id) } else { .transcript(id) }
+    }
 }
 
 // What a menu, a key or the Transcript menu asks the library to do. The window
@@ -19,6 +34,8 @@ enum LibraryRequest {
     case move(LibraryTranscript, to: LibraryFolder?)
     case newFolder(moving: LibraryTranscript?)
     case trash(LibraryTranscript)
+    case renameFolder(LibraryFolder)
+    case trashFolder(LibraryFolder)
 }
 
 // What the Transcript menu can act on: the open transcript, if any.
@@ -36,23 +53,19 @@ struct WorkspaceSidebar: View {
     let library: LibraryStore
     let destination: OutputDestination.Status
     @Binding var selection: SidebarSelection?
+    let onNewTranscription: () -> Void
     let onRefresh: () -> Void
     let onRequest: (LibraryRequest) -> Void
 
     @State private var collapsedFolders: Set<String> = []
     @State private var archiveExpanded = false
 
-    private var isReady: Bool {
-        if case .ready = destination { true } else { false }
-    }
-
     var body: some View {
         let sections = library.sections
         List(selection: $selection) {
-            Label("New Transcription", systemImage: "plus")
-                .tag(SidebarSelection.newTranscription)
-
-            if !jobs.isEmpty {
+            // The queue pane already shows these; the sidebar lists them when
+            // another view is open, so they stay reachable.
+            if !jobs.isEmpty && selection != .newTranscription {
                 Section("In progress") {
                     ForEach(jobs) { job in
                         SidebarJobRow(job: job)
@@ -62,35 +75,14 @@ struct WorkspaceSidebar: View {
             }
 
             if !sections.pinned.isEmpty {
-                Section("Pinned") { rows(sections.pinned, showsFolder: true) }
-            }
-
-            if isReady {
-                Section {
-                    if sections.folders.isEmpty {
-                        Text("Folders you create appear here.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .selectionDisabled()
-                            .contextMenu { newFolderMenu }
+                Section("Pinned") {
+                    ForEach(sections.pinned) { item in
+                        row(item, showsFolder: true, tag: .pinned(item.id))
                     }
-                    ForEach(sections.folders, id: \.folder.id) { group in folderRow(group) }
-                } header: {
-                    HStack {
-                        Text("Folders")
-                        Spacer()
-                        Button { onRequest(.newFolder(moving: nil)) } label: {
-                            Image(systemName: "folder.badge.plus")
-                        }
-                        .buttonStyle(.borderless)
-                        .help("New Folder")
-                        .accessibilityLabel("New Folder")
-                    }
-                    .contextMenu { newFolderMenu }
                 }
             }
 
-            if !sections.recent.isEmpty || library.items.isEmpty {
+            if !sections.recent.isEmpty || library.items.isEmpty && sections.folders.isEmpty {
                 Section {
                     if library.items.isEmpty {
                         Text(emptyMessage)
@@ -100,7 +92,7 @@ struct WorkspaceSidebar: View {
                             .selectionDisabled()
                             .contextMenu { refreshMenu }
                     } else {
-                        rows(sections.recent, showsFolder: false)
+                        ForEach(sections.recent) { row($0, showsFolder: false, tag: .transcript($0.id)) }
                     }
                 } header: {
                     // A header's menu covers only the header, so the rows carry it too.
@@ -109,27 +101,57 @@ struct WorkspaceSidebar: View {
                 }
             }
 
+            if !sections.folders.isEmpty {
+                Section("Folders") {
+                    ForEach(sections.folders, id: \.folder.id) { folderRow($0) }
+                }
+            }
+
             if !sections.archived.isEmpty {
-                Section("Archive", isExpanded: $archiveExpanded) { rows(sections.archived, showsFolder: true) }
+                Section("Archive", isExpanded: $archiveExpanded) {
+                    ForEach(sections.archived) { row($0, showsFolder: true, tag: .transcript($0.id)) }
+                }
             }
         }
         .listStyle(.sidebar)
+        // One warm ground for both appearances (see Theme.sidebar).
+        .scrollContentBackground(.hidden)
+        .background(Theme.sidebar)
+        .safeAreaInset(edge: .top, spacing: 0) { newButton }
         .accessibilityLabel("Transcription sidebar")
         // The Delete key asks to move the selected transcript to the Trash.
         .onDeleteCommand {
-            if case .transcript(let id) = selection,
+            if let id = selection?.transcriptID,
                let item = library.items.first(where: { $0.id == id }), item.isManaged {
                 onRequest(.trash(item))
             }
         }
     }
 
-    private func rows(_ items: [LibraryTranscript], showsFolder: Bool) -> some View {
-        ForEach(items) { item in
-            SidebarTranscriptRow(item: item, showsFolder: showsFolder)
-                .tag(SidebarSelection.transcript(item.id))
-                .contextMenu { entryMenu(item) }
+    // One click starts a new transcription; the menu holds the other things
+    // that can be created (more can be added here later).
+    private var newButton: some View {
+        Menu {
+            Button("New Transcription", systemImage: "waveform.badge.plus", action: onNewTranscription)
+            Button("New Folder…", systemImage: "folder.badge.plus") { onRequest(.newFolder(moving: nil)) }
+        } label: {
+            Label("New Transcription", systemImage: "plus")
+                .frame(maxWidth: .infinity)
+        } primaryAction: {
+            onNewTranscription()
         }
+        .menuStyle(.button)
+        .controlSize(.large)
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Theme.sidebar)
+    }
+
+    private func row(_ item: LibraryTranscript, showsFolder: Bool, tag: SidebarSelection) -> some View {
+        SidebarTranscriptRow(item: item, showsFolder: showsFolder)
+            .tag(tag)
+            .contextMenu { entryMenu(item) }
     }
 
     private func folderRow(_ group: LibrarySections.Group) -> some View {
@@ -139,23 +161,18 @@ struct WorkspaceSidebar: View {
                 if open { collapsedFolders.remove(group.folder.id) } else { collapsedFolders.insert(group.folder.id) }
             })
         ) {
-            if group.entries.isEmpty {
-                Text("No transcripts")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-                    .selectionDisabled()
-            }
-            rows(group.entries, showsFolder: false)
+            ForEach(group.entries) { row($0, showsFolder: false, tag: .transcript($0.id)) }
         } label: {
             Label(group.folder.name, systemImage: "folder")
                 .lineLimit(1)
                 .truncationMode(.middle)
                 .contextMenu {
+                    Button("Rename Folder…") { onRequest(.renameFolder(group.folder)) }
                     Button("Reveal in Finder") {
                         NSWorkspace.shared.activateFileViewerSelecting([group.folder.url])
                     }
                     Divider()
-                    newFolderMenu
+                    Button("Move to Trash…", role: .destructive) { onRequest(.trashFolder(group.folder)) }
                 }
         }
     }
@@ -186,10 +203,6 @@ struct WorkspaceSidebar: View {
         }
         Divider()
         refreshMenu
-    }
-
-    private var newFolderMenu: some View {
-        Button("New Folder…") { onRequest(.newFolder(moving: nil)) }
     }
 
     // The same refresh as View › Refresh Transcripts (⌘R).

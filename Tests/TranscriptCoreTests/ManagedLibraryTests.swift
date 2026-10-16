@@ -296,9 +296,9 @@ final class ManagedScanTests: ManagedLibraryCase {
 
         let sections = LibrarySections(try scan())
         XCTAssertEqual(sections.pinned.map(\.title), ["Filed Pinned", "Mid", "Pinned Old"], "pinned first, newest first, across folders")
-        XCTAssertEqual(sections.recent.map(\.title), ["New", "Old"])
+        XCTAssertEqual(sections.recent.map(\.title), ["New", "Old"], "pinned and archived entries are not Recent")
         XCTAssertEqual(sections.folders.map(\.folder.name), ["Work"])
-        XCTAssertEqual(sections.folders[0].entries.map(\.title), ["Filed"])
+        XCTAssertEqual(sections.folders[0].entries.map(\.title), ["Filed Pinned", "Filed"], "a pinned entry is also listed in its folder")
         XCTAssertEqual(Set(sections.archived.map(\.title)), ["Gone", "Gone Pinned"], "archived wins over pinned; one place only")
     }
 
@@ -555,5 +555,79 @@ final class ReviewFixTests: ManagedLibraryCase {
         XCTAssertEqual(EntryName.sanitized("Interview.app"), "Interview-app")
         let written = try LibraryOperations.writeEntry(baseName: "Talk.app", in: folder, markdown: markdown(), createdAt: created)
         XCTAssertEqual(try scan().items.map(\.markdownURL), [written.markdown])
+    }
+}
+
+
+// The folder actions of the UI pass (LTR-57).
+final class FolderActionTests: ManagedLibraryCase {
+    func testRenameKeepsEveryTranscriptAndByte() throws {
+        let md = try makeEntry("Talk", in: "Old")
+        let hash = try sha(md)
+        let renamed = try LibraryOperations.renameFolder(LibraryFolder(url: folder.appendingPathComponent("Old")), to: " New ")
+        XCTAssertEqual(renamed.name, "New")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: folder.appendingPathComponent("Old").path))
+        let item = try entry("Talk")
+        XCTAssertEqual(item.group?.lastPathComponent, "New")
+        XCTAssertEqual(try sha(item.markdownURL), hash)
+        XCTAssertEqual(item.createdAt, created)
+    }
+
+    func testRenameRefusesTakenInvalidAndPackageNamesWithoutChangingAnything() throws {
+        try makeEntry("A", in: "One"); try makeEntry("B", in: "Two")
+        let before = try snapshot()
+        let one = LibraryFolder(url: folder.appendingPathComponent("One"))
+        XCTAssertThrowsError(try LibraryOperations.renameFolder(one, to: "Two")) { XCTAssertEqual($0 as? LibraryError, .nameTaken("Two")) }
+        XCTAssertThrowsError(try LibraryOperations.renameFolder(one, to: "two"), "case-insensitive duplicate")
+        for bad in ["", "a/b", ".hidden", "x.app"] { XCTAssertThrowsError(try LibraryOperations.renameFolder(one, to: bad), bad) }
+        XCTAssertEqual(try snapshot(), before)
+    }
+
+    func testRenameCanChangeOnlyTheCase() throws {
+        try makeEntry("A", in: "work")
+        _ = try LibraryOperations.renameFolder(LibraryFolder(url: folder.appendingPathComponent("work")), to: "Work")
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: folder.path), ["Work"])
+        XCTAssertEqual(try scan().items.count, 1)
+    }
+
+    func testAFolderOfManagedTranscriptsGoesToTheTrashWhole() throws {
+        try makeEntry("A", in: "Work", audio: true); try makeEntry("B", in: "Work")
+        let work = LibraryFolder(url: folder.appendingPathComponent("Work"))
+        XCTAssertEqual(LibraryOperations.inspect(work), .init(entryCount: 2, unmanaged: []))
+        var trashed: [URL] = []
+        try LibraryOperations.trashFolder(work) { trashed.append($0) }
+        XCTAssertEqual(trashed, [work.url])
+    }
+
+    func testAFolderWithOtherFilesIsNeverTrashedAndSaysWhat() throws {
+        try makeEntry("A", in: "Work")
+        try write("notes", "Work/notes.txt")
+        try writePair("Legacy", in: "Work")
+        try write("x", "Work/.DS_Store")
+        let work = LibraryFolder(url: folder.appendingPathComponent("Work"))
+        let contents = LibraryOperations.inspect(work)
+        XCTAssertEqual(contents.entryCount, 1)
+        XCTAssertEqual(Set(contents.unmanaged), ["Legacy.md", "Legacy.timing.json", "notes.txt"])
+        XCTAssertThrowsError(try LibraryOperations.trashFolder(work) { _ in XCTFail("must not trash") }) {
+            XCTAssertEqual($0 as? LibraryError, .folderHasOtherFiles("Work"))
+        }
+    }
+
+    func testAFailedTrashMoveDeletesNothingAndAMissingFolderIsReported() throws {
+        try makeEntry("A", in: "Work")
+        let work = LibraryFolder(url: folder.appendingPathComponent("Work"))
+        struct Refused: Error {}
+        XCTAssertThrowsError(try LibraryOperations.trashFolder(work) { _ in throw Refused() })
+        XCTAssertEqual(try scan().items.count, 1)
+        try FileManager.default.removeItem(at: work.url)
+        XCTAssertThrowsError(try LibraryOperations.trashFolder(work) { _ in XCTFail() })
+        XCTAssertThrowsError(try LibraryOperations.renameFolder(work, to: "X"))
+    }
+
+    func testAnEmptyFolderCanBeTrashed() throws {
+        let empty = try LibraryOperations.createOrganizationFolder(named: "Empty", in: folder)
+        var trashed = 0
+        try LibraryOperations.trashFolder(empty) { _ in trashed += 1 }
+        XCTAssertEqual(trashed, 1)
     }
 }

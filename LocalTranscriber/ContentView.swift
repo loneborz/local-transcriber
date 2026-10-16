@@ -14,7 +14,11 @@ private enum LibraryPrompt {
     case rename(LibraryTranscript)
     case newFolder(moving: LibraryTranscript?)
     case trash(LibraryTranscript)
-    case failure(String)
+    case renameFolder(LibraryFolder)
+    case trashFolder(LibraryFolder, entries: Int)
+    // The folder holds files the app did not create, so it is not trashed from here.
+    case folderNeedsReview(LibraryFolder, names: [String])
+    case failure(title: String, reason: String)
 }
 
 struct ContentView: View {
@@ -64,6 +68,7 @@ struct ContentView: View {
                 library: library,
                 destination: destination.status,
                 selection: sidebarSelection,
+                onNewTranscription: showNewTranscription,
                 onRefresh: { refreshLibrary() },
                 onRequest: handle
             )
@@ -89,8 +94,7 @@ struct ContentView: View {
         .focusedSceneValue(\.refreshTranscripts) { refreshLibrary() }
         .focusedSceneValue(\.libraryCommands, LibraryCommands(
             selected: selectedTranscript, canCreateFolder: destination.isReady, request: handle))
-        .modifier(LibraryPromptModifier(
-            prompt: $prompt, text: $promptText, library: library, commit: commit))
+        .modifier(LibraryPromptModifier(prompt: $prompt, text: $promptText, commit: commit))
         // Another window changed files: look again.
         .onReceive(NotificationCenter.default.publisher(for: .libraryDidChange)) { note in
             if (note.object as? LibraryStore) !== library { refreshLibrary(recheckFolder: false) }
@@ -134,7 +138,7 @@ struct ContentView: View {
         .onChange(of: library.items) { selectionStillExists() }
         // Audio belongs to the open transcript only: any other selection silences it.
         .onChange(of: selection) { _, new in
-            if case .transcript(let id) = new, player.itemID == id { return }
+            if let id = new?.transcriptID, player.itemID == id { return }
             player.stop()
         }
         .onChange(of: inProgressJobs.map(\.id)) { selectionStillExists() }
@@ -163,7 +167,7 @@ struct ContentView: View {
     }
 
     private var selectedTranscript: LibraryTranscript? {
-        if case .transcript(let id) = selection { library.items.first { $0.id == id } } else { nil }
+        selection?.transcriptID.flatMap { id in library.items.first { $0.id == id } }
     }
 
     // MARK: library actions
@@ -179,47 +183,85 @@ struct ContentView: View {
         case .trash(let item):
             prompt = .trash(item)
         case .togglePin(let item):
-            attempt { try library.setPinned(item, !item.isPinned) }
+            let verb = item.isPinned ? "unpin" : "pin"
+            attempt("Couldn’t \(verb) “\(item.title)”") { try library.setPinned(item, !item.isPinned) }
         case .toggleArchive(let item):
-            attempt { try library.setArchived(item, !item.isArchived) }
+            let verb = item.isArchived ? "unarchive" : "archive"
+            attempt("Couldn’t \(verb) “\(item.title)”") { try library.setArchived(item, !item.isArchived) }
         case .move(let item, let folder):
-            attempt { follow(item, to: try library.move(item, to: folder)) }
+            attempt("Couldn’t move “\(item.title)”") { follow(item, to: try library.move(item, to: folder)) }
+        case .renameFolder(let folder):
+            promptText = folder.name
+            prompt = .renameFolder(folder)
+        case .trashFolder(let folder):
+            let contents = LibraryOperations.inspect(folder)
+            prompt = contents.isSafeToTrash
+                ? .trashFolder(folder, entries: contents.entryCount)
+                : .folderNeedsReview(folder, names: contents.unmanaged)
         }
     }
 
     private func commit(_ prompt: LibraryPrompt) {
-        attempt {
-            switch prompt {
-            case .rename(let item):
-                follow(item, to: try library.rename(item, to: promptText))
-            case .newFolder(let moving):
+        switch prompt {
+        case .rename(let item):
+            attempt("Couldn’t rename “\(item.title)”") { follow(item, to: try library.rename(item, to: promptText)) }
+        case .newFolder(let moving):
+            attempt("Couldn’t create the folder") {
                 let folder = try library.createFolder(named: promptText)
                 if let moving { follow(moving, to: try library.move(moving, to: folder)) }
-            case .trash(let item):
+            }
+        case .trash(let item):
+            attempt("Couldn’t move “\(item.title)” to the Trash") {
                 try library.trash(item)
                 if player.itemID == item.id { player.stop() }
-                if case .transcript(item.id) = selection { showNewTranscription() }
-            case .failure:
-                break
+                if selection?.transcriptID == item.id { showNewTranscription() }
             }
+        case .renameFolder(let folder):
+            attempt("Couldn’t rename the folder “\(folder.name)”") {
+                let renamed = try library.renameFolder(folder, to: promptText)
+                followFolder(folder, to: renamed)
+            }
+        case .trashFolder(let folder, _):
+            attempt("Couldn’t move the folder “\(folder.name)” to the Trash") {
+                let inside = selection?.transcriptID?.hasPrefix(folder.url.standardizedFileURL.path + "/") == true
+                try library.trashFolder(folder)
+                if inside { player.stop(); showNewTranscription() }
+            }
+        case .folderNeedsReview(let folder, _):
+            NSWorkspace.shared.activateFileViewerSelecting([folder.url])
+        case .failure:
+            break
         }
     }
 
-    private func attempt(_ work: () throws -> Void) {
-        do { try work() } catch { prompt = .failure(error.localizedDescription) }
+    private func attempt(_ title: String, _ work: () throws -> Void) {
+        do { try work() } catch { prompt = .failure(title: title, reason: error.localizedDescription) }
+    }
+
+    // A folder was renamed: an open transcript inside it follows to its new path.
+    private func followFolder(_ old: LibraryFolder, to new: LibraryFolder) {
+        let oldPath = old.url.standardizedFileURL.path
+        for job in queue.jobs {
+            if let url = job.savedTranscriptURL, url.standardizedFileURL.path.hasPrefix(oldPath + "/") {
+                job.savedTranscriptURL = URL(fileURLWithPath: new.url.path + String(url.standardizedFileURL.path.dropFirst(oldPath.count)))
+            }
+        }
+        guard let current = selection, let id = current.transcriptID, id.hasPrefix(oldPath + "/") else { return }
+        if player.itemID == id { player.stop() }
+        selection = current.replacingTranscript(with: new.url.standardizedFileURL.path + String(id.dropFirst(oldPath.count)))
     }
 
     // A renamed or moved transcript keeps its place in the sidebar and in the
     // queue; its audio stops, because the file it was playing has moved.
     private func follow(_ old: LibraryTranscript, to new: LibraryTranscript) {
         queue.relocate(from: old.markdownURL, to: new.markdownURL)
-        guard case .transcript(old.id) = selection else { return }
+        guard let current = selection, current.transcriptID == old.id else { return }
         if player.itemID == old.id { player.stop() }
-        selection = .transcript(new.id)
+        selection = current.replacingTranscript(with: new.id)
     }
 
     private var isReviewingTranscript: Bool {
-        if case .transcript = selection { true } else { false }
+        selection?.transcriptID != nil
     }
 
     // A saved job asks to open its transcript when it is the whole batch and the
@@ -327,6 +369,13 @@ struct ContentView: View {
             selection = .newTranscription
         case .transcript(let id) where !library.items.contains { $0.id == id }:
             selection = .newTranscription
+        case .pinned(let id):
+            // Unpinned or archived: the Pinned row is gone, the transcript stays open.
+            guard let item = library.items.first(where: { $0.id == id }) else {
+                selection = .newTranscription
+                return
+            }
+            if !item.isPinned || item.isArchived { selection = .transcript(id) }
         default:
             break
         }
@@ -335,7 +384,7 @@ struct ContentView: View {
     // New Transcription and a live job show the queue; a transcript opens inline.
     @ViewBuilder
     private var detail: some View {
-        if case .transcript(let id) = selection, let item = library.items.first(where: { $0.id == id }) {
+        if let id = selection?.transcriptID, let item = library.items.first(where: { $0.id == id }) {
             TranscriptReviewView(item: item, player: player)
         } else {
             content
@@ -586,6 +635,17 @@ struct ContentView: View {
         .controlSize(.large)
     }
 
+    // Sources on the left (recessed): Add Files, the app-audio choice and the
+    // microphone. Actions on the right (raised): Record and Transcribe.
+    private var sourcesRow: some View {
+        HStack(spacing: 12) {
+            Button("Add Files", action: chooseFiles)
+                .disabled(!recorder.isIdle)
+            appPicker(maxWidth: 150)
+            micToggle
+        }
+    }
+
     private var addFilesSegment: some View {
         Button("Add Files", action: chooseFiles)
             .disabled(!recorder.isIdle)
@@ -597,22 +657,23 @@ struct ContentView: View {
 
     private var actionBarOneRow: some View {
         HStack(spacing: 0) {
-            addFilesSegment
+            sourcesRow
+                .accessibilityElement(children: .contain)
+                .accessibilityLabel("Sources")
+                .padding(.horizontal, 12)
+                .frame(maxHeight: .infinity)
+                .background(Theme.recessed)
+                .fixedSize(horizontal: true, vertical: false)
             Theme.rule.frame(width: 1).accessibilityHidden(true)
             HStack(spacing: 12) {
-                HStack(spacing: 12) {
-                    appPicker(maxWidth: 150)
-                    micToggle
-                    recordButton
-                }
-                .accessibilityElement(children: .contain)
-                .accessibilityLabel("Record audio")
-
+                Spacer(minLength: 0)
+                recordButton
                 transcribeButton
             }
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("Actions")
             .padding(.horizontal, 12)
-            .fixedSize(horizontal: true, vertical: false)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Theme.raised)
         }
         .frame(height: 44)
@@ -620,13 +681,18 @@ struct ContentView: View {
 
     private var actionBarTwoRows: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 8) {
+            HStack(spacing: 12) {
                 Button("Add Files", action: chooseFiles)
-                Spacer()
+                    .disabled(!recorder.isIdle)
+                appPicker(maxWidth: 220)
+                micToggle
+                Spacer(minLength: 8)
                 Text("⌘V pastes a YouTube link")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("Sources")
             .padding(.horizontal, 12)
             .frame(height: 44)
             .background(Theme.recessed)
@@ -634,17 +700,12 @@ struct ContentView: View {
             Theme.rule.frame(height: 1).accessibilityHidden(true)
 
             HStack(spacing: 12) {
-                HStack(spacing: 12) {
-                    appPicker(maxWidth: 260)
-                    micToggle
-                    Spacer(minLength: 8)
-                    recordButton
-                }
-                .accessibilityElement(children: .contain)
-                .accessibilityLabel("Record audio")
-
+                Spacer(minLength: 8)
+                recordButton
                 transcribeButton
             }
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("Actions")
             .padding(.horizontal, 12)
             .frame(height: 44)
             .background(Theme.raised)
@@ -777,8 +838,7 @@ struct ContentView: View {
     // preferences live in Settings.
     private var footer: some View {
         HStack(spacing: 16) {
-            Text("New items: \(selectedLanguage.title)")
-                .help("Language given to newly added and recorded items")
+            languagePicker
 
             Spacer()
 
@@ -795,8 +855,29 @@ struct ContentView: View {
         }
         .font(.subheadline)
         .foregroundStyle(.secondary)
+        .controlSize(.small)
         .padding(.horizontal, 16)
-        .padding(.vertical, 10)
+        .padding(.vertical, 8)
+    }
+
+    // The default language for newly added and recorded items (waiting items keep
+    // theirs). Locked while a recording runs; same preference as before.
+    private var languagePicker: some View {
+        HStack(spacing: 6) {
+            Text("New items:")
+            Picker("Language for new items", selection: $selectedLanguage) {
+                ForEach(TranscriptionLanguage.allCases) { language in
+                    Text(language.title).tag(language)
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .fixedSize()
+            .disabled(!destination.canChangeLanguage)
+        }
+        .help(destination.canChangeLanguage
+              ? "Language given to newly added and recorded items. Waiting items keep theirs unless you use Apply Language to All Waiting."
+              : "The language can’t change while recording.")
     }
 
     private var destinationStatus: some View {
@@ -1093,15 +1174,15 @@ private struct JobRow: View {
                         Button {
                             NSWorkspace.shared.activateFileViewerSelecting([savedTranscriptURL])
                         } label: {
-                            Text(savedTranscriptURL.lastPathComponent)
-                                .font(.caption.monospaced())
+                            Text(savedTranscriptURL.deletingPathExtension().lastPathComponent)
+                                .font(.caption)
                                 .underline(true, color: Theme.emphasis.opacity(0.55))
                                 .lineLimit(1)
                                 .truncationMode(.middle)
                         }
                         .buttonStyle(.plain)
                         .pointerStyle(.link)
-                        .help("Show in Finder")
+                        .help("Show \(savedTranscriptURL.lastPathComponent) in Finder")
                     }
                 }
 
@@ -1424,14 +1505,13 @@ enum TranscriptionLanguage: String, CaseIterable, Identifiable {
 private struct LibraryPromptModifier: ViewModifier {
     @Binding var prompt: LibraryPrompt?
     @Binding var text: String
-    let library: LibraryStore
     let commit: (LibraryPrompt) -> Void
 
     func body(content: Content) -> some View {
         content.alert(title, isPresented: Binding(get: { prompt != nil }, set: { if !$0 { prompt = nil } }),
                       presenting: prompt) { current in
             switch current {
-            case .rename:
+            case .rename, .renameFolder:
                 TextField("Name", text: $text)
                 Button("Rename") { commit(current) }
                 Button("Cancel", role: .cancel) {}
@@ -1439,8 +1519,11 @@ private struct LibraryPromptModifier: ViewModifier {
                 TextField("Name", text: $text)
                 Button("Create") { commit(current) }
                 Button("Cancel", role: .cancel) {}
-            case .trash:
+            case .trash, .trashFolder:
                 Button("Move to Trash", role: .destructive) { commit(current) }
+                Button("Cancel", role: .cancel) {}
+            case .folderNeedsReview:
+                Button("Show in Finder") { commit(current) }
                 Button("Cancel", role: .cancel) {}
             case .failure:
                 Button("OK", role: .cancel) {}
@@ -1453,9 +1536,12 @@ private struct LibraryPromptModifier: ViewModifier {
     private var title: String {
         switch prompt {
         case .rename: "Rename Transcript"
+        case .renameFolder: "Rename Folder"
         case .newFolder(let moving): moving == nil ? "New Folder" : "New Folder and Move"
         case .trash(let item): "Move “\(item.title)” to the Trash?"
-        case .failure: "Couldn’t Do That"
+        case .trashFolder(let folder, _): "Move the folder “\(folder.name)” to the Trash?"
+        case .folderNeedsReview(let folder, _): "“\(folder.name)” Has Other Files"
+        case .failure(let title, _): title
         case nil: ""
         }
     }
@@ -1463,14 +1549,18 @@ private struct LibraryPromptModifier: ViewModifier {
     private func message(for prompt: LibraryPrompt) -> String {
         switch prompt {
         case .rename: return "Renames the folder and its Markdown file. The transcript itself is not changed."
+        case .renameFolder: return "The transcripts inside keep their names and contents."
         case .newFolder: return "Creates a folder in the output folder."
-        case .trash(let item):
-            let files = LibraryOperations.contents(of: item).map {
-                "\($0.name) (\(ByteCountFormatter.string(fromByteCount: $0.bytes, countStyle: .file)))"
-            }
-            return "The folder and everything in it moves to the Trash: \(files.joined(separator: ", ")). "
-                + "Audio kept with the transcript goes with it. You can put it back from the Trash."
-        case .failure(let reason): return reason
+        case .trash:
+            return "The transcript and its timing data and audio go with it. You can restore it from the Trash."
+        case .trashFolder(_, let entries):
+            let count = entries == 1 ? "its 1 transcript" : "its \(entries) transcripts"
+            return "The folder and \(count), with their timing data and audio, go with it. You can restore it from the Trash."
+        case .folderNeedsReview(_, let names):
+            let shown = names.prefix(4).map { "“\($0)”" }.joined(separator: ", ")
+            let more = names.count > 4 ? " and \(names.count - 4) more" : ""
+            return "It contains items Local Transcriber didn’t create: \(shown)\(more). Nothing was moved. Look through the folder in Finder first."
+        case .failure(_, let reason): return reason
         }
     }
 }

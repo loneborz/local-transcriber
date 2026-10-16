@@ -195,6 +195,7 @@ nonisolated enum LibraryError: LocalizedError, Equatable {
     case metadataUnsupported
     case missing(String)
     case tooManyCollisions
+    case folderHasOtherFiles(String)
 
     var errorDescription: String? {
         switch self {
@@ -204,6 +205,7 @@ nonisolated enum LibraryError: LocalizedError, Equatable {
         case .outsideLibrary: "That location is not in the library."
         case .metadataUnreadable: "The entry’s entry.json can’t be read, so it was left as it is."
         case .metadataUnsupported: "The entry’s entry.json is from a newer version, so it was left as it is."
+        case .folderHasOtherFiles(let name): "“\(name)” holds files that Local Transcriber didn’t create, so it wasn’t moved to the Trash."
         case .tooManyCollisions: "Too many items with this name already exist."
         case .missing(let name): "“\(name)” is no longer there. Refresh the library."
         }

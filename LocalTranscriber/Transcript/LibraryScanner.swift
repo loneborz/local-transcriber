@@ -223,9 +223,10 @@ nonisolated enum LibraryJoin {
     }
 }
 
-// How the sidebar groups the listing. An entry is shown in one place only:
-// archived ones in Archive, else pinned ones in Pinned, else in their folder or
-// among the loose Recent ones. Every list keeps the listing's order (newest first).
+// How the sidebar groups the listing. Archived entries are only in Archive. A
+// pinned entry is listed in Pinned and also where it lives (its folder); the
+// two rows are one transcript. Loose entries that are not pinned are Recent.
+// Every list keeps the listing's order (newest first).
 nonisolated struct LibrarySections: Equatable, Sendable {
     struct Group: Equatable, Sendable {
         var folder: LibraryFolder
@@ -243,11 +244,12 @@ nonisolated struct LibrarySections: Equatable, Sendable {
         for item in listing.items {
             if item.isArchived {
                 archived.append(item)
-            } else if item.isPinned {
-                pinned.append(item)
-            } else if let group = item.group, let slot = index[group.standardizedFileURL.path] {
+                continue
+            }
+            if item.isPinned { pinned.append(item) }
+            if let group = item.group, let slot = index[group.standardizedFileURL.path] {
                 folders[slot].entries.append(item)
-            } else {
+            } else if !item.isPinned {
                 recent.append(item)
             }
         }

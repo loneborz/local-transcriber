@@ -124,6 +124,31 @@ final class LibraryStore {
         changed()
     }
 
+    // Renames the folder and shows its transcripts at their new paths at once.
+    func renameFolder(_ folder: LibraryFolder, to name: String) throws -> LibraryFolder {
+        let renamed = try LibraryOperations.renameFolder(folder, to: name)
+        let old = folder.url.path, new = renamed.url.path
+        items = items.map { item in
+            guard item.markdownURL.path.hasPrefix(old + "/") else { return item }
+            var moved = item
+            moved.markdownURL = URL(fileURLWithPath: new + String(item.markdownURL.path.dropFirst(old.count)))
+            moved.group = item.group == nil ? nil : renamed.url
+            return moved
+        }
+        folders = folders.map { $0.id == folder.id ? renamed : $0 }
+            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        seenPaths.formUnion(items.map(\.id))
+        changed()
+        return renamed
+    }
+
+    func trashFolder(_ folder: LibraryFolder) throws {
+        try LibraryOperations.trashFolder(folder)
+        items.removeAll { $0.markdownURL.path.hasPrefix(folder.url.path + "/") }
+        folders.removeAll { $0.id == folder.id }
+        changed()
+    }
+
     func createFolder(named name: String) throws -> LibraryFolder {
         guard let folder else { throw LibraryError.outsideLibrary }
         let created = try LibraryOperations.createOrganizationFolder(named: name, in: folder)

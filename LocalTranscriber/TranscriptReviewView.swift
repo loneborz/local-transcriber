@@ -121,10 +121,12 @@ struct TranscriptReviewView: View {
         .padding(.horizontal, 4)
     }
 
-    // "Saved <date> · length · language · transcriber", using what the header says.
+    // "Created <date>" when the entry records one; otherwise "Saved <date>" with the
+    // file's save date. Then length, language and transcriber, from the header.
     private var metadata: String {
         let header = loaded?.header ?? item.header
-        var parts = ["Saved \(item.savedAt.formatted(date: .abbreviated, time: .shortened))"]
+        var parts = [item.createdAt.map { "Created \($0.formatted(date: .abbreviated, time: .shortened))" }
+                     ?? "Saved \(item.savedAt.formatted(date: .abbreviated, time: .shortened))"]
         if let duration = header.duration { parts.append(TimestampFormat.string(duration)) }
         if let language = header.language {
             parts.append(Locale.current.localizedString(forIdentifier: language) ?? language)

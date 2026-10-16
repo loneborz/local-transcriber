@@ -1,23 +1,16 @@
 import SwiftUI
 
 // The one Settings window (app menu Settings…, ⌘, and the footer entry). Native
-// look: one tab per category, each a self-contained Form, so a category or a
-// control is added without touching the others. Controls that would change
+// look: a single Form today (the default language lives in the footer, next to
+// where it is used); a second category would bring back a TabView. Controls that would change
 // something a running job or recording depends on are locked app-wide while it
 // runs (see OutputDestination), with a note that says why.
 struct SettingsView: View {
     let destination: OutputDestination
 
     var body: some View {
-        TabView {
-            Tab("General", systemImage: "gearshape") {
-                GeneralSettings(destination: destination)
-            }
-            Tab("Transcription", systemImage: "waveform") {
-                TranscriptionSettings(destination: destination)
-            }
-        }
-        .frame(width: 480)
+        GeneralSettings(destination: destination)
+            .frame(width: 480)
     }
 }
 
@@ -77,29 +70,5 @@ private struct GeneralSettings: View {
         } else {
             nil
         }
-    }
-}
-
-private struct TranscriptionSettings: View {
-    let destination: OutputDestination
-    @AppStorage("defaultLanguage") private var language = TranscriptionLanguage.english
-
-    var body: some View {
-        Form {
-            Picker("Default language", selection: $language) {
-                ForEach(TranscriptionLanguage.allCases) { language in
-                    Text(language.title).tag(language)
-                }
-            }
-            .disabled(!destination.canChangeLanguage)
-
-            Text(destination.canChangeLanguage
-                 ? "Given to newly added and recorded items. Waiting items change only through Apply Language to All Waiting."
-                 : "The language can’t change while recording.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(20)
     }
 }

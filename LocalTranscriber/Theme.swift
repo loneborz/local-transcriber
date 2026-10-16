@@ -7,6 +7,10 @@ import AppKit
 enum Theme {
     // Window ground, continued under the title bar.
     static let paper = color(light: 0xF3F0EA, dark: 0x171214)
+    // The sidebar: the same warm ground as the window, one step lighter in Dark
+    // and one step darker in Light, so both appearances keep the same relation
+    // between sidebar and content instead of the system's cool, wallpaper-tinted material.
+    static let sidebar = color(light: 0xEAE5DC, dark: 0x1F1819)
     // The import zone.
     static let recessed = color(light: 0xE8E2D9, dark: 0x171214)
     // The record zone, the action bar's record segment and the queue list.

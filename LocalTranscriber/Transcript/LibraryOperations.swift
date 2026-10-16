@@ -107,6 +107,56 @@ nonisolated enum LibraryOperations {
         return LibraryFolder(url: url)
     }
 
+    // MARK: managing an organization folder
+
+    // What is inside a folder: transcripts the app manages (entry folders) and
+    // anything else. Hidden Finder housekeeping files are not "anything else".
+    struct FolderContents: Equatable, Sendable {
+        var entryCount = 0
+        // Names of items the app did not create (loose files, legacy transcripts, subfolders).
+        var unmanaged: [String] = []
+        var isSafeToTrash: Bool { unmanaged.isEmpty }
+    }
+
+    static func inspect(_ folder: LibraryFolder) -> FolderContents {
+        var found = FolderContents()
+        let children = (try? FileManager.default.contentsOfDirectory(
+            at: folder.url, includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey])) ?? []
+        for child in children {
+            let name = child.lastPathComponent
+            if name == ".DS_Store" { continue }
+            let values = try? child.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
+            let isEntry = values?.isDirectory == true && values?.isSymbolicLink != true
+                && (try? child.appendingPathComponent(EntryMetadata.fileName).checkResourceIsReachable()) == true
+            if isEntry { found.entryCount += 1 } else { found.unmanaged.append(name) }
+        }
+        found.unmanaged.sort { $0.localizedStandardCompare($1) == .orderedAscending }
+        return found
+    }
+
+    // Renames the folder; its contents are untouched. Refused (nothing changes)
+    // for an invalid name or a name that is taken in the output folder.
+    static func renameFolder(_ folder: LibraryFolder, to raw: String) throws -> LibraryFolder {
+        let name = try EntryName.validated(raw).get()
+        guard isDirectory(folder.url) else { throw LibraryError.missing(folder.name) }
+        let target = folder.url.deletingLastPathComponent().appendingPathComponent(name, isDirectory: true)
+        if folder.name == name { return folder }
+        if exists(target), !isSame(target, folder.url) { throw LibraryError.nameTaken(name) }
+        try rename(folder.url, to: target)
+        return LibraryFolder(url: target)
+    }
+
+    // Moves the folder and everything in it to the Trash, only when it holds
+    // nothing but managed transcripts. A failure deletes nothing.
+    static func trashFolder(
+        _ folder: LibraryFolder,
+        using trasher: (URL) throws -> Void = { try FileManager.default.trashItem(at: $0, resultingItemURL: nil) }
+    ) throws {
+        guard isDirectory(folder.url) else { throw LibraryError.missing(folder.name) }
+        guard inspect(folder).isSafeToTrash else { throw LibraryError.folderHasOtherFiles(folder.name) }
+        try trasher(folder.url)
+    }
+
     // MARK: managing an entry
 
     static func setPinned(_ item: LibraryTranscript, _ pinned: Bool) throws -> LibraryTranscript {
@@ -224,9 +274,13 @@ nonisolated enum LibraryOperations {
         (try? url.checkResourceIsReachable()) == true || (try? url.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink) == true
     }
 
+    // Asks the file system each time: a URL caches the resource values it has read.
     private static func isDirectory(_ url: URL) -> Bool {
-        guard let values = try? url.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey]) else { return false }
-        return values.isDirectory == true && values.isSymbolicLink != true
+        var isDirectory: ObjCBool = false
+        guard let type = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.type] as? FileAttributeType,
+              type == .typeDirectory,
+              FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory) else { return false }
+        return isDirectory.boolValue
     }
 
     // The same file or folder, also when only the case of the name differs on a
