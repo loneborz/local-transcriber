@@ -26,6 +26,9 @@ import SwiftUI
         WindowGroup {
             ContentView(destination: destination)
         }
+        // The title is hidden (see ContentView), so the title bar only needs room for
+        // the window controls; the compact style gives the content that height back.
+        .windowToolbarStyle(.unifiedCompact(showsTitle: false))
         .commands {
             // The window has no text field, so the standard Paste is always
             // disabled and would swallow ⌘V. This Paste adds a copied YouTube
