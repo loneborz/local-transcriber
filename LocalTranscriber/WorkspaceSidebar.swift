@@ -15,6 +15,7 @@ struct WorkspaceSidebar: View {
     let library: LibraryStore
     let destination: OutputDestination.Status
     @Binding var selection: SidebarSelection?
+    let onRefresh: () -> Void
 
     var body: some View {
         List(selection: $selection) {
@@ -30,23 +31,34 @@ struct WorkspaceSidebar: View {
                 }
             }
 
-            Section("Transcripts") {
+            Section {
                 if library.items.isEmpty {
                     Text(emptyMessage)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(4)
                         .selectionDisabled()
+                        .contextMenu { refreshMenu }
                 } else {
                     ForEach(library.items) { item in
                         SidebarTranscriptRow(item: item)
                             .tag(SidebarSelection.transcript(item.id))
+                            .contextMenu { refreshMenu }
                     }
                 }
+            } header: {
+                // A header's menu covers only the header, so the rows carry it too.
+                Text("Transcripts")
+                    .contextMenu { refreshMenu }
             }
         }
         .listStyle(.sidebar)
         .accessibilityLabel("Transcription sidebar")
+    }
+
+    // The same refresh as View › Refresh Transcripts (⌘R).
+    private var refreshMenu: some View {
+        Button("Refresh Transcripts", action: onRefresh)
     }
 
     // Quiet and specific: it says why the list is empty, and what fills it.

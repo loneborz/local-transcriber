@@ -16,7 +16,7 @@ let package = Package(
             exclude: [
                 "Assets.xcassets", "AudioReviewPlayer.swift", "BatchQueue.swift", "ContentView.swift", "Credits.rtf",
                 "LibraryStore.swift", "MyApp.swift", "OutputDestination.swift", "Recorder.swift",
-                "SourcePackage.swift", "Theme.swift", "TranscriptReviewView.swift",
+                "SettingsView.swift", "SourcePackage.swift", "Theme.swift", "TranscriptReviewView.swift",
                 "TranscriptionService.swift", "WorkspaceSidebar.swift",
             ],
             sources: ["Transcript", "YouTubeSource.swift"],

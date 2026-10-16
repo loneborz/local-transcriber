@@ -17,6 +17,7 @@ enum OutputError: LocalizedError {
 // The user-chosen folder that finished transcripts are written to. The folder
 // is remembered across launches with a security-scoped bookmark, because the
 // sandbox only grants access to a panel-selected folder for the current process.
+// The app owns one instance, shared by every window and Settings.
 @MainActor @Observable
 final class OutputDestination {
     enum Status {
@@ -35,6 +36,33 @@ final class OutputDestination {
     init() {
         refresh()
     }
+
+    // Every window's queue and recorder, held weakly. Busy state is computed from
+    // the live objects, never stored, so a closed window cannot leave a stale
+    // lock: its recorder is cancelled on close, and its queue drops out once it
+    // is gone (a queue still running after its window closed keeps the lock
+    // until its last save, which is when it stops writing here).
+    private struct Weak<T: AnyObject> { weak var value: T? }
+    private var queues: [Weak<BatchQueue>] = []
+    private var recorders: [Weak<Recorder>] = []
+
+    func register(_ queue: BatchQueue, _ recorder: Recorder) {
+        queues.removeAll { $0.value == nil }
+        recorders.removeAll { $0.value == nil }
+        if !queues.contains(where: { $0.value === queue }) { queues.append(Weak(value: queue)) }
+        if !recorders.contains(where: { $0.value === recorder }) { recorders.append(Weak(value: recorder)) }
+    }
+
+    // App-wide, across all windows.
+    var isTranscribing: Bool { queues.contains { $0.value?.isProcessing == true } }
+    var isRecording: Bool { recorders.contains { $0.value?.isIdle == false } }
+
+    // The folder receives job saves and the recording at Stop; the source-package
+    // mode is read at each YouTube save; a recording takes the default language
+    // when it is queued after Stop.
+    var canChangeFolder: Bool { !isTranscribing && !isRecording }
+    var canChangeSourcePackage: Bool { !isTranscribing }
+    var canChangeLanguage: Bool { !isRecording }
 
     isolated deinit {
         accessedFolder?.stopAccessingSecurityScopedResource()
@@ -107,8 +135,10 @@ final class OutputDestination {
     }
 
     // Folder-only picker. Returns true when a folder was chosen and remembered.
+    // Every entry point comes through here, so the app-wide guard lives here.
     @discardableResult
     func choose() -> Bool {
+        guard canChangeFolder else { return false }
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
         panel.canChooseDirectories = true

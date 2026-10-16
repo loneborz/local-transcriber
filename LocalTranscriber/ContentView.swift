@@ -9,13 +9,14 @@ extension FocusedValues {
 }
 
 struct ContentView: View {
-    @State private var queue = BatchQueue()
+    // Shared by all windows and Settings; owned by the app.
+    let destination: OutputDestination
+    @State private var queue: BatchQueue
     @State private var recorder = Recorder()
     @State private var isTargeted = false
     @State private var isQueueTargeted = false
     @FocusState private var isImportZoneFocused: Bool
     @AppStorage("defaultLanguage") private var selectedLanguage = TranscriptionLanguage.english
-    @AppStorage(BatchQueue.sourcePackageModeKey) private var savesSourcePackages = false
     @State private var notice: String?
     @State private var library = LibraryStore()
     @State private var selection: SidebarSelection? = .newTranscription
@@ -32,6 +33,11 @@ struct ContentView: View {
     // The window's only audio player (see AudioReviewPlayer).
     @State private var player = AudioReviewPlayer()
 
+    init(destination: OutputDestination) {
+        self.destination = destination
+        _queue = State(initialValue: BatchQueue(destination: destination))
+    }
+
     private let supportedExtensions = [
         "mp4",
         "mov",
@@ -45,8 +51,9 @@ struct ContentView: View {
             WorkspaceSidebar(
                 jobs: inProgressJobs,
                 library: library,
-                destination: queue.destination.status,
-                selection: sidebarSelection
+                destination: destination.status,
+                selection: sidebarSelection,
+                onRefresh: { refreshLibrary() }
             )
             .navigationSplitViewColumnWidth(min: 190, ideal: 230, max: 340)
         } detail: {
@@ -69,8 +76,10 @@ struct ContentView: View {
         .focusedSceneValue(\.pasteLinks, pasteFromClipboard)
         .focusedSceneValue(\.refreshTranscripts) { refreshLibrary() }
         .onAppear {
+            // Makes this window's work count in the app-wide guards (Settings, folder).
+            destination.register(queue, recorder)
             recorder.refreshApps()
-            library.refresh(folder: queue.destination.readyFolder)
+            library.refresh(folder: destination.readyFolder)
         }
         // Closing the window must not leave a recording running unseen.
         .onDisappear {
@@ -85,8 +94,11 @@ struct ContentView: View {
         }
         // The library follows the output folder, a saved job, and the app coming
         // back to the front (files may have changed meanwhile).
-        .onChange(of: queue.destination.readyFolder) { _, folder in
+        .onChange(of: destination.readyFolder) { _, folder in
             library.refresh(folder: folder)
+        }
+        .onChange(of: folderBlocked) { _, blocked in
+            if !blocked && notice == Self.folderBlockedNotice { notice = nil }
         }
         .onChange(of: queue.currentBatch) { _, batch in
             firstVisibleBatch = QueueWorkspace.firstVisibleBatch(forNewBatch: batch)
@@ -124,8 +136,9 @@ struct ContentView: View {
 
     private func refreshLibrary(recheckFolder: Bool = true) {
         // Re-resolves the folder so one that went away shows its unavailable status.
-        if recheckFolder && !queue.isProcessing && recorder.isIdle { queue.destination.refresh() }
-        library.refresh(folder: queue.destination.readyFolder)
+        // Not while any window's queue or recording uses the shared folder.
+        if recheckFolder && destination.canChangeFolder { destination.refresh() }
+        library.refresh(folder: destination.readyFolder)
     }
 
     private var isReviewingTranscript: Bool {
@@ -295,6 +308,17 @@ struct ContentView: View {
                 HStack(spacing: 10) {
                     summaryView
                     Spacer(minLength: 8)
+                    // Existing jobs change language only through this, and only while
+                    // Waiting. Left of Clear Queue, so Clear Queue never moves.
+                    if queue.waitingCount >= 2 {
+                        Button("Apply Language to All Waiting") {
+                            queue.applyLocale(selectedLanguage.locale)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                        .disabled(!destination.canChangeLanguage)
+                        .help("Give every waiting item the default language, \(selectedLanguage.title).")
+                    }
                     Button("Clear Queue") {
                         queue.clear()
                         notice = nil
@@ -437,9 +461,14 @@ struct ContentView: View {
             .accessibilityLabel("Include microphone")
     }
 
+    // No ready folder while running work uses it: choose() refuses its panel,
+    // so Record or Transcribe would silently do nothing. The footer says why.
+    private var folderBlocked: Bool { !destination.isReady && !destination.canChangeFolder }
+    private static let folderBlockedNotice = "The output folder is unavailable. Choose another one when the running work finishes."
+
     private var recordButton: some View {
         Button("Record", action: startRecording)
-            .disabled(!recorder.canRecord)
+            .disabled(!recorder.canRecord || folderBlocked)
     }
 
     @ViewBuilder
@@ -448,6 +477,7 @@ struct ContentView: View {
             Button("Transcribe \(queue.waitingCount)", action: startQueue)
                 .buttonStyle(.borderedProminent)
                 .tint(Theme.wineFill)
+                .disabled(folderBlocked)
         }
     }
 
@@ -547,7 +577,12 @@ struct ContentView: View {
     // launch and termination notifications.
     private func startRecording() {
         Task {
-            await recorder.record(to: queue.destination) { addRecording($0) }
+            await recorder.record(to: destination) { addRecording($0) }
+            // record() refreshes the folder first. If it vanished while a
+            // transcription or recording runs, choose() refuses its panel and nothing starts.
+            if recorder.isIdle && recorder.error == nil && folderBlocked {
+                notice = Self.folderBlockedNotice
+            }
         }
     }
 
@@ -639,6 +674,7 @@ struct ContentView: View {
                 recorder.chooseFolderAndSave()
             }
             .controlSize(.small)
+            .disabled(!destination.canChangeFolder)
         }
     }
 
@@ -658,7 +694,7 @@ struct ContentView: View {
     }
 
     // Status, not controls: language and destination read quietly here, and
-    // the secondary controls live in Options.
+    // preferences live in Settings.
     private var footer: some View {
         HStack(spacing: 16) {
             Text("New items: \(selectedLanguage.title)")
@@ -670,8 +706,12 @@ struct ContentView: View {
 
             Spacer()
 
-            optionsMenu
-                .disabled(!recorder.isIdle)
+            // Opens the same window as Settings… in the app menu and ⌘,. Never
+            // disabled: the controls inside lock themselves while work runs.
+            SettingsLink {
+                Label("Settings", systemImage: "gearshape")
+            }
+            .buttonStyle(.plain)
         }
         .font(.subheadline)
         .foregroundStyle(.secondary)
@@ -681,13 +721,13 @@ struct ContentView: View {
 
     private var destinationStatus: some View {
         HStack(spacing: 6) {
-            switch queue.destination.status {
+            switch destination.status {
             case .none:
                 Button("Choose an output folder…") {
-                    queue.destination.choose()
+                    destination.choose()
                 }
                 .buttonStyle(.link)
-                .disabled(queue.isProcessing)
+                .disabled(!destination.canChangeFolder)
             case .ready(let url):
                 Button {
                     NSWorkspace.shared.activateFileViewerSelecting([url])
@@ -704,51 +744,17 @@ struct ContentView: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
                 Button("Choose…") {
-                    queue.destination.choose()
+                    destination.choose()
                 }
                 .buttonStyle(.link)
-                .disabled(queue.isProcessing)
+                .disabled(!destination.canChangeFolder)
             }
         }
-    }
-
-    // Queue-level language: new items inherit it (it is the persisted default).
-    // Existing jobs change only through Apply to all, and only while Waiting.
-    private var optionsMenu: some View {
-        Menu("Options") {
-            Picker("Language", selection: $selectedLanguage) {
-                ForEach(TranscriptionLanguage.allCases) { language in
-                    Text(language.title).tag(language)
-                }
-            }
-
-            if queue.waitingCount >= 2 {
-                Button("Apply Language to All Waiting") {
-                    queue.applyLocale(selectedLanguage.locale)
-                }
-            }
-
-            Divider()
-
-            Button("Change Output Folder…") {
-                queue.destination.choose()
-            }
-            .disabled(queue.isProcessing)
-
-            Button("Refresh Transcripts") { refreshLibrary() }
-
-            if queue.hasYouTubeJobs {
-                Toggle("Save YouTube Links as Source Packages", isOn: $savesSourcePackages)
-                    .disabled(queue.isProcessing)
-            }
-        }
-        .menuStyle(.borderlessButton)
-        .fixedSize()
     }
 
     // No destination yet: ask once; cancelling starts nothing.
     private func startQueue() {
-        guard queue.destination.isReady || queue.destination.choose() else { return }
+        guard destination.isReady || destination.choose() else { return }
         queue.start()
     }
 
@@ -1301,7 +1307,7 @@ private struct BrandLine: View {
     }
 }
 
-private enum TranscriptionLanguage: String, CaseIterable, Identifiable {
+enum TranscriptionLanguage: String, CaseIterable, Identifiable {
     case english = "en-US"
     case dutch = "nl-NL"
     case german = "de-DE"

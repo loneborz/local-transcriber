@@ -106,7 +106,11 @@ final class BatchQueue {
     // UserDefaults key of the "save YouTube links as source packages" mode.
     static let sourcePackageModeKey = "sourcePackageMode"
 
-    let destination = OutputDestination()
+    let destination: OutputDestination
+
+    init(destination: OutputDestination) {
+        self.destination = destination
+    }
     private var isRunning = false
     private var batchCounter = 0
     // The batch the newest jobs belong to; changes when a new batch begins.
@@ -115,12 +119,6 @@ final class BatchQueue {
     var isProcessing: Bool { isRunning }
     var hasWaitingJobs: Bool { jobs.contains(where: \.isWaiting) }
     var waitingCount: Int { jobs.filter(\.isWaiting).count }
-
-    // A YouTube job in any state counts, so the source-package control stays
-    // visible until the last YouTube job is removed or the queue is cleared.
-    var hasYouTubeJobs: Bool {
-        jobs.contains { if case .youtube = $0.source { true } else { false } }
-    }
 
     // Only Waiting jobs are editable; active, Complete and Failed jobs keep
     // the language they started with.

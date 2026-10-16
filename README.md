@@ -27,7 +27,7 @@ Drag media onto the window, paste a YouTube link with ⌘V, or press Record. Eve
 - YouTube links: `youtube.com` (including `www.`, `m.` and `music.`) and `youtu.be` watch, shorts, live and embed links. A link transcribes one video, so playlist parameters are dropped.
 - Recordings: the microphone, one running app's audio, or both. Nothing is captured until you press Record, and macOS asks for the microphone and Screen & System Audio Recording permissions the first time you need them, not at launch. Stop saves an M4A named `Recording <date> <time> (<source>).m4a` in the output folder and queues it like any dropped file. The recording stays there, and the app never deletes it automatically. Whole-system audio is not offered, and the app keeps no video or screen recordings.
 
-Each job has its own language: English (`en-US`), Dutch (`nl-NL`), German (`de-DE`), French (`fr-FR`), Russian (`ru-RU`), Spanish (`es-ES`), Italian (`it-IT`), Portuguese (`pt-BR`), Turkish (`tr-TR`) or Swedish (`sv-SE`). The Options menu sets the default for new jobs, and Apply Language to All Waiting changes the jobs that haven't started. For the language you pick, the app uses whichever Apple speech module supports it, and macOS may download Apple's language assets the first time you use one.
+Each job has its own language: English (`en-US`), Dutch (`nl-NL`), German (`de-DE`), French (`fr-FR`), Russian (`ru-RU`), Spanish (`es-ES`), Italian (`it-IT`), Portuguese (`pt-BR`), Turkish (`tr-TR`) or Swedish (`sv-SE`). Settings › Transcription sets the default for new jobs, and Apply Language to All Waiting, above the queue, changes the jobs that haven't started. For the language you pick, the app uses whichever Apple speech module supports it, and macOS may download Apple's language assets the first time you use one.
 
 A failed job never stops the others, and Retry puts it back in line (a rejected link can't be retried). If an automatic save fails, the job stays complete and offers Save Transcript… as a fallback.
 
@@ -55,7 +55,7 @@ Transcript text...
 
 YouTube links are saved as `<video title> [<video ID>].md`. In that flat form the `Source` line names the downloaded audio file, not the video URL.
 
-For research or archiving, turn on Save YouTube Links as Source Packages in the Options menu (it shows up while the queue holds a YouTube link). Each link is then saved as a folder named after its video ID:
+For research or archiving, turn on Save YouTube Links as Source Packages in Settings › General. Each link is then saved as a folder named after its video ID:
 
 ```text
 <output folder>/
