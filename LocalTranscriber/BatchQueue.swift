@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import os
 
 struct MediaInfo {
     let type: String
@@ -49,6 +50,17 @@ final class TranscriptionJob: Identifiable {
     // Set for a recording: the entry folder that already holds its audio, and
     // when the recording started (the entry's creation time).
     var recording: (folder: URL, startedAt: Date)?
+    // Whether the user has started this job. A job added while the queue is
+    // running waits until the user starts it too, so its language can still be
+    // checked; the runner only takes started jobs.
+    var isStarted = false
+    // The window that added the job. Only that window opens its transcript on its own.
+    var originWindow: UUID?
+    // When processing began (elapsed time is shown from this).
+    var startedAt: Date?
+    // How far into the audio the recognizer has delivered results (nil until the
+    // first result). Coverage of the audio only: no estimate of the work left.
+    var progress: RecognitionProgress?
 
     init(source: JobSource, locale: Locale) {
         self.source = source
@@ -80,6 +92,9 @@ final class TranscriptionJob: Identifiable {
         return .now
     }
 
+    // Waiting and not started yet: the user can still review and change it.
+    var isUnstarted: Bool { isWaiting && !isStarted }
+
     var isWaiting: Bool {
         if case .waiting = state { return true }
         return false
@@ -108,15 +123,6 @@ final class TranscriptionJob: Identifiable {
     }
 }
 
-struct BatchSummary {
-    var succeeded = 0
-    var failed = 0
-    var mediaDuration: TimeInterval = 0
-    var processingDuration: Duration = .zero
-
-    var hasFinishedJobs: Bool { succeeded + failed > 0 }
-}
-
 @MainActor @Observable
 final class BatchQueue {
     private(set) var jobs: [TranscriptionJob] = []
@@ -130,12 +136,13 @@ final class BatchQueue {
     }
     private var isRunning = false
     private var batchCounter = 0
-    // The batch the newest jobs belong to; changes when a new batch begins.
-    var currentBatch: Int { batchCounter }
+    private static let log = Logger(subsystem: "nl.wavesweb.LocalTranscriber", category: "progress")
 
     var isProcessing: Bool { isRunning }
     var hasWaitingJobs: Bool { jobs.contains(where: \.isWaiting) }
     var waitingCount: Int { jobs.filter(\.isWaiting).count }
+    // Waiting jobs the user has not started yet.
+    var unstartedCount: Int { jobs.count(where: \.isUnstarted) }
 
     // Only Waiting jobs are editable; active, Complete and Failed jobs keep
     // the language they started with.
@@ -146,10 +153,11 @@ final class BatchQueue {
     }
 
     // Adds jobs in the Waiting state (invalid sources start Failed), each
-    // owning the given locale. Nothing runs until `start` is called; if a batch
-    // is already running, its runner picks the new jobs up.
-    func enqueue(_ sources: [JobSource], locale: Locale) -> [TranscriptionJob] {
+    // owning the given locale. Nothing runs until `start` is called, also while
+    // another job is running; the running batch does not take them.
+    func enqueue(_ sources: [JobSource], locale: Locale, originWindow: UUID? = nil) -> [TranscriptionJob] {
         let newJobs = sources.map { TranscriptionJob(source: $0, locale: locale) }
+        for job in newJobs { job.originWindow = originWindow }
         // Files added while nothing is waiting or running begin a new batch; files
         // added to unfinished work join it.
         if !jobs.contains(where: \.isUnfinished) { batchCounter += 1 }
@@ -165,27 +173,6 @@ final class BatchQueue {
         jobs.removeAll { $0.id == job.id }
     }
 
-    // Totals over the jobs currently in the queue. Duration and processing
-    // time come from Complete jobs only; downloading is not processing.
-    var summary: BatchSummary { summary(of: jobs) }
-
-    func summary(of jobs: [TranscriptionJob]) -> BatchSummary {
-        var summary = BatchSummary()
-        for job in jobs {
-            switch job.state {
-            case .complete(let transcript, let processingDuration):
-                summary.succeeded += 1
-                summary.mediaDuration += transcript.duration ?? 0
-                summary.processingDuration += processingDuration
-            case .failed:
-                summary.failed += 1
-            default:
-                break
-            }
-        }
-        return summary
-    }
-
     // Returns one Failed job to Waiting. Complete jobs are never touched, so
     // a retry cannot repeat finished work. The caller starts the queue.
     func retry(_ job: TranscriptionJob) {
@@ -194,6 +181,10 @@ final class BatchQueue {
         job.saveError = nil
         job.sidecarWarning = nil
         job.exportedAsPackage = false
+        job.startedAt = nil
+        job.progress = nil
+        // Retry is the user's explicit start of this one job.
+        job.isStarted = true
         job.state = .waiting
     }
 
@@ -206,32 +197,48 @@ final class BatchQueue {
         }
     }
 
-    // Idle means no batch is running, so any mix of Waiting, Complete and
-    // Failed jobs can be cleared. Never cancels an active job.
-    var canClear: Bool { !jobs.isEmpty && !isRunning }
-
-    func clear() {
-        guard canClear else { return }
-        jobs.removeAll()
+    // Failed jobs and Complete jobs that were saved are finished and can be cleared;
+    // Waiting and active jobs, and jobs whose save failed, are not touched.
+    private func isClearable(_ job: TranscriptionJob) -> Bool {
+        switch job.state {
+        case .failed: true
+        case .complete: job.savedTranscriptURL != nil
+        default: false
+        }
     }
 
-    func start() {
-        guard !isRunning, hasWaitingJobs else { return }
+    var canClear: Bool { jobs.contains(where: isClearable) }
+
+    func clearFinished() {
+        jobs.removeAll(where: isClearable)
+    }
+
+    // Starts the given Waiting jobs, or every Waiting job. Jobs added later wait for
+    // their own start, also while this batch runs.
+    func start(_ only: [TranscriptionJob]? = nil) {
+        for job in only ?? jobs where job.isWaiting { job.isStarted = true }
+        startRunner()
+    }
+
+    // Used by Retry: only the retried job was started.
+    func startRunner() {
+        guard !isRunning, jobs.contains(where: { $0.isWaiting && $0.isStarted }) else { return }
         isRunning = true
         Task { await run() }
     }
 
-    // Re-checks for waiting jobs on every pass, so jobs appended mid-run are
-    // picked up; `isRunning` is cleared with no suspension point after the
-    // last check.
+    // Re-checks for started jobs on every pass; `isRunning` is cleared with no
+    // suspension point after the last check.
     private func run() async {
-        while let job = jobs.first(where: \.isWaiting) {
+        while let job = jobs.first(where: { $0.isWaiting && $0.isStarted }) {
             await process(job)
         }
         isRunning = false
     }
 
     private func process(_ job: TranscriptionJob) async {
+        job.startedAt = .now
+        job.progress = nil
         switch job.source {
         case .file(let url):
             await transcribeAndSave(job, mediaURL: url)
@@ -264,7 +271,16 @@ final class BatchQueue {
             let transcript = try await TranscriptionService.transcribe(
                 url: mediaURL,
                 locale: locale,
-                onPhaseChange: { job.state = .transcribing($0) }
+                onPhaseChange: { job.state = .transcribing($0) },
+                onProgress: { position, total in
+                    // Late or overlapping results never move the position back.
+                    if job.progress == nil {
+                        job.progress = RecognitionProgress(position: position, total: total)
+                    } else {
+                        job.progress?.report(position: position, total: total)
+                    }
+                    Self.log.info("recognized \(position, format: .fixed(precision: 1)) of \(total, format: .fixed(precision: 1)) s")
+                }
             )
             job.state = .complete(transcript, processingDuration: startedAt.duration(to: clock.now))
             save(transcript, for: job, mediaURL: mediaURL)

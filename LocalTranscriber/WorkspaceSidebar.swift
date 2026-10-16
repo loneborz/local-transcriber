@@ -7,14 +7,13 @@ import SwiftUI
 // `.pinned` only says which row carries the highlight.
 enum SidebarSelection: Hashable {
     case newTranscription
-    case job(UUID)
     case transcript(LibraryTranscript.ID)
     case pinned(LibraryTranscript.ID)
 
     var transcriptID: LibraryTranscript.ID? {
         switch self {
         case .transcript(let id), .pinned(let id): id
-        case .newTranscription, .job: nil
+        case .newTranscription: nil
         }
     }
 
@@ -49,7 +48,11 @@ struct LibraryCommands {
 // and sidebar styling; sentence-case section headers; no custom selection colour.
 // Library: Pinned, Folders (real folders), Recent (not in a folder), Archive.
 struct WorkspaceSidebar: View {
+    let queue: BatchQueue
     let jobs: [TranscriptionJob]
+    let processing: ProcessingActions
+    // While this window records: the recording's status and Stop, wherever the user is.
+    let recordingBanner: AnyView?
     let library: LibraryStore
     let destination: OutputDestination.Status
     @Binding var selection: SidebarSelection?
@@ -63,15 +66,14 @@ struct WorkspaceSidebar: View {
     var body: some View {
         let sections = library.sections
         List(selection: $selection) {
-            // The queue pane already shows these; the sidebar lists them when
-            // another view is open, so they stay reachable.
-            if !jobs.isEmpty && selection != .newTranscription {
-                Section("In progress") {
-                    ForEach(jobs) { job in
-                        SidebarJobRow(job: job)
-                            .tag(SidebarSelection.job(job.id))
-                    }
+            if let recordingBanner {
+                Section("Recording") {
+                    recordingBanner.selectionDisabled()
                 }
+            }
+
+            if !jobs.isEmpty {
+                ProcessingSection(queue: queue, jobs: jobs, actions: processing)
             }
 
             if !sections.pinned.isEmpty {
@@ -225,62 +227,6 @@ struct WorkspaceSidebar: View {
             } else {
                 "Transcripts saved in this folder appear here."
             }
-        }
-    }
-}
-
-private struct SidebarJobRow: View {
-    let job: TranscriptionJob
-
-    var body: some View {
-        HStack(spacing: 8) {
-            icon
-                .frame(width: 16, height: 16)
-                .accessibilityHidden(true)
-
-            VStack(alignment: .leading, spacing: 1) {
-                Text(job.displayName)
-                    .font(.callout)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                status
-                    .font(.caption)
-                    .lineLimit(1)
-            }
-        }
-        .accessibilityElement(children: .combine)
-    }
-
-    @ViewBuilder
-    private var icon: some View {
-        switch job.state {
-        case .waiting:
-            Image(systemName: "clock").foregroundStyle(.secondary)
-        case .downloading, .transcribing:
-            ProgressView().controlSize(.small)
-        case .complete:
-            // Listed here only until its library entry appears, or when its save failed.
-            job.savedTranscriptURL == nil
-                ? Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
-                : Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
-        case .failed:
-            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.red)
-        }
-    }
-
-    @ViewBuilder
-    private var status: some View {
-        switch job.state {
-        case .waiting:
-            Text("Waiting").foregroundStyle(.secondary)
-        case .downloading:
-            Text("Downloading…").foregroundStyle(.secondary)
-        case .transcribing(let phase):
-            Text(phase?.label ?? "Transcribing…").foregroundStyle(.secondary)
-        case .complete:
-            Text(job.savedTranscriptURL == nil ? "Not saved" : "Complete").foregroundStyle(.secondary)
-        case .failed:
-            Text("Failed").foregroundStyle(.red)
         }
     }
 }

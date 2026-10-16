@@ -24,10 +24,12 @@ private enum LibraryPrompt {
 struct ContentView: View {
     // Shared by all windows and Settings; owned by the app.
     let destination: OutputDestination
-    @State private var queue: BatchQueue
+    // One queue for the whole app (see MyApp); every window shows and feeds it.
+    let queue: BatchQueue
+    // This window; the jobs it adds open their transcript here, not in other windows.
+    @State private var windowID = UUID()
     @State private var recorder = Recorder()
     @State private var isTargeted = false
-    @State private var isQueueTargeted = false
     @FocusState private var isImportZoneFocused: Bool
     @AppStorage("defaultLanguage") private var selectedLanguage = TranscriptionLanguage.english
     @State private var notice: String?
@@ -40,17 +42,14 @@ struct ContentView: View {
     @State private var pendingOpen: PendingOpen?
     // Jobs whose save has already been looked at, so each save is considered once.
     @State private var announcedSaves: Set<UUID> = []
-    // The New Transcription workspace shows the retained queue from this batch on
-    // (settled jobs of earlier batches are hidden, never deleted).
-    @State private var firstVisibleBatch = 0
     // The window's only audio player (see AudioReviewPlayer).
     @State private var player = AudioReviewPlayer()
     @State private var prompt: LibraryPrompt?
     @State private var promptText = ""
 
-    init(destination: OutputDestination) {
+    init(destination: OutputDestination, queue: BatchQueue) {
         self.destination = destination
-        _queue = State(initialValue: BatchQueue(destination: destination))
+        self.queue = queue
     }
 
     private let supportedExtensions = [
@@ -64,7 +63,10 @@ struct ContentView: View {
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             WorkspaceSidebar(
+                queue: queue,
                 jobs: inProgressJobs,
+                processing: processingActions,
+                recordingBanner: recorder.isIdle ? nil : AnyView(recordingStatus(compact: true)),
                 library: library,
                 destination: destination.status,
                 selection: sidebarSelection,
@@ -82,9 +84,8 @@ struct ContentView: View {
             }
             .frame(minWidth: 640, minHeight: 368)
         }
-        // The window keeps its title (Window menu, accessibility); the title bar
-        // does not repeat the app name over the content.
-        .toolbar(removing: .title)
+        // The title bar says where the user is (see `contextTitle`).
+        .navigationTitle(contextTitle)
         // The paper continues under the title bar.
         .containerBackground(Theme.paper, for: .window)
         .contentShape(Rectangle())
@@ -127,9 +128,6 @@ struct ContentView: View {
         .onChange(of: folderBlocked) { _, blocked in
             if !blocked && notice == Self.folderBlockedNotice { notice = nil }
         }
-        .onChange(of: queue.currentBatch) { _, batch in
-            firstVisibleBatch = QueueWorkspace.firstVisibleBatch(forNewBatch: batch)
-        }
         .onChange(of: savedJobCount) { noteSavedJobs() }
         // The scan that follows a save answers the pending open.
         .onChange(of: library.revision) { resolvePendingOpen() }
@@ -144,7 +142,6 @@ struct ContentView: View {
             if let id = new?.transcriptID, player.itemID == id { return }
             player.stop()
         }
-        .onChange(of: inProgressJobs.map(\.id)) { selectionStillExists() }
     }
 
     // The live jobs, failed jobs and Complete jobs whose save failed. A job that
@@ -275,7 +272,9 @@ struct ContentView: View {
     // user is not reading another transcript. The request names the URL the save
     // reported and waits for a scan that started after the save.
     private func noteSavedJobs() {
-        let fresh = queue.jobs.filter { $0.savedTranscriptURL != nil && !announcedSaves.contains($0.id) }
+        let fresh = queue.jobs.filter {
+            $0.originWindow == windowID && $0.savedTranscriptURL != nil && !announcedSaves.contains($0.id)
+        }
         announcedSaves.formUnion(fresh.map(\.id))
         if fresh.count == 1, let job = fresh.first, let url = job.savedTranscriptURL,
            AutoOpen.shouldRequest(
@@ -298,25 +297,7 @@ struct ContentView: View {
         if case .complete = job.state { job.savedTranscriptURL != nil } else { false }
     }
 
-    private var queueEntries: [QueueEntry] {
-        queue.jobs.map {
-            QueueEntry(id: $0.id, batch: $0.batch, isSettled: isSettled($0), isUnfinished: $0.isUnfinished)
-        }
-    }
-
-    // What the New Transcription workspace shows: a window over the retained queue.
-    private var visibleJobs: [TranscriptionJob] {
-        let shown = Set(QueueWorkspace.visible(queueEntries, firstVisibleBatch: firstVisibleBatch))
-        return queue.jobs.filter { shown.contains($0.id) }
-    }
-
-    // Leaving a transcript for New Transcription starts a fresh workspace: finished
-    // batches are put behind the user (still in the queue, still in the library);
-    // a batch that is still running stays whole.
     private func showNewTranscription() {
-        if isReviewingTranscript {
-            firstVisibleBatch = QueueWorkspace.firstVisibleBatch(afterStartingFresh: queueEntries)
-        }
         selection = .newTranscription
     }
 
@@ -334,46 +315,52 @@ struct ContentView: View {
             })
     }
 
-    private func jobRow(_ job: TranscriptionJob) -> some View {
-        let entry = job.savedTranscriptURL.flatMap { LibraryJoin.item(forSavedURL: $0, in: library.joinIndex) }
-        let awaiting = job.savedTranscriptURL.map {
-            LibraryJoin.isAwaitingEntry(
-                savedURL: $0, folder: library.folder, in: library.joinIndex, seen: library.seenPaths)
-        } ?? false
-        return JobRow(
-            job: job,
-            onOpen: entry.map { item in { selection = .transcript(item.id) } },
-            savedElsewhere: job.savedTranscriptURL != nil && entry == nil && !awaiting,
-            onSave: {
-                if case .complete(let transcript, _) = job.state {
-                    saveTranscript(transcript, for: job)
-                }
-            }, onCopy: {
-                copyMarkdown(for: job)
-            }, onRemove: {
-                queue.remove(job)
-            }, onRetry: {
-                queue.retry(job)
-                startQueue()
-            })
+    // The native title bar says where the user is.
+    private var contextTitle: String {
+        switch selection {
+        case .newTranscription, nil: return "New Transcription"
+        case .pinned: return "Library / Pinned"
+        case .transcript:
+            guard let item = selectedTranscript else { return "Library" }
+            if item.isArchived { return "Library / Archive" }
+            return "Library / " + (item.group?.lastPathComponent ?? "Recent")
+        }
     }
 
-    private var queueRows: some View {
-        let jobs = visibleJobs
-        return VStack(spacing: 0) {
-            ForEach(jobs) { job in
-                if job.id != jobs.first?.id {
-                    Theme.rule.frame(height: 1).accessibilityHidden(true)
-                }
-                jobRow(job)
-            }
-        }
+    private var processingActions: ProcessingActions {
+        ProcessingActions(
+            openTarget: { job in
+                job.savedTranscriptURL
+                    .flatMap { LibraryJoin.item(forSavedURL: $0, in: library.joinIndex) }
+                    .map { item in { selection = .transcript(item.id) } }
+            },
+            savedElsewhere: { job in
+                guard let url = job.savedTranscriptURL else { return false }
+                let entry = LibraryJoin.item(forSavedURL: url, in: library.joinIndex)
+                let awaiting = LibraryJoin.isAwaitingEntry(
+                    savedURL: url, folder: library.folder, in: library.joinIndex, seen: library.seenPaths)
+                return entry == nil && !awaiting
+            },
+            save: { job in
+                if case .complete(let transcript, _) = job.state { saveTranscript(transcript, for: job) }
+            },
+            copy: { copyMarkdown(for: $0) },
+            retry: { job in
+                queue.retry(job)
+                startQueue(only: [job])
+            },
+            remove: { queue.remove($0) },
+            start: { startQueue() },
+            applyLanguage: { queue.applyLocale(selectedLanguage.locale) },
+            clearFinished: { queue.clearFinished(); notice = nil },
+            canStart: !destination.isRecording && !folderBlocked,
+            canChangeLanguage: destination.canChangeLanguage,
+            defaultLanguageTitle: selectedLanguage.title
+        )
     }
 
     private func selectionStillExists() {
         switch selection {
-        case .job(let id) where !inProgressJobs.contains { $0.id == id }:
-            selection = .newTranscription
         case .pinned(let id), .transcript(let id):
             // Keep the highlight on a row that exists: a pinned entry that was unpinned
             // or archived leaves Pinned; a loose entry that was pinned leaves Recent.
@@ -400,97 +387,34 @@ struct ContentView: View {
         }
     }
 
-    @ViewBuilder
+    // New Transcription is an input surface: mark and tagline above one surface
+    // with two inputs, import on the left and record on the right. The work itself
+    // is listed in the sidebar's Processing section.
     private var content: some View {
-        if visibleJobs.isEmpty {
-            // Mark and tagline above one surface with two inputs: import on the
-            // left, record on the right. Centered, so a taller window does not
-            // leave a loose empty lower third.
-            VStack(spacing: 24) {
-                VStack(spacing: 12) {
-                    BrandMark()
-                    BrandLine()
-                }
-
-                HStack(spacing: 0) {
-                    importZone
-                    Theme.rule.frame(width: 1).accessibilityHidden(true)
-                    recordZone
-                        .frame(width: 260)
-                        .frame(maxHeight: .infinity)
-                        .background(Theme.raised)
-                }
-                .fixedSize(horizontal: false, vertical: true)
-                .surface()
-
-                if hasMessages {
-                    messages(alignment: .center)
-                        .multilineTextAlignment(.center)
-                }
+        VStack(spacing: 24) {
+            VStack(spacing: 12) {
+                BrandMark()
+                BrandLine()
             }
-            .frame(maxWidth: 560, maxHeight: .infinity)
-            .padding(40)
-        } else {
-            VStack(alignment: .leading, spacing: 8) {
-                actionBar
 
-                if hasMessages {
-                    messages(alignment: .leading)
-                        .padding(.horizontal, 4)
-                }
-
-                // Clear belongs to the queue, so it heads the queue with the summary.
-                // It stays visible while a job runs, disabled, so the header never jumps.
-                HStack(spacing: 10) {
-                    summaryView
-                    Spacer(minLength: 8)
-                    // Existing jobs change language only through this, and only while
-                    // Waiting. Left of Clear Queue, so Clear Queue never moves.
-                    if queue.waitingCount >= 2 {
-                        Button("Apply Language to All Waiting") {
-                            queue.applyLocale(selectedLanguage.locale)
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                        .disabled(!destination.canChangeLanguage)
-                        .help("Give every waiting item the default language, \(selectedLanguage.title).")
-                    }
-                    Button("Clear Queue") {
-                        queue.clear()
-                        notice = nil
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .disabled(!queue.canClear)
-                    .help("Remove all items from the queue. Saved transcripts and media stay in place.")
-                }
-                .padding(.horizontal, 4)
-                .frame(minHeight: 24)
-
-                ScrollView {
-                    queueRows
-                }
-                .background(Theme.raised)
-                .surface()
-                .overlay {
-                    if isTargeted || isQueueTargeted {
-                        RoundedRectangle(cornerRadius: 16)
-                            .strokeBorder(Color.accentColor.opacity(0.65), lineWidth: 1.5)
-                    }
-                }
-                // ScrollView is a platform view and does not pass drops up to the
-                // window-level destination, so it is a drop target itself.
-                .contentShape(Rectangle())
-                .dropDestination(for: URL.self) { urls, _ in
-                    addDroppedFiles(urls)
-                } isTargeted: { targeted in
-                    isQueueTargeted = targeted
-                }
+            HStack(spacing: 0) {
+                importZone
+                Theme.rule.frame(width: 1).accessibilityHidden(true)
+                recordZone
+                    .frame(width: 260)
+                    .frame(maxHeight: .infinity)
+                    .background(Theme.raised)
             }
-            .frame(maxWidth: 720, maxHeight: .infinity)
-            .padding(.horizontal, 16)
-            .padding(.top, 12)
+            .fixedSize(horizontal: false, vertical: true)
+            .surface()
+
+            if hasMessages {
+                messages(alignment: .center)
+                    .multilineTextAlignment(.center)
+            }
         }
+        .frame(maxWidth: 560, maxHeight: .infinity)
+        .padding(40)
     }
 
     private var hasMessages: Bool {
@@ -607,120 +531,6 @@ struct ContentView: View {
             .disabled(!recorder.canRecord || folderBlocked)
     }
 
-    @ViewBuilder
-    private var transcribeButton: some View {
-        if recorder.isIdle && !queue.isProcessing && queue.waitingCount > 0 {
-            Button("Transcribe \(queue.waitingCount)", action: startQueue)
-                .buttonStyle(.borderedProminent)
-                .tint(Theme.wineFill)
-                .disabled(folderBlocked)
-        }
-    }
-
-    // Inputs on the left (recessed), recording and Transcribe on the right
-    // (raised). A running recording replaces the record segment. When one row
-    // does not fit, the bar falls back to two rows.
-    private var actionBar: some View {
-        Group {
-            if recorder.isIdle {
-                ViewThatFits(in: .horizontal) {
-                    actionBarOneRow
-                    actionBarTwoRows
-                }
-            } else {
-                HStack(spacing: 0) {
-                    addFilesSegment
-                    Theme.rule.frame(width: 1).accessibilityHidden(true)
-                    recordingStatus(compact: true)
-                        .padding(.horizontal, 12)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-                        .background(Theme.raised)
-                        .overlay(Color.red.opacity(0.07).allowsHitTesting(false).accessibilityHidden(true))
-                }
-                .frame(height: 44)
-            }
-        }
-        .surface()
-        .controlSize(.large)
-    }
-
-    // Sources on the left (recessed): Add Files, the app-audio choice and the
-    // microphone. Actions on the right (raised): Record and Transcribe.
-    private var sourcesRow: some View {
-        HStack(spacing: 12) {
-            Button("Add Files", action: chooseFiles)
-                .disabled(!recorder.isIdle)
-            appPicker(maxWidth: 150)
-            micToggle
-        }
-    }
-
-    private var addFilesSegment: some View {
-        Button("Add Files", action: chooseFiles)
-            .disabled(!recorder.isIdle)
-            .padding(.horizontal, 12)
-            .frame(maxHeight: .infinity)
-            .background(Theme.recessed)
-            .fixedSize(horizontal: true, vertical: false)
-    }
-
-    private var actionBarOneRow: some View {
-        HStack(spacing: 0) {
-            sourcesRow
-                .accessibilityElement(children: .contain)
-                .accessibilityLabel("Sources")
-                .padding(.horizontal, 12)
-                .frame(maxHeight: .infinity)
-                .background(Theme.recessed)
-                .fixedSize(horizontal: true, vertical: false)
-            Theme.rule.frame(width: 1).accessibilityHidden(true)
-            HStack(spacing: 12) {
-                Spacer(minLength: 0)
-                recordButton
-                transcribeButton
-            }
-            .accessibilityElement(children: .contain)
-            .accessibilityLabel("Actions")
-            .padding(.horizontal, 12)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Theme.raised)
-        }
-        .frame(height: 44)
-    }
-
-    private var actionBarTwoRows: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 12) {
-                Button("Add Files", action: chooseFiles)
-                    .disabled(!recorder.isIdle)
-                appPicker(maxWidth: 220)
-                micToggle
-                Spacer(minLength: 8)
-                Text("⌘V pastes a YouTube link")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            .accessibilityElement(children: .contain)
-            .accessibilityLabel("Sources")
-            .padding(.horizontal, 12)
-            .frame(height: 44)
-            .background(Theme.recessed)
-
-            Theme.rule.frame(height: 1).accessibilityHidden(true)
-
-            HStack(spacing: 12) {
-                Spacer(minLength: 8)
-                recordButton
-                transcribeButton
-            }
-            .accessibilityElement(children: .contain)
-            .accessibilityLabel("Actions")
-            .padding(.horizontal, 12)
-            .frame(height: 44)
-            .background(Theme.raised)
-        }
-    }
-
     // Starts from the visible selection; the app list is kept current by the
     // launch and termination notifications.
     private func startRecording() {
@@ -829,8 +639,10 @@ struct ContentView: View {
     // The recording was saved as an entry folder holding its audio; the transcript
     // is written into that same folder.
     private func addRecording(_ url: URL, startedAt: Date) {
+        let before = Set(queue.jobs.map(\.id))
         _ = addDroppedFiles([url], recording: (url.deletingLastPathComponent(), startedAt))
-        startQueue()
+        // Stop is the user's start for the recording; other waiting jobs are not started with it.
+        startQueue(only: queue.jobs.filter { !before.contains($0.id) })
     }
 
     // Same path as a drop; the panel offers only the extensions a drop accepts.
@@ -923,45 +735,12 @@ struct ContentView: View {
     }
 
     // No destination yet: ask once; cancelling starts nothing.
-    private func startQueue() {
+    private func startQueue(only jobs: [TranscriptionJob]? = nil) {
         guard destination.isReady || destination.choose() else { return }
-        queue.start()
-    }
-
-    // Shown once any job has finished: counts and totals, one quiet line.
-    @ViewBuilder
-    private var summaryView: some View {
-        let summary = queue.summary(of: visibleJobs)
-        if summary.hasFinishedJobs {
-            Text(summaryText(for: summary))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .truncationMode(.tail)
-        }
-    }
-
-    private func summaryText(for summary: BatchSummary) -> String {
-        var parts = ["\(summary.succeeded) succeeded"]
-        if summary.failed > 0 {
-            parts.append("\(summary.failed) failed")
-        }
-        if let media = MetricsFormat.mediaDuration(summary.mediaDuration) {
-            parts.append("\(media) of media")
-            parts.append("processed in \(MetricsFormat.processingDuration(summary.processingDuration))")
-        }
-        if let speed = MetricsFormat.realtimeSpeed(
-            mediaDuration: summary.mediaDuration,
-            processingDuration: summary.processingDuration
-        ) {
-            parts.append("\(speed) realtime")
-        }
-        return parts.joined(separator: " · ")
+        queue.start(jobs)
     }
 
     private func addDroppedFiles(_ urls: [URL], recording: (folder: URL, startedAt: Date)? = nil) -> Bool {
-        // Input and its notices live in the queue view.
-        showNewTranscription()
         var sources: [JobSource] = []
         var hasUnsupportedItem = false
         for url in urls {
@@ -979,12 +758,13 @@ struct ContentView: View {
         guard !sources.isEmpty else {
             if hasUnsupportedItem {
                 notice = "Not supported. Drop an MP4, MOV, M4A, MP3 or WAV file, or a YouTube link."
+                showNewTranscription()   // the notice lives on the input surface
             }
             return false
         }
 
         notice = nil
-        for job in queue.enqueue(sources, locale: selectedLanguage.locale) {
+        for job in queue.enqueue(sources, locale: selectedLanguage.locale, originWindow: windowID) {
             job.recording = recording
             if case .file(let url) = job.source {
                 Task {
@@ -1004,7 +784,6 @@ struct ContentView: View {
     }
 
     private func pasteFromClipboard() {
-        showNewTranscription()
         let pasteboard = NSPasteboard.general
         var urls = (pasteboard.readObjects(forClasses: [NSURL.self]) as? [URL]) ?? []
         if urls.isEmpty, let text = pasteboard.string(forType: .string) {
@@ -1014,6 +793,7 @@ struct ContentView: View {
         }
         guard !urls.isEmpty else {
             notice = "Nothing to paste. Copy a YouTube link or a media file first."
+            showNewTranscription()
             return
         }
         _ = addDroppedFiles(urls)
@@ -1117,338 +897,6 @@ struct ContentView: View {
             job.savedTranscriptURL = nil
             notice = error.localizedDescription
         }
-    }
-}
-
-private struct JobRow: View {
-    let job: TranscriptionJob
-    // Present when the job's transcript is listed in the library.
-    let onOpen: (() -> Void)?
-    // Saved, but not into the folder the library is listing.
-    let savedElsewhere: Bool
-    let onSave: () -> Void
-    // Returns whether the pasteboard accepted the text.
-    let onCopy: () -> Bool
-    let onRemove: () -> Void
-    let onRetry: () -> Void
-
-    // Confirmation lives only in this row. Every click bumps `copyClicks`,
-    // which restarts the reset task; the task is cancelled with the row.
-    @State private var copied = false
-    @State private var copyClicks = 0
-
-    var body: some View {
-        HStack(alignment: .center, spacing: 10) {
-            statusIcon
-                .frame(width: 16, height: 16)
-                .accessibilityHidden(true)
-
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    nameView
-
-                    if let metadata = job.metadata {
-                        Text(metadata.detailText)
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .fixedSize()
-                    } else if let mediaInfo = job.mediaInfo {
-                        Text("\(mediaInfo.type) · \(mediaInfo.duration) · \(mediaInfo.fileSize)")
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .fixedSize()
-                    }
-                }
-
-                statusText
-                    .font(.caption)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                if case .complete = job.state, job.savedTranscriptURL == nil, let saveError = job.saveError {
-                    Text("Not saved: \(saveError)")
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .textSelection(.enabled)
-                }
-
-                if case .complete = job.state, let savedTranscriptURL = job.savedTranscriptURL {
-                    HStack(spacing: 0) {
-                        Text("Saved · ")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-
-                        Button {
-                            NSWorkspace.shared.activateFileViewerSelecting([savedTranscriptURL])
-                        } label: {
-                            Text(savedTranscriptURL.deletingPathExtension().lastPathComponent)
-                                .font(.caption)
-                                .underline(true, color: Theme.emphasis.opacity(0.55))
-                                .lineLimit(1)
-                                .truncationMode(.middle)
-                        }
-                        .buttonStyle(.plain)
-                        .pointerStyle(.link)
-                        .help("Show \(savedTranscriptURL.lastPathComponent) in Finder")
-                    }
-                }
-
-                if savedElsewhere {
-                    Text("Not in the current library: saved to another output folder.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                // The transcript is saved; only its timing file is not.
-                if case .complete = job.state, let sidecarWarning = job.sidecarWarning {
-                    Text(sidecarWarning)
-                        .font(.caption)
-                        .foregroundStyle(.orange)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .textSelection(.enabled)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-
-            // The language can only change while the job waits; afterwards it is shown as text.
-            if job.isWaiting {
-                Picker("Language", selection: language) {
-                    ForEach(TranscriptionLanguage.allCases) { language in
-                        Text(language.title).tag(language)
-                    }
-                }
-                .labelsHidden()
-                .pickerStyle(.menu)
-                .controlSize(.small)
-                .fixedSize()
-            } else {
-                Text(language.wrappedValue.title)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            if let onOpen {
-                Button("Open", action: onOpen)
-                    .controlSize(.small)
-                    .help("Open this transcript")
-                    .accessibilityLabel("Open transcript")
-            }
-
-            if case .complete = job.state {
-                Button {
-                    copied = onCopy()
-                    copyClicks += 1
-                } label: {
-                    // The hidden "Copied" reserves its width so the row does not shift.
-                    ZStack {
-                        Text("Copied").hidden()
-                        Text(copied ? "Copied" : "Copy")
-                    }
-                }
-                .controlSize(.small)
-                .help("Copy transcript as Markdown")
-                .accessibilityLabel("Copy transcript as Markdown")
-                .accessibilityValue(copied ? "Copied" : "")
-                .task(id: copyClicks) {
-                    guard copied else { return }
-                    try? await Task.sleep(for: .milliseconds(1500))
-                    if !Task.isCancelled { copied = false }
-                }
-            }
-
-            if case .complete = job.state, job.saveError != nil, job.savedTranscriptURL == nil {
-                Button("Save Transcript…", action: onSave)
-                    .controlSize(.small)
-            }
-
-            if job.canRetry {
-                Button("Retry", action: onRetry)
-                    .controlSize(.small)
-            }
-
-            if job.isWaiting {
-                Button(action: onRemove) {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Remove from queue")
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-    }
-
-    // Local files reveal in Finder; YouTube jobs open the video; a rejected link is plain text.
-    @ViewBuilder
-    private var nameView: some View {
-        switch job.source {
-        case .file(let url):
-            Button {
-                NSWorkspace.shared.activateFileViewerSelecting([url])
-            } label: {
-                nameLabel(foreground: .primary)
-            }
-            .buttonStyle(.plain)
-            .pointerStyle(.link)
-            .help("Reveal original file in Finder")
-        case .youtube(_, let url):
-            Button {
-                NSWorkspace.shared.open(url)
-            } label: {
-                nameLabel(foreground: .primary)
-            }
-            .buttonStyle(.plain)
-            .pointerStyle(.link)
-            .help("Open on YouTube")
-        case .invalid:
-            nameLabel(foreground: .secondary)
-                .textSelection(.enabled)
-        }
-    }
-
-    private func nameLabel(foreground: some ShapeStyle) -> some View {
-        Text(job.displayName)
-            .font(.callout.weight(.medium))
-            .foregroundStyle(foreground)
-            .lineLimit(1)
-            .truncationMode(.middle)
-    }
-
-    @ViewBuilder
-    private var statusIcon: some View {
-        switch job.state {
-        case .waiting:
-            Image(systemName: "clock")
-                .foregroundStyle(.secondary)
-        case .downloading, .transcribing:
-            ProgressView()
-                .controlSize(.small)
-        case .complete:
-            Image(systemName: "checkmark.circle.fill")
-                .foregroundStyle(.green)
-        case .failed:
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(.red)
-        }
-    }
-
-    @ViewBuilder
-    private var statusText: some View {
-        switch job.state {
-        case .waiting:
-            Text("Waiting")
-                .foregroundStyle(.secondary)
-        case .downloading:
-            Text("Downloading…")
-                .foregroundStyle(.secondary)
-        case .transcribing(let phase):
-            Text(phase?.label ?? "Transcribing…")
-                .foregroundStyle(.secondary)
-        case .complete(let transcript, let processingDuration):
-            Text("Complete · \(transcript.characterCount) characters · \(completionMetrics(for: transcript, processingDuration: processingDuration))")
-                .foregroundStyle(.secondary)
-        case .failed(let message):
-            Text("Failed · \(message)")
-                .foregroundStyle(.red)
-                .textSelection(.enabled)
-        }
-    }
-
-    // The job owns a Locale; the picker only edits it while the job is Waiting.
-    private var language: Binding<TranscriptionLanguage> {
-        Binding(
-            get: { TranscriptionLanguage.allCases.first { $0.locale == job.locale } ?? .english },
-            set: { job.locale = $0.locale }
-        )
-    }
-
-    private func completionMetrics(for transcript: Transcript, processingDuration: Duration) -> String {
-        let processingTime = MetricsFormat.processingDuration(processingDuration)
-        var text = "Processed in \(processingTime)"
-
-        if let mediaDuration = transcript.duration.flatMap(MetricsFormat.mediaDuration) {
-            text = "\(mediaDuration) processed in \(processingTime)"
-        }
-
-        if let realtimeSpeed = transcript.duration.flatMap({
-            MetricsFormat.realtimeSpeed(mediaDuration: $0, processingDuration: processingDuration)
-        }) {
-            text += " · \(realtimeSpeed) realtime"
-        }
-
-        return text
-    }
-}
-
-// Shared by the per-job line and the queue summary so both always agree.
-private enum MetricsFormat {
-    static func mediaDuration(_ seconds: TimeInterval) -> String? {
-        guard seconds.isFinite, seconds > 0 else { return nil }
-
-        if seconds < 60 {
-            let tenths = (seconds * 10).rounded() / 10
-            return "\(number(tenths, decimals: tenths.rounded() == tenths ? 0 : 1))s"
-        }
-
-        guard seconds < Double(Int.max) else { return nil }
-        let wholeSeconds = Int(seconds)
-        let hours = wholeSeconds / 3600
-        let minutes = (wholeSeconds % 3600) / 60
-        return hours > 0
-            ? "\(hours)h \(twoDigits(minutes))m"
-            : "\(minutes)m"
-    }
-
-    static func realtimeSpeed(mediaDuration: TimeInterval, processingDuration: Duration) -> String? {
-        guard mediaDuration.isFinite, mediaDuration > 0 else { return nil }
-        let elapsedSeconds = seconds(processingDuration)
-        guard elapsedSeconds > 0 else { return nil }
-
-        let speed = mediaDuration / elapsedSeconds
-        guard speed.isFinite, speed > 0 else { return nil }
-
-        let rounded = speed >= 20 ? speed.rounded() : (speed * 10).rounded() / 10
-        let decimals = speed < 20 && rounded.rounded() != rounded ? 1 : 0
-        return "\(number(rounded, decimals: decimals))×"
-    }
-
-    static func processingDuration(_ duration: Duration) -> String {
-        let seconds = seconds(duration)
-        if seconds < 60 {
-            let tenths = (seconds * 10).rounded() / 10
-            return "\(number(tenths, decimals: tenths.rounded() == tenths ? 0 : 1))s"
-        }
-
-        guard seconds < Double(Int.max) else { return "\(number(seconds, decimals: 0))s" }
-        let totalSeconds = Int(seconds.rounded())
-        let hours = totalSeconds / 3600
-        let minutes = (totalSeconds % 3600) / 60
-        let remainingSeconds = totalSeconds % 60
-        if hours > 0 {
-            return "\(hours)h \(twoDigits(minutes))m \(twoDigits(remainingSeconds))s"
-        }
-        return "\(minutes)m \(remainingSeconds)s"
-    }
-
-    private static func seconds(_ duration: Duration) -> Double {
-        let components = duration.components
-        return Double(components.seconds) + Double(components.attoseconds) / 1e18
-    }
-
-    private static func number(_ value: Double, decimals: Int) -> String {
-        String(
-            format: decimals == 0 ? "%.0f" : "%.1f",
-            locale: Locale(identifier: "en_US_POSIX"),
-            value
-        )
-    }
-
-    private static func twoDigits(_ value: Int) -> String {
-        String(format: "%02d", value)
     }
 }
 

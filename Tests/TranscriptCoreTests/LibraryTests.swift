@@ -301,68 +301,6 @@ extension LibraryJoinTests {
 }
 
 final class WorkspaceFlowTests: TreeTestCase {
-    private func entry(_ batch: Int, _ kind: Kind) -> QueueEntry {
-        QueueEntry(id: UUID(), batch: batch, isSettled: kind == .saved, isUnfinished: kind == .running)
-    }
-    private enum Kind { case saved, running, failed }   // failed: also Complete with a failed save
-
-    private func shown(_ jobs: [QueueEntry], floor: Int) -> [UUID] {
-        QueueWorkspace.visible(jobs, firstVisibleBatch: floor)
-    }
-
-    func testNewTranscriptionAfterASingleJobCompletedShowsAFreshWorkspace() {
-        let done = [entry(1, .saved)]
-        let floor = QueueWorkspace.firstVisibleBatch(afterStartingFresh: done)
-        XCTAssertEqual(shown(done, floor: floor), [], "nothing from the finished batch")
-    }
-
-    func testNewTranscriptionAfterReviewingASavedTranscriptIsFreshToo() {
-        // Several finished batches, none running.
-        let jobs = [entry(1, .saved), entry(2, .saved), entry(2, .saved)]
-        XCTAssertEqual(shown(jobs, floor: QueueWorkspace.firstVisibleBatch(afterStartingFresh: jobs)), [])
-    }
-
-    func testANewBatchStartsOwnVisibleWorkAndHidesEarlierSettledBatches() {
-        let earlier = [entry(1, .saved), entry(1, .saved)]
-        let new = entry(2, .running)
-        let floor = QueueWorkspace.firstVisibleBatch(forNewBatch: 2)
-        XCTAssertEqual(shown(earlier + [new], floor: floor), [new.id])
-    }
-
-    func testAMultiFileBatchKeepsItsResultsWhileItRunsAndUntilTheUserStartsFresh() {
-        let batch = [entry(3, .saved), entry(3, .saved), entry(3, .running)]
-        // Starting fresh while it is still running does not retire it.
-        let floorWhileRunning = QueueWorkspace.firstVisibleBatch(afterStartingFresh: batch)
-        XCTAssertEqual(floorWhileRunning, 3)
-        XCTAssertEqual(shown(batch, floor: floorWhileRunning), batch.map(\.id))
-        // Finished and the user still there: the floor was not moved, results stay.
-        let finished = [entry(3, .saved), entry(3, .saved), entry(3, .saved)]
-        XCTAssertEqual(shown(finished, floor: 3), finished.map(\.id))
-        // Deliberately leaving the context retires it.
-        XCTAssertEqual(shown(finished, floor: QueueWorkspace.firstVisibleBatch(afterStartingFresh: finished)), [])
-    }
-
-    func testFailedAndSaveFailedJobsStayReachableInAFreshWorkspaceForRetryAndSave() {
-        let failed = entry(1, .failed)
-        let saved = entry(1, .saved)
-        let jobs = [saved, failed]
-        let floor = QueueWorkspace.firstVisibleBatch(afterStartingFresh: jobs)
-        XCTAssertEqual(shown(jobs, floor: floor), [failed.id], "recoverable work is never hidden, however old")
-        XCTAssertEqual(shown(jobs, floor: QueueWorkspace.firstVisibleBatch(forNewBatch: 9)), [failed.id])
-    }
-
-    func testHidingIsAWindowNotADeletion() {
-        let jobs = [entry(1, .saved), entry(1, .saved), entry(2, .failed)]
-        _ = shown(jobs, floor: 5)
-        XCTAssertEqual(jobs.count, 3, "the retained queue is a separate value; the window never mutates it")
-        XCTAssertEqual(shown(jobs, floor: 0), jobs.map(\.id), "moving the window back shows everything again")
-    }
-
-    func testStartingFreshOnAnEmptyQueueIsHarmless() {
-        XCTAssertEqual(QueueWorkspace.firstVisibleBatch(afterStartingFresh: []), 1)
-        XCTAssertEqual(shown([], floor: 1), [])
-    }
-
     func testOnlyAWholeSingleJobBatchOpensItselfAndNeverOverAnotherTranscript() {
         XCTAssertTrue(AutoOpen.shouldRequest(batchJobCount: 1, userIsReviewingTranscript: false))
         XCTAssertFalse(AutoOpen.shouldRequest(batchJobCount: 2, userIsReviewingTranscript: false), "multi-file batch: no jumping")

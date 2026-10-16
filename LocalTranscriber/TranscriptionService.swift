@@ -8,7 +8,7 @@ enum TranscriptionPhase: Sendable {
 
     var label: String {
         switch self {
-        case .preparingVideo: "Preparing video…"
+        case .preparingVideo: "Preparing audio…"
         case .preparingLanguage: "Preparing language…"
         case .transcribing: "Transcribing…"
         }
@@ -19,7 +19,11 @@ enum TranscriptionService {
     static func transcribe(
         url: URL,
         locale: Locale,
-        onPhaseChange: @MainActor (TranscriptionPhase) -> Void = { _ in }
+        onPhaseChange: @MainActor (TranscriptionPhase) -> Void = { _ in },
+        // How far into the audio the recognizer has delivered results (seconds), and
+        // the audio's total length. Reported as results arrive; coverage of the audio,
+        // not an estimate of the work left.
+        onProgress: @escaping @MainActor (_ position: TimeInterval, _ total: TimeInterval) -> Void = { _, _ in }
     ) async throws -> Transcript {
         var temporaryAudioURL: URL?
         defer {
@@ -49,6 +53,14 @@ enum TranscriptionService {
             try validateNormalizedAudio(file, covers: sourceAudioDuration)
         }
 
+        let totalDuration = file.processingFormat.sampleRate > 0
+            ? Double(file.length) / file.processingFormat.sampleRate
+            : 0
+        let reportPosition: @Sendable (TimeInterval) async -> Void = { position in
+            guard totalDuration > 0 else { return }
+            await onProgress(position, totalDuration)
+        }
+
         let transcriptLocaleIdentifier = locale.identifier.replacingOccurrences(of: "_", with: "-")
         let speechLocale = Self.exactSupportedLocale(
             await SpeechTranscriber.supportedLocale(equivalentTo: locale),
@@ -72,7 +84,7 @@ enum TranscriptionService {
             transcriber = speechTranscriber
             transcriptTranscriber = .speechTranscriber
             collectSegments = {
-                try await Self.collectSegments(from: speechTranscriber) { $0.text }
+                try await Self.collectSegments(from: speechTranscriber, progress: reportPosition) { $0.text }
             }
         } else if let dictationLocale {
             // Punctuation is on deliberately (LTR-16): it adds sentences in nl-NL and
@@ -87,7 +99,7 @@ enum TranscriptionService {
             transcriber = dictationTranscriber
             transcriptTranscriber = .dictationTranscriber
             collectSegments = {
-                var collected = try await Self.collectSegments(from: dictationTranscriber) { $0.text }
+                var collected = try await Self.collectSegments(from: dictationTranscriber, progress: reportPosition) { $0.text }
                 // Only the Markdown segments are adjusted; the raw recognition stays as emitted.
                 collected.segments = Self.reattachingLeadingPunctuation(collected.segments)
                 return collected
@@ -148,12 +160,14 @@ enum TranscriptionService {
 
     private static func collectSegments<Module: SpeechModule>(
         from module: Module,
+        progress: @Sendable (TimeInterval) async -> Void,
         text: (Module.Result) -> AttributedString
     ) async throws -> CollectedResults {
         try await module.results.reduce(into: CollectedResults(segments: [], recognition: TimedRecognition())) { partialResult, result in
             let range = result.range
             let start = CMTimeGetSeconds(range.start)
             let end = CMTimeGetSeconds(CMTimeRangeGetEnd(range))
+            if end.isFinite { await progress(end) }
             let attributedText = text(result)
             partialResult.segments.append(
                 TranscriptSegment(startTime: start, endTime: end, text: String(attributedText.characters))

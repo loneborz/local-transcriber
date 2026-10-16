@@ -2,6 +2,11 @@ import SwiftUI
 
 @main struct MyApp: App {
     init() {
+        // One destination and one queue for the whole app, whatever windows exist.
+        let destination = OutputDestination()
+        _destination = State(initialValue: destination)
+        _queue = State(initialValue: BatchQueue(destination: destination))
+
         // Nothing is running yet, so anything in the acquisition directory is
         // left over from a crashed or killed run. Children are also terminated
         // on a normal quit.
@@ -16,7 +21,10 @@ import SwiftUI
     }
 
     // One output folder for all windows and Settings (see OutputDestination).
-    @State private var destination = OutputDestination()
+    @State private var destination: OutputDestination
+    // The one transcription queue: every window shows and feeds it, and a closed
+    // window does not take its work with it. Not kept across quitting the app.
+    @State private var queue: BatchQueue
 
     @FocusedValue(\.pasteLinks) private var pasteLinks
     @FocusedValue(\.refreshTranscripts) private var refreshTranscripts
@@ -24,11 +32,10 @@ import SwiftUI
 
     var body: some Scene {
         WindowGroup {
-            ContentView(destination: destination)
+            ContentView(destination: destination, queue: queue)
         }
-        // The title is hidden (see ContentView), so the title bar only needs room for
-        // the window controls; the compact style gives the content that height back.
-        .windowToolbarStyle(.unifiedCompact(showsTitle: false))
+        // The compact title bar shows the window's context (ContentView.contextTitle).
+        .windowToolbarStyle(.unifiedCompact)
         .commands {
             // The window has no text field, so the standard Paste is always
             // disabled and would swallow ⌘V. This Paste adds a copied YouTube
