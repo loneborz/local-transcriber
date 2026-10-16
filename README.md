@@ -21,7 +21,7 @@ SHA-256: `dc2f6189533f3e8483354068cb43d489a2383e7b4e8c7cce5a6b24b82f60359a`. Che
 
 ## What it does
 
-Drag media onto the window, paste a YouTube link with ⌘V, or press Record. Everything goes into one queue shared by all windows that runs one job at a time, listed in the sidebar's Processing section (start it with Start, keep working in the Library while it runs, and watch the recognized audio position), and each finished transcript is saved to the output folder you chose the first time. Dropping a link from a browser's address bar works after you select the URL first (I have only seen that in Safari).
+Drag media onto the window, paste a YouTube link with ⌘V, or press Record. The app transcribes one file or link at a time and starts it as soon as you add it; the sidebar's Processing section shows its stage and the recognized audio position while you keep working in the Library, and a finished transcript appears there with a small New badge until you open it, and each finished transcript is saved to the output folder you chose the first time. Dropping a link from a browser's address bar works after you select the URL first (I have only seen that in Safari).
 
 - Local files: MP4, MOV, M4A, MP3 and WAV. For video, AVFoundation first extracts the audio to a temporary M4A.
 - YouTube links: `youtube.com` (including `www.`, `m.` and `music.`) and `youtu.be` watch, shorts, live and embed links. A link transcribes one video, so playlist parameters are dropped.

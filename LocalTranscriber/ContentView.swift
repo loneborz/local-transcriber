@@ -470,8 +470,9 @@ struct ContentView: View {
 
     private var recordButton: some View {
         Button("Record", action: startRecording)
-            .disabled(!recorder.canRecord || folderBlocked || queue.isBusy)
-            .help(queue.isBusy ? "Another transcription is running. Record when it has finished." : "")
+            .disabled(!recorder.canRecord || folderBlocked || queue.isBusy || destination.isRecording)
+            .help(queue.isBusy ? "Another transcription is running. Record when it has finished."
+                  : destination.isRecording ? "Another window is recording." : "")
     }
 
     // Starts from the visible selection; the app list is kept current by the
@@ -863,6 +864,7 @@ struct ContentView: View {
             )
             job.savedTranscriptURL = destination
             queue.dismiss(job)   // saved by hand: the slot is free again
+            NotificationCenter.default.post(name: .libraryDidChange, object: nil)
             notice = nil
         } catch {
             job.savedTranscriptURL = nil
