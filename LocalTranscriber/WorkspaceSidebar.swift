@@ -128,21 +128,10 @@ struct WorkspaceSidebar: View {
         }
     }
 
-    // One click starts a new transcription; the menu holds the other things
-    // that can be created (more can be added here later).
     private var newButton: some View {
-        Menu {
-            Button("New Transcription", systemImage: "waveform.badge.plus", action: onNewTranscription)
-            Button("New Folder…", systemImage: "folder.badge.plus") { onRequest(.newFolder(moving: nil)) }
-        } label: {
-            Label("New Transcription", systemImage: "plus")
-                .frame(maxWidth: .infinity)
-        } primaryAction: {
-            onNewTranscription()
-        }
-        .menuStyle(.button)
-        .controlSize(.large)
-        .frame(maxWidth: .infinity)
+        NewControl(
+            onNewTranscription: onNewTranscription,
+            onNewFolder: { onRequest(.newFolder(moving: nil)) })
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .background(Theme.sidebar)
@@ -311,5 +300,91 @@ private struct SidebarTranscriptRow: View {
         parts.append(item.sortDate.formatted(date: .abbreviated, time: .shortened))
         if let duration = item.header.duration { parts.append(TimestampFormat.string(duration)) }
         return parts.joined(separator: " · ")
+    }
+}
+
+// The creation control at the top of the sidebar: one full-width "New" button that
+// expands, inline, into the things that can be created. More actions can be added
+// to the panel later.
+private struct NewControl: View {
+    let onNewTranscription: () -> Void
+    let onNewFolder: () -> Void
+
+    @State private var isExpanded = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private static let radius: CGFloat = 10
+
+    var body: some View {
+        VStack(spacing: 6) {
+            Button { set(!isExpanded) } label: {
+                Label("New", systemImage: "plus")
+                    .frame(maxWidth: .infinity)
+                    .overlay(alignment: .trailing) {
+                        Image(systemName: "chevron.down")
+                            .font(.caption.weight(.semibold))
+                            .rotationEffect(.degrees(isExpanded ? 180 : 0))
+                            .accessibilityHidden(true)
+                    }
+            }
+            .buttonStyle(.borderedProminent)
+            .buttonBorderShape(.roundedRectangle(radius: Self.radius))
+            .controlSize(.large)
+            .accessibilityLabel("New")
+            .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
+            .accessibilityHint("Shows New Transcription and New Folder")
+
+            if isExpanded {
+                VStack(spacing: 2) {
+                    PanelRow(title: "New Transcription", symbol: "waveform") { choose(onNewTranscription) }
+                    PanelRow(title: "New Folder…", symbol: "folder.badge.plus") { choose(onNewFolder) }
+                }
+                .padding(4)
+                .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: Self.radius))
+                .overlay {
+                    RoundedRectangle(cornerRadius: Self.radius)
+                        .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .onExitCommand { set(false) }
+    }
+
+    private func set(_ expanded: Bool) {
+        withAnimation(reduceMotion ? nil : .snappy(duration: 0.2)) { isExpanded = expanded }
+    }
+
+    // Does the action, and folds the panel away.
+    private func choose(_ action: () -> Void) {
+        set(false)
+        action()
+    }
+}
+
+private struct PanelRow: View {
+    let title: String
+    let symbol: String
+    let action: () -> Void
+
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                // A fixed icon column keeps the titles aligned.
+                Image(systemName: symbol)
+                    .frame(width: 20)
+                    .accessibilityHidden(true)
+                Text(title)
+            }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 6)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .background(Color.accentColor.opacity(isHovered ? 0.18 : 0), in: RoundedRectangle(cornerRadius: 6))
+        .onHover { isHovered = $0 }
     }
 }
