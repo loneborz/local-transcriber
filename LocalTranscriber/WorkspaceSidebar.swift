@@ -143,27 +143,38 @@ struct WorkspaceSidebar: View {
             .contextMenu { entryMenu(item) }
     }
 
+    @ViewBuilder
     private func folderRow(_ group: LibrarySections.Group) -> some View {
-        DisclosureGroup(isExpanded: Binding(
-            get: { !collapsedFolders.contains(group.folder.id) },
-            set: { open in
-                if open { collapsedFolders.remove(group.folder.id) } else { collapsedFolders.insert(group.folder.id) }
-            })
-        ) {
-            ForEach(group.entries) { row($0, showsFolder: false, tag: .transcript($0.id)) }
-        } label: {
-            Label(group.folder.name, systemImage: "folder")
-                .lineLimit(1)
-                .truncationMode(.middle)
-                .contextMenu {
-                    Button("Rename Folder…") { onRequest(.renameFolder(group.folder)) }
-                    Button("Reveal in Finder") {
-                        NSWorkspace.shared.activateFileViewerSelecting([group.folder.url])
-                    }
-                    Divider()
-                    Button("Move to Trash…", role: .destructive) { onRequest(.trashFolder(group.folder)) }
-                }
+        // An empty folder has nothing to expand: no chevron, just the folder.
+        if group.entries.isEmpty {
+            folderLabel(group.folder)
+        } else {
+            DisclosureGroup(isExpanded: Binding(
+                get: { !collapsedFolders.contains(group.folder.id) },
+                set: { open in
+                    if open { collapsedFolders.remove(group.folder.id) } else { collapsedFolders.insert(group.folder.id) }
+                })
+            ) {
+                ForEach(group.entries) { row($0, showsFolder: false, tag: .transcript($0.id)) }
+            } label: {
+                folderLabel(group.folder)
+            }
         }
+    }
+
+    private func folderLabel(_ folder: LibraryFolder) -> some View {
+        Label(folder.name, systemImage: "folder")
+            .font(.callout)
+            .lineLimit(1)
+            .truncationMode(.middle)
+            .contextMenu {
+                Button("Rename Folder…") { onRequest(.renameFolder(folder)) }
+                Button("Reveal in Finder") {
+                    NSWorkspace.shared.activateFileViewerSelecting([folder.url])
+                }
+                Divider()
+                Button("Move to Trash…", role: .destructive) { onRequest(.trashFolder(folder)) }
+            }
     }
 
     @ViewBuilder
@@ -229,6 +240,7 @@ private struct SidebarJobRow: View {
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(job.displayName)
+                    .font(.callout)
                     .lineLimit(1)
                     .truncationMode(.middle)
                 status
@@ -281,6 +293,7 @@ private struct SidebarTranscriptRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 1) {
             Text(item.title)
+                .font(.callout)
                 .lineLimit(1)
                 .truncationMode(.middle)
             Text(detail)

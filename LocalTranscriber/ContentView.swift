@@ -82,6 +82,9 @@ struct ContentView: View {
             }
             .frame(minWidth: 640, minHeight: 368)
         }
+        // The window keeps its title (Window menu, accessibility); the title bar
+        // does not repeat the app name over the content.
+        .toolbar(removing: .title)
         // The paper continues under the title bar.
         .containerBackground(Theme.paper, for: .window)
         .contentShape(Rectangle())
