@@ -115,14 +115,21 @@ final class LibraryScannerTests: TreeTestCase {
         try write(markdown(), ".LocalTranscriber-1234.tmp")
         try write(markdown(), "Talk.txt")
         try write("empty package", "NoTranscript/audio.m4a")
-        // Only one folder level is read.
+        // LTR-52 (a deliberate change to LTR-44's "one folder level"): a folder that is
+        // not an entry is an organization folder and its transcripts are listed, but
+        // folders are one level deep: nothing below an entry or a second folder level.
         try write(markdown(), "Nested/loose.md")
         try write(markdown(), "Nested/Deep/transcript.md")
+        try write(markdown(), "Nested/Deeper/Deepest/loose.md")
+        try write(markdown(), "abc123/Inside/loose.md")
 
         let items = try LibraryScanner.scan(folder: folder)
-        XCTAssertEqual(Set(names(items)), ["Talk.md", "Talk 2.md", "abc123/transcript.md"])
-        XCTAssertEqual(items.first { $0.kind == .package }?.artifactURL.lastPathComponent, "abc123")
-        XCTAssertEqual(items.first { $0.title == "Talk" }?.artifactURL.lastPathComponent, "Talk.md")
+        XCTAssertEqual(
+            Set(names(items)),
+            ["Talk.md", "Talk 2.md", "abc123/transcript.md", "Nested/loose.md", "Nested/Deep/transcript.md"])
+        XCTAssertEqual(items.first { $0.markdownURL.path.hasSuffix("abc123/transcript.md") }?.artifactURL.lastPathComponent, "abc123")
+        XCTAssertEqual(items.first { $0.title == "Talk" && $0.group == nil && $0.kind == .flat }?.artifactURL.lastPathComponent, "Talk.md")
+        XCTAssertEqual(try LibraryScanner.scanLibrary(folder: folder).folders.map(\.name), ["Nested", "NoTranscript"])
     }
 
     func testReadsTheHeader() throws {

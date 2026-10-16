@@ -6,6 +6,15 @@ import UniformTypeIdentifiers
 extension FocusedValues {
     @Entry var pasteLinks: (() -> Void)?
     @Entry var refreshTranscripts: (() -> Void)?
+    @Entry var libraryCommands: LibraryCommands?
+}
+
+// A question the library asks before it acts, or a failure it reports.
+private enum LibraryPrompt {
+    case rename(LibraryTranscript)
+    case newFolder(moving: LibraryTranscript?)
+    case trash(LibraryTranscript)
+    case failure(String)
 }
 
 struct ContentView: View {
@@ -32,6 +41,8 @@ struct ContentView: View {
     @State private var firstVisibleBatch = 0
     // The window's only audio player (see AudioReviewPlayer).
     @State private var player = AudioReviewPlayer()
+    @State private var prompt: LibraryPrompt?
+    @State private var promptText = ""
 
     init(destination: OutputDestination) {
         self.destination = destination
@@ -53,7 +64,8 @@ struct ContentView: View {
                 library: library,
                 destination: destination.status,
                 selection: sidebarSelection,
-                onRefresh: { refreshLibrary() }
+                onRefresh: { refreshLibrary() },
+                onRequest: handle
             )
             .navigationSplitViewColumnWidth(min: 190, ideal: 230, max: 340)
         } detail: {
@@ -75,6 +87,14 @@ struct ContentView: View {
         }
         .focusedSceneValue(\.pasteLinks, pasteFromClipboard)
         .focusedSceneValue(\.refreshTranscripts) { refreshLibrary() }
+        .focusedSceneValue(\.libraryCommands, LibraryCommands(
+            selected: selectedTranscript, canCreateFolder: destination.isReady, request: handle))
+        .modifier(LibraryPromptModifier(
+            prompt: $prompt, text: $promptText, library: library, commit: commit))
+        // Another window changed files: look again.
+        .onReceive(NotificationCenter.default.publisher(for: .libraryDidChange)) { note in
+            if (note.object as? LibraryStore) !== library { refreshLibrary(recheckFolder: false) }
+        }
         .onAppear {
             // Makes this window's work count in the app-wide guards (Settings, folder).
             destination.register(queue, recorder)
@@ -126,7 +146,8 @@ struct ContentView: View {
         queue.jobs.filter { job in
             guard case .complete = job.state else { return true }
             guard let url = job.savedTranscriptURL else { return true }
-            return LibraryJoin.isAwaitingEntry(savedURL: url, folder: library.folder, in: library.joinIndex)
+            return LibraryJoin.isAwaitingEntry(
+                savedURL: url, folder: library.folder, in: library.joinIndex, seen: library.seenPaths)
         }
     }
 
@@ -139,6 +160,62 @@ struct ContentView: View {
         // Not while any window's queue or recording uses the shared folder.
         if recheckFolder && destination.canChangeFolder { destination.refresh() }
         library.refresh(folder: destination.readyFolder)
+    }
+
+    private var selectedTranscript: LibraryTranscript? {
+        if case .transcript(let id) = selection { library.items.first { $0.id == id } } else { nil }
+    }
+
+    // MARK: library actions
+
+    private func handle(_ request: LibraryRequest) {
+        switch request {
+        case .rename(let item):
+            promptText = item.title
+            prompt = .rename(item)
+        case .newFolder(let moving):
+            promptText = ""
+            prompt = .newFolder(moving: moving)
+        case .trash(let item):
+            prompt = .trash(item)
+        case .togglePin(let item):
+            attempt { try library.setPinned(item, !item.isPinned) }
+        case .toggleArchive(let item):
+            attempt { try library.setArchived(item, !item.isArchived) }
+        case .move(let item, let folder):
+            attempt { follow(item, to: try library.move(item, to: folder)) }
+        }
+    }
+
+    private func commit(_ prompt: LibraryPrompt) {
+        attempt {
+            switch prompt {
+            case .rename(let item):
+                follow(item, to: try library.rename(item, to: promptText))
+            case .newFolder(let moving):
+                let folder = try library.createFolder(named: promptText)
+                if let moving { follow(moving, to: try library.move(moving, to: folder)) }
+            case .trash(let item):
+                try library.trash(item)
+                if player.itemID == item.id { player.stop() }
+                if case .transcript(item.id) = selection { showNewTranscription() }
+            case .failure:
+                break
+            }
+        }
+    }
+
+    private func attempt(_ work: () throws -> Void) {
+        do { try work() } catch { prompt = .failure(error.localizedDescription) }
+    }
+
+    // A renamed or moved transcript keeps its place in the sidebar and in the
+    // queue; its audio stops, because the file it was playing has moved.
+    private func follow(_ old: LibraryTranscript, to new: LibraryTranscript) {
+        queue.relocate(from: old.markdownURL, to: new.markdownURL)
+        guard case .transcript(old.id) = selection else { return }
+        if player.itemID == old.id { player.stop() }
+        selection = .transcript(new.id)
     }
 
     private var isReviewingTranscript: Bool {
@@ -211,7 +288,8 @@ struct ContentView: View {
     private func jobRow(_ job: TranscriptionJob) -> some View {
         let entry = job.savedTranscriptURL.flatMap { LibraryJoin.item(forSavedURL: $0, in: library.joinIndex) }
         let awaiting = job.savedTranscriptURL.map {
-            LibraryJoin.isAwaitingEntry(savedURL: $0, folder: library.folder, in: library.joinIndex)
+            LibraryJoin.isAwaitingEntry(
+                savedURL: $0, folder: library.folder, in: library.joinIndex, seen: library.seenPaths)
         } ?? false
         return JobRow(
             job: job,
@@ -577,7 +655,7 @@ struct ContentView: View {
     // launch and termination notifications.
     private func startRecording() {
         Task {
-            await recorder.record(to: destination) { addRecording($0) }
+            await recorder.record(to: destination) { addRecording($0, startedAt: $1) }
             // record() refreshes the folder first. If it vanished while a
             // transcription or recording runs, choose() refuses its panel and nothing starts.
             if recorder.isIdle && recorder.error == nil && folderBlocked {
@@ -678,8 +756,10 @@ struct ContentView: View {
         }
     }
 
-    private func addRecording(_ url: URL) {
-        _ = addDroppedFiles([url])
+    // The recording was saved as an entry folder holding its audio; the transcript
+    // is written into that same folder.
+    private func addRecording(_ url: URL, startedAt: Date) {
+        _ = addDroppedFiles([url], recording: (url.deletingLastPathComponent(), startedAt))
         startQueue()
     }
 
@@ -789,7 +869,7 @@ struct ContentView: View {
         return parts.joined(separator: " · ")
     }
 
-    private func addDroppedFiles(_ urls: [URL]) -> Bool {
+    private func addDroppedFiles(_ urls: [URL], recording: (folder: URL, startedAt: Date)? = nil) -> Bool {
         // Input and its notices live in the queue view.
         showNewTranscription()
         var sources: [JobSource] = []
@@ -815,6 +895,7 @@ struct ContentView: View {
 
         notice = nil
         for job in queue.enqueue(sources, locale: selectedLanguage.locale) {
+            job.recording = recording
             if case .file(let url) = job.source {
                 Task {
                     job.mediaInfo = await loadMediaInfo(for: url)
@@ -1334,6 +1415,62 @@ enum TranscriptionLanguage: String, CaseIterable, Identifiable {
         case .portuguese: "Portuguese"
         case .turkish: "Turkish"
         case .swedish: "Swedish"
+        }
+    }
+}
+
+
+// The alerts of the library actions: a name to type, a Trash confirmation, a failure.
+private struct LibraryPromptModifier: ViewModifier {
+    @Binding var prompt: LibraryPrompt?
+    @Binding var text: String
+    let library: LibraryStore
+    let commit: (LibraryPrompt) -> Void
+
+    func body(content: Content) -> some View {
+        content.alert(title, isPresented: Binding(get: { prompt != nil }, set: { if !$0 { prompt = nil } }),
+                      presenting: prompt) { current in
+            switch current {
+            case .rename:
+                TextField("Name", text: $text)
+                Button("Rename") { commit(current) }
+                Button("Cancel", role: .cancel) {}
+            case .newFolder:
+                TextField("Name", text: $text)
+                Button("Create") { commit(current) }
+                Button("Cancel", role: .cancel) {}
+            case .trash:
+                Button("Move to Trash", role: .destructive) { commit(current) }
+                Button("Cancel", role: .cancel) {}
+            case .failure:
+                Button("OK", role: .cancel) {}
+            }
+        } message: { current in
+            Text(message(for: current))
+        }
+    }
+
+    private var title: String {
+        switch prompt {
+        case .rename: "Rename Transcript"
+        case .newFolder(let moving): moving == nil ? "New Folder" : "New Folder and Move"
+        case .trash(let item): "Move “\(item.title)” to the Trash?"
+        case .failure: "Couldn’t Do That"
+        case nil: ""
+        }
+    }
+
+    private func message(for prompt: LibraryPrompt) -> String {
+        switch prompt {
+        case .rename: return "Renames the folder and its Markdown file. The transcript itself is not changed."
+        case .newFolder: return "Creates a folder in the output folder."
+        case .trash(let item):
+            let files = LibraryOperations.contents(of: item).map {
+                "\($0.name) (\(ByteCountFormatter.string(fromByteCount: $0.bytes, countStyle: .file)))"
+            }
+            return "The folder and everything in it moves to the Trash: \(files.joined(separator: ", ")). "
+                + "Audio kept with the transcript goes with it. You can put it back from the Trash."
+        case .failure(let reason): return reason
         }
     }
 }

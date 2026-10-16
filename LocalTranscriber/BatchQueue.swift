@@ -46,6 +46,9 @@ final class TranscriptionJob: Identifiable {
     // when the save is attempted, so later changes to the preference cannot
     // change what Copy or the manual Save writes for this job.
     var exportedAsPackage = false
+    // Set for a recording: the entry folder that already holds its audio, and
+    // when the recording started (the entry's creation time).
+    var recording: (folder: URL, startedAt: Date)?
 
     init(source: JobSource, locale: Locale) {
         self.source = source
@@ -61,6 +64,20 @@ final class TranscriptionJob: Identifiable {
         case .youtube(let videoID, _): metadata?.title ?? "YouTube · \(videoID)"
         case .invalid(let input, _): input
         }
+    }
+
+    // The entry folder's name: the media file's name, or a video's title.
+    func entryName(mediaURL: URL) -> String {
+        if case .youtube = source, let title = metadata?.title, !title.isEmpty { return title }
+        return mediaURL.deletingPathExtension().lastPathComponent
+    }
+
+    // When the entry was created: the recording's start, a video's acquisition,
+    // or, for an imported file, now (the save).
+    var createdAt: Date {
+        if let recording { return recording.startedAt }
+        if case .youtube = source, let acquired = metadata?.acquiredAt { return acquired }
+        return .now
     }
 
     var isWaiting: Bool {
@@ -180,6 +197,15 @@ final class BatchQueue {
         job.state = .waiting
     }
 
+    // The library renamed or moved a saved transcript: the jobs that saved it
+    // follow the file.
+    func relocate(from old: URL, to new: URL) {
+        let oldPath = old.standardizedFileURL.path
+        for job in jobs where job.savedTranscriptURL?.standardizedFileURL.path == oldPath {
+            job.savedTranscriptURL = new
+        }
+    }
+
     // Idle means no batch is running, so any mix of Waiting, Complete and
     // Failed jobs can be cleared. Never cancels an active job.
     var canClear: Bool { !jobs.isEmpty && !isRunning }
@@ -251,48 +277,47 @@ final class BatchQueue {
     // in memory, and the error is recorded for the manual Save fallback.
     private func save(_ transcript: Transcript, for job: TranscriptionJob, mediaURL: URL) {
         // Decided before the write, so it is also set when the write fails.
-        var package: (videoID: String, metadata: SourceMetadata)?
+        var package: SourceMetadata?
         if UserDefaults.standard.bool(forKey: Self.sourcePackageModeKey),
-           case .youtube(let videoID, _) = job.source,
+           case .youtube = job.source,
            let metadata = job.metadata {
-            package = (videoID, metadata)
+            package = metadata
         }
         job.exportedAsPackage = package != nil
 
         job.sidecarWarning = nil
+        var metadataWarning: String?
 
         do {
             let saved = try TranscriptSidecar.saveWithSidecar(
                 transcript,
                 markdown: job.markdown(for: transcript),
                 writeMarkdown: { markdown in
-                    if let package {
-                        // Source package: only for YouTube jobs. The audio is copied out
-                        // of the temporary directory before the caller removes it.
-                        let packageURL = try destination.writePackage(
-                            videoID: package.videoID,
-                            audio: mediaURL,
-                            manifest: SourcePackageManifest(
-                                metadata: package.metadata,
-                                transcriptionLocale: transcript.localeIdentifier
-                            ).encoded(),
-                            transcript: markdown
-                        )
-                        job.savedTranscriptURL = packageURL
-                        return packageURL.appendingPathComponent(SourcePackageManifest.transcriptFilename)
-                    }
-                    let markdownURL = try destination.write(
-                        markdown,
-                        baseName: mediaURL.deletingPathExtension().lastPathComponent
+                    // One folder per job, named after the media (or the video's
+                    // title). A source package also keeps the audio, copied out of
+                    // the temporary directory before the caller removes it.
+                    let written = try destination.writeEntry(
+                        baseName: job.entryName(mediaURL: mediaURL),
+                        existingFolder: job.recording?.folder,
+                        markdown: markdown,
+                        createdAt: job.createdAt,
+                        audio: package == nil ? nil : mediaURL,
+                        manifest: try package.map {
+                            try SourcePackageManifest(
+                                metadata: $0, transcriptionLocale: transcript.localeIdentifier
+                            ).encoded()
+                        }
                     )
-                    job.savedTranscriptURL = markdownURL
-                    return markdownURL
+                    metadataWarning = written.metadataWarning
+                    job.savedTranscriptURL = written.markdown
+                    return written.markdown
                 },
                 // The sidecar goes next to the file actually written.
                 writeSidecar: { try destination.writeSidecar($0, besides: $1) }
             )
             job.saveError = nil
-            job.sidecarWarning = saved.sidecarWarning
+            job.sidecarWarning = [saved.sidecarWarning, metadataWarning].compactMap { $0 }.joined(separator: "\n")
+            if job.sidecarWarning?.isEmpty == true { job.sidecarWarning = nil }
         } catch {
             job.saveError = error.localizedDescription
         }

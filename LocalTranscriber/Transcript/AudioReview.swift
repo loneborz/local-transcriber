@@ -14,6 +14,7 @@ nonisolated enum AudioResolution {
 
     // The one place the transcript's audio could be: nothing else is ever played.
     // - Source package: audio.m4a inside the package folder.
+    // - Entry: the same, else audio.m4a in the entry folder (source package entries).
     // - Flat transcript: the file named by the Markdown's Source line, in the same
     //   folder. The name comes from the Source line, never from the Markdown's own
     //   name ("Meeting 2.md" belongs to "Meeting.m4a").
@@ -24,11 +25,20 @@ nonisolated enum AudioResolution {
         case .package:
             return item.markdownURL.deletingLastPathComponent().appendingPathComponent(packageAudioName)
         case .flat:
-            let name = item.header.source
-            guard isPlainFileName(name),
-                  supportedExtensions.contains((name as NSString).pathExtension.lowercased()) else { return nil }
-            return item.markdownURL.deletingLastPathComponent().appendingPathComponent(name)
+            return namedAudioURL(for: item)
+        case .entry:
+            // The audio the Source line names, else the `audio.m4a` that a source
+            // package entry keeps (its Source line is the video link).
+            return namedAudioURL(for: item)
+                ?? item.entryFolderURL.appendingPathComponent(packageAudioName)
         }
+    }
+
+    private static func namedAudioURL(for item: LibraryTranscript) -> URL? {
+        let name = item.header.source
+        guard isPlainFileName(name),
+              supportedExtensions.contains((name as NSString).pathExtension.lowercased()) else { return nil }
+        return item.markdownURL.deletingLastPathComponent().appendingPathComponent(name)
     }
 
     // A file name only: no separators, no parent references, not hidden, not a link.

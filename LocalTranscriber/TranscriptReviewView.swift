@@ -62,8 +62,9 @@ struct TranscriptReviewView: View {
         .frame(maxWidth: 720, maxHeight: .infinity, alignment: .top)
         .padding(.horizontal, 16)
         .padding(.top, 12)
-        // Reloads when another transcript is chosen or the file changed on disk.
-        .task(id: item) { await load() }
+        // Reloads when another transcript is chosen or the file changed on disk, not
+        // when only its library state (pinned, archived) changed: that must not stop playback.
+        .task(id: ReloadKey(url: item.markdownURL, savedAt: item.savedAt)) { await load() }
     }
 
     private var loaded: TranscriptReview? {
@@ -466,4 +467,9 @@ private struct MarkdownBlockRow: View {
         }
         .padding(.vertical, 6)
     }
+}
+
+private struct ReloadKey: Equatable {
+    var url: URL
+    var savedAt: Date
 }

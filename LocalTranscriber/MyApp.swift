@@ -20,6 +20,7 @@ import SwiftUI
 
     @FocusedValue(\.pasteLinks) private var pasteLinks
     @FocusedValue(\.refreshTranscripts) private var refreshTranscripts
+    @FocusedValue(\.libraryCommands) private var library
 
     var body: some Scene {
         WindowGroup {
@@ -47,6 +48,26 @@ import SwiftUI
                 Button("Refresh Transcripts") { refreshTranscripts?() }
                     .keyboardShortcut("r")
                     .disabled(refreshTranscripts == nil)
+            }
+
+            // The library actions for the open transcript, for keyboard use; the
+            // sidebar's context menu offers the same.
+            CommandMenu("Transcript") {
+                let item = library?.selected.flatMap { $0.isManaged ? $0 : nil }
+                Button("Rename…") { item.map { library?.request(.rename($0)) } }
+                    .disabled(item == nil)
+                Button(item?.isPinned == true ? "Unpin" : "Pin") { item.map { library?.request(.togglePin($0)) } }
+                    .disabled(item == nil)
+                Button(item?.isArchived == true ? "Unarchive" : "Archive") { item.map { library?.request(.toggleArchive($0)) } }
+                    .disabled(item == nil)
+                Divider()
+                Button("New Folder…") { library?.request(.newFolder(moving: nil)) }
+                    .keyboardShortcut("n", modifiers: [.command, .shift])
+                    .disabled(library?.canCreateFolder != true)
+                Divider()
+                Button("Move to Trash…") { item.map { library?.request(.trash($0)) } }
+                    .keyboardShortcut(.delete, modifiers: .command)
+                    .disabled(item == nil)
             }
         }
 

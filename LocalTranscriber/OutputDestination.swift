@@ -4,12 +4,10 @@ import Observation
 
 enum OutputError: LocalizedError {
     case notConfigured
-    case tooManyCollisions
 
     var errorDescription: String? {
         switch self {
         case .notConfigured: "No output folder is configured."
-        case .tooManyCollisions: "Too many files with this name already exist."
         }
     }
 }
@@ -162,13 +160,29 @@ final class OutputDestination {
         return true
     }
 
-    // Writes `<baseName>.md`, or `<baseName> 2.md`, `<baseName> 3.md`, … when
-    // the name is taken. Existing files are never overwritten.
-    func write(_ markdown: String, baseName: String) throws -> URL {
-        let data = Data(markdown.utf8)
-        return try placeWithoutOverwriting(baseName: baseName, pathExtension: "md") {
-            // Foundation traps if .withoutOverwriting is combined with .atomic.
-            try data.write(to: $0, options: .withoutOverwriting)
+    // Writes a finished transcript as a new entry folder (see LibraryOperations).
+    // Into the folder of a recording when `existingFolder` is given. Never
+    // overwrites or reuses an existing file or folder.
+    func writeEntry(
+        baseName: String,
+        existingFolder: URL?,
+        markdown: String,
+        createdAt: Date,
+        audio: URL?,
+        manifest: Data?
+    ) throws -> LibraryOperations.WrittenEntry {
+        guard case .ready(let folder) = status else { throw OutputError.notConfigured }
+
+        let didStart = folder.startAccessingSecurityScopedResource()
+        defer { if didStart { folder.stopAccessingSecurityScopedResource() } }
+
+        do {
+            return try LibraryOperations.writeEntry(
+                baseName: baseName, in: folder, existingFolder: existingFolder, markdown: markdown,
+                createdAt: createdAt, audio: audio, manifest: manifest)
+        } catch {
+            refresh()
+            throw error
         }
     }
 
@@ -183,87 +197,20 @@ final class OutputDestination {
         return try SidecarFile.write(data, besides: markdownURL)
     }
 
-    // Moves a finished recording out of app-local staging under the same
-    // naming rule. moveItem never replaces an existing file.
-    func saveRecording(_ stagedFile: URL, baseName: String) throws -> URL {
-        try placeWithoutOverwriting(baseName: baseName, pathExtension: stagedFile.pathExtension) {
-            try FileManager.default.moveItem(at: stagedFile, to: $0)
-        }
-    }
-
-    // Calls `place` with `<baseName>.<ext>`, then `<baseName> 2.<ext>`, … until
-    // it does not fail because the file already exists.
-    private func placeWithoutOverwriting(
-        baseName: String,
-        pathExtension: String,
-        _ place: (URL) throws -> Void
-    ) throws -> URL {
+    // Moves a finished recording out of app-local staging into a new entry
+    // folder of its own, where its transcript is added later. Returns the audio.
+    func saveRecording(_ stagedFile: URL, baseName: String, startedAt: Date) throws -> URL {
         guard case .ready(let folder) = status else { throw OutputError.notConfigured }
 
         let didStart = folder.startAccessingSecurityScopedResource()
         defer { if didStart { folder.stopAccessingSecurityScopedResource() } }
 
-        for attempt in 1...9999 {
-            let name = attempt == 1 ? baseName : "\(baseName) \(attempt)"
-            let url = folder.appendingPathComponent("\(name).\(pathExtension)")
-            do {
-                try place(url)
-                return url
-            } catch let error as CocoaError where error.code == .fileWriteFileExists {
-                continue
-            } catch {
-                refresh()
-                throw error
-            }
+        do {
+            return try LibraryOperations.saveRecording(stagedFile, baseName: baseName, in: folder, startedAt: startedAt)
+        } catch {
+            refresh()
+            throw error
         }
-        throw OutputError.tooManyCollisions
-    }
-
-    // Writes a source package: a new `<videoID>/` folder holding the audio,
-    // `source.json` and `transcript.md`. An existing folder is never reused or
-    // overwritten; the next free `<videoID> 2`, `<videoID> 3`, … is created
-    // instead. If any step fails, the folder created here is removed again so
-    // no half-written package is left behind.
-    func writePackage(videoID: String, audio: URL, manifest: Data, transcript: String) throws -> URL {
-        guard case .ready(let folder) = status else { throw OutputError.notConfigured }
-
-        let didStart = folder.startAccessingSecurityScopedResource()
-        defer { if didStart { folder.stopAccessingSecurityScopedResource() } }
-
-        let fileManager = FileManager.default
-        for attempt in 1...9999 {
-            let name = attempt == 1 ? videoID : "\(videoID) \(attempt)"
-            let package = folder.appendingPathComponent(name, isDirectory: true)
-            do {
-                try fileManager.createDirectory(at: package, withIntermediateDirectories: false)
-            } catch let error as CocoaError where error.code == .fileWriteFileExists {
-                continue
-            } catch {
-                refresh()
-                throw error
-            }
-
-            do {
-                try fileManager.copyItem(
-                    at: audio,
-                    to: package.appendingPathComponent(SourcePackageManifest.audioFilename)
-                )
-                try manifest.write(
-                    to: package.appendingPathComponent(SourcePackageManifest.manifestFilename),
-                    options: .withoutOverwriting
-                )
-                try Data(transcript.utf8).write(
-                    to: package.appendingPathComponent(SourcePackageManifest.transcriptFilename),
-                    options: .withoutOverwriting
-                )
-                return package
-            } catch {
-                try? fileManager.removeItem(at: package)
-                refresh()
-                throw error
-            }
-        }
-        throw OutputError.tooManyCollisions
     }
 
     @discardableResult

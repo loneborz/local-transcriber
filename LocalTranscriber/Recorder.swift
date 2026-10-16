@@ -79,7 +79,9 @@ final class Recorder {
     private var lastSoundAt: Date?
     private var silenceTask: Task<Void, Never>?
     private var destination: OutputDestination?
-    private var onSaved: (URL) -> Void = { _ in }
+    private var onSaved: (URL, Date) -> Void = { _, _ in }
+    // When the capture began: the recording's creation time.
+    private var startedAt = Date.now
 
     var isIdle: Bool {
         if case .idle = state { return true }
@@ -109,7 +111,7 @@ final class Recorder {
         }
     }
 
-    func record(to destination: OutputDestination, onSaved: @escaping (URL) -> Void) async {
+    func record(to destination: OutputDestination, onSaved: @escaping (URL, Date) -> Void) async {
         guard canRecord else { return }
         error = nil
         silenceWarning = nil
@@ -187,6 +189,7 @@ final class Recorder {
         self.onSaved = onSaved
         stagingDirectory = staging
         let startedAt = Date.now
+        self.startedAt = startedAt
         lastSoundAt = nil
         state = .recording(since: startedAt)
         silenceTask = Task { [weak self] in
@@ -251,7 +254,7 @@ final class Recorder {
     // Drops what only a pending recording needs.
     private func release() {
         destination = nil
-        onSaved = { _ in }
+        onSaved = { _, _ in }
     }
 
     // Saves the staged recording into the output folder, then hands it on.
@@ -261,11 +264,11 @@ final class Recorder {
         destination.refresh()
         do {
             guard destination.isReady else { throw OutputError.notConfigured }
-            let saved = try destination.saveRecording(file, baseName: baseName)
+            let saved = try destination.saveRecording(file, baseName: baseName, startedAt: startedAt)
             try? FileManager.default.removeItem(at: file.deletingLastPathComponent())
             unsavedRecording = nil
             error = nil
-            onSaved(saved)
+            onSaved(saved, startedAt)
             release()
         } catch OutputError.notConfigured {
             self.error = "The output folder is unavailable. The recording wasn’t saved or queued; it is kept until you quit."

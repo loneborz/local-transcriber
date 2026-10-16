@@ -5,9 +5,18 @@ import os
 // The in-memory result of scanning the output folder. It is rebuilt on demand
 // and kept nowhere: no database, no index file, nothing written. The folder is
 // the store (doc-3); this is only the last listing of it.
+extension Notification.Name {
+    // Posted by a store after it changed files, so other windows rescan.
+    static let libraryDidChange = Notification.Name("LocalTranscriber.libraryDidChange")
+}
+
 @MainActor @Observable
 final class LibraryStore {
     private(set) var items: [LibraryTranscript] = []
+    // The organization folders, empty ones included.
+    private(set) var folders: [LibraryFolder] = []
+    // Every transcript this window has listed since the folder was chosen.
+    private(set) var seenPaths: Set<String> = []
     // Where `items` came from; nil when there is no usable output folder.
     private(set) var folder: URL?
     // Set when the folder could not be listed (items are then empty).
@@ -31,6 +40,8 @@ final class LibraryStore {
 
         if newFolder != folder {
             items = []
+            folders = []
+            seenPaths = []
             joinIndex = [:]
             loadError = nil
         }
@@ -45,15 +56,15 @@ final class LibraryStore {
         isLoading = true
         Task.detached(priority: .userInitiated) {
             let started = ContinuousClock.now
-            let result = Result { try LibraryScanner.scan(folder: newFolder) }
+            let result = Result { try LibraryScanner.scanLibrary(folder: newFolder) }
             let elapsed = started.duration(to: .now)
-            let index = (try? result.get()).map(LibraryJoin.index) ?? [:]
+            let index = (try? result.get()).map { LibraryJoin.index($0.items) } ?? [:]
             await self.apply(result, index: index, request: request, elapsed: elapsed)
         }
     }
 
     private func apply(
-        _ result: Result<[LibraryTranscript], Error>,
+        _ result: Result<LibraryListing, Error>,
         index: LibraryJoin.Index,
         request: Int,
         elapsed: Duration
@@ -63,16 +74,77 @@ final class LibraryStore {
         defer { revision += 1 }
         switch result {
         case .success(let scanned):
-            items = scanned
+            items = scanned.items
+            folders = scanned.folders
+            seenPaths.formUnion(index.keys)
             joinIndex = index
             loadError = nil
             let milliseconds = Double(elapsed.components.attoseconds) / 1e15 + Double(elapsed.components.seconds) * 1000
-            Self.log.info("library scan: \(scanned.count, privacy: .public) transcripts in \(milliseconds, format: .fixed(precision: 1), privacy: .public) ms")
+            Self.log.info("library scan: \(scanned.items.count, privacy: .public) transcripts in \(milliseconds, format: .fixed(precision: 1), privacy: .public) ms")
         case .failure(let error):
             items = []
+            folders = []
             joinIndex = [:]
             loadError = error.localizedDescription
             Self.log.error("library scan failed: \(error.localizedDescription)")
         }
+    }
+
+    // MARK: changing the library
+    //
+    // Each action changes files (see LibraryOperations), shows the result at once
+    // and lets a rescan and the other windows confirm it. A failure throws and
+    // changes nothing.
+
+    var sections: LibrarySections { LibrarySections(LibraryListing(items: items, folders: folders)) }
+
+    @discardableResult
+    func rename(_ item: LibraryTranscript, to name: String) throws -> LibraryTranscript {
+        replace(item, with: try LibraryOperations.rename(item, to: name))
+    }
+
+    func setPinned(_ item: LibraryTranscript, _ pinned: Bool) throws {
+        replace(item, with: try LibraryOperations.setPinned(item, pinned))
+    }
+
+    func setArchived(_ item: LibraryTranscript, _ archived: Bool) throws {
+        replace(item, with: try LibraryOperations.setArchived(item, archived))
+    }
+
+    // `destination` is an organization folder, or nil for the top level.
+    @discardableResult
+    func move(_ item: LibraryTranscript, to destination: LibraryFolder?) throws -> LibraryTranscript {
+        guard let folder else { throw LibraryError.outsideLibrary }
+        return replace(item, with: try LibraryOperations.move(item, to: destination?.url ?? folder, root: folder))
+    }
+
+    func trash(_ item: LibraryTranscript) throws {
+        try LibraryOperations.trash(item)
+        items.removeAll { $0.id == item.id }
+        changed()
+    }
+
+    func createFolder(named name: String) throws -> LibraryFolder {
+        guard let folder else { throw LibraryError.outsideLibrary }
+        let created = try LibraryOperations.createOrganizationFolder(named: name, in: folder)
+        folders.append(created)
+        folders.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        changed()
+        return created
+    }
+
+    @discardableResult
+    private func replace(_ old: LibraryTranscript, with new: LibraryTranscript) -> LibraryTranscript {
+        items.removeAll { $0.id == old.id }
+        items.append(new)
+        items.sort(by: LibraryScanner.isOrderedBefore)
+        seenPaths.insert(new.id)
+        changed()
+        return new
+    }
+
+    private func changed() {
+        refresh(folder: folder)
+        NotificationCenter.default.post(name: .libraryDidChange, object: self)
     }
 }

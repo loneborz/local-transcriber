@@ -25,7 +25,7 @@ Drag media onto the window, paste a YouTube link with ⌘V, or press Record. Eve
 
 - Local files: MP4, MOV, M4A, MP3 and WAV. For video, AVFoundation first extracts the audio to a temporary M4A.
 - YouTube links: `youtube.com` (including `www.`, `m.` and `music.`) and `youtu.be` watch, shorts, live and embed links. A link transcribes one video, so playlist parameters are dropped.
-- Recordings: the microphone, one running app's audio, or both. Nothing is captured until you press Record, and macOS asks for the microphone and Screen & System Audio Recording permissions the first time you need them, not at launch. Stop saves an M4A named `Recording <date> <time> (<source>).m4a` in the output folder and queues it like any dropped file. The recording stays there, and the app never deletes it automatically. Whole-system audio is not offered, and the app keeps no video or screen recordings.
+- Recordings: the microphone, one running app's audio, or both. Nothing is captured until you press Record, and macOS asks for the microphone and Screen & System Audio Recording permissions the first time you need them, not at launch. Stop saves the M4A in its own folder, `Recording <date> <time> (<source>)/`, in the output folder and queues it like any dropped file; the transcript is written into the same folder. The recording stays there, and the app never deletes it by itself (Move to Trash in the sidebar moves the whole folder to the Trash, after asking). Whole-system audio is not offered, and the app keeps no video or screen recordings.
 
 Each job has its own language: English (`en-US`), Dutch (`nl-NL`), German (`de-DE`), French (`fr-FR`), Russian (`ru-RU`), Spanish (`es-ES`), Italian (`it-IT`), Portuguese (`pt-BR`), Turkish (`tr-TR`) or Swedish (`sv-SE`). Settings › Transcription sets the default for new jobs, and Apply Language to All Waiting, above the queue, changes the jobs that haven't started. For the language you pick, the app uses whichever Apple speech module supports it, and macOS may download Apple's language assets the first time you use one.
 
@@ -33,7 +33,7 @@ A failed job never stops the others, and Retry puts it back in line (a rejected 
 
 ## Output
 
-The first time you transcribe, the app asks for an output folder and remembers it. It never overwrites anything: a name that already exists becomes `name 2.md`, `name 3.md` and so on.
+The first time you transcribe, the app asks for an output folder and remembers it. It never overwrites anything: each transcript gets its own folder named after the media (`Weekly Meeting/`), and a name that already exists becomes `Weekly Meeting 2/`, `Weekly Meeting 3/` and so on.
 
 Each transcript is one Markdown file, ordered by audio time and grouped by minute:
 
@@ -53,27 +53,39 @@ Each transcript is one Markdown file, ordered by audio time and grouped by minut
 Transcript text...
 ```
 
-YouTube links are saved as `<video title> [<video ID>].md`. In that flat form the `Source` line names the downloaded audio file, not the video URL.
-
-For research or archiving, turn on Save YouTube Links as Source Packages in Settings › General. Each link is then saved as a folder named after its video ID:
+Every new transcript is a folder with the same name inside:
 
 ```text
 <output folder>/
-  jNQXAC9IVRw/
-    audio.m4a        the downloaded audio
-    source.json      where it came from
-    transcript.md    the timestamped transcript, with the video's URL, channel and date
+  Meetings/                      a folder you made in the app (a real folder, also in Finder)
+    Weekly Meeting/
+      Weekly Meeting.md          the timestamped transcript
+      Weekly Meeting.timing.json timing data for playback
+      entry.json                 when it was created, pinned, archived
 ```
 
-`source.json` is a small versioned file that the app defines itself (schema version 1). It holds the video's URL, ID, title, channel, publication date and duration, when it was fetched, the audio file name and the transcription language. An existing folder is never reused (a repeat becomes `jNQXAC9IVRw 2/`), and a package that can't be completed isn't left half-written. Local files are always a single `.md`.
+A YouTube link is saved the same way, named after the video's title. In that form the `Source` line names the downloaded audio file, not the video URL, and the audio is not kept.
+
+For research or archiving, turn on Save YouTube Links as Source Packages in Settings › General. The folder then also holds the audio and where it came from:
+
+```text
+<output folder>/
+  Me at the zoo/
+    Me at the zoo.md   the timestamped transcript, with the video's URL, channel and date
+    audio.m4a          the downloaded audio
+    source.json        where it came from
+    entry.json
+```
+
+`source.json` is a small versioned file that the app defines itself (schema version 1). It holds the video's URL, ID, title, channel, publication date and duration, when it was fetched, the audio file name and the transcription language. `entry.json` (schema version 1) holds `createdAt` (the start of a recording, the moment a file was added, or the moment a link was fetched), and `pinned` and `archived` when set. An existing folder is never reused, and a folder that can't be completed isn't left half-written. Transcripts saved by v0.6 and earlier (a loose `.md`, or a source package with `transcript.md`) stay listed and readable and are never changed or moved; they can only be managed in Finder.
 
 ## Library and review
 
-The sidebar lists the transcripts in your output folder, newest first, with the one in progress above them. It scans the selected folder and the source-package folders directly inside it, nothing deeper. Nothing is imported and no database or index is created, so files you add or move show up. Select a transcript to read it in the window. The Markdown file stays the source of truth, and Copy puts all of it on the clipboard.
+The sidebar lists what is in your output folder: Pinned, Folders (real folders you create with the folder button or ⇧⌘N), Recent (transcripts in no folder) and Archive, with the one in progress above them. Right-click a transcript (or use the Transcript menu) to rename it, pin it, archive it, move it to a folder, or move it to the Trash. Rename changes the folder and file name only; archive changes nothing on disk except `entry.json`; Move to Trash asks first and never deletes permanently. The app scans the output folder and the folders directly inside it, nothing deeper. Nothing is imported and no database or index is created, so changes made in Finder show up after a refresh (⌘R). Select a transcript to read it in the window. The Markdown file stays the source of truth, and Copy puts all of it on the clipboard.
 
 Each new transcript also gets a `Name.timing.json` next to its Markdown (`transcript.timing.json` inside a source package) with the recognizer's timing. The Markdown itself doesn't change. The timing is used only when it belongs to that Markdown, by its checksum and the text of its lines. Otherwise the transcript opens as plain Markdown with a short note, which is also how transcripts made before 0.6 open.
 
-When the recording sits next to its transcript, a player appears. Click a timestamp or any timed line to jump there and play. The current line is highlighted, the view follows it, and Jump to Playing takes you back if you scroll away. The audio is the file named by the transcript's `Source` line in the same folder (or `audio.m4a` in a source package), and its duration has to match the transcript's to within a second. Audio imported from somewhere else, and YouTube transcripts saved without their audio, open for reading without a player. Jump positions are only as exact as the recognizer's timing.
+When the recording sits next to its transcript, a player appears. Click a timestamp or any timed line to jump there and play. The current line is highlighted, the view follows it, and Jump to Playing takes you back if you scroll away. The audio is the file named by the transcript's `Source` line in the same folder (or `audio.m4a` in a source package folder), and its duration has to match the transcript's to within a second. Audio imported from somewhere else, and YouTube transcripts saved without their audio, open for reading without a player. Jump positions are only as exact as the recognizer's timing.
 
 ## Privacy
 

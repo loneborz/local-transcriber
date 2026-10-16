@@ -6,8 +6,7 @@ import Foundation
 struct SourcePackageManifest: Encodable {
     static let currentSchemaVersion = 1
     static let audioFilename = "audio.m4a"
-    static let transcriptFilename = "transcript.md"
-    static let manifestFilename = "source.json"
+        static let manifestFilename = SourcePackageFile.manifestName
 
     let schemaVersion: Int
     let sourceType: String
