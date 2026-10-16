@@ -109,7 +109,7 @@ final class EntryWriteTests: ManagedLibraryCase {
         XCTAssertEqual(written.markdown.lastPathComponent, "Weekly Meeting.md")
         XCTAssertEqual(try String(contentsOf: written.markdown, encoding: .utf8), text, "byte-identical Markdown")
         XCTAssertNil(written.metadataWarning)
-        XCTAssertEqual(EntryMetadata.read(in: written.folder), .valid(EntryMetadata(createdAt: created)))
+        XCTAssertEqual(EntryMetadata.read(in: written.folder), .valid(EntryMetadata(createdAt: created, unopened: true)))
 
         let item = try entry("Weekly Meeting")
         XCTAssertEqual(item.kind, .entry)
@@ -501,18 +501,6 @@ final class LibraryActionTests: ManagedLibraryCase {
         }
         XCTAssertEqual(try snapshot(), before)
     }
-
-    func testAJobFindsItsEntryBySavedMarkdown() throws {
-        let md = try makeEntry("Talk")
-        let item = try entry("Talk")
-        XCTAssertEqual(item.artifactURL, md)
-        let index = LibraryJoin.index([item])
-        XCTAssertEqual(LibraryJoin.item(forSavedURL: md, in: index)?.id, item.id)
-        // A file the library listed and no longer lists is not "waiting" for an entry.
-        let gone = md.standardizedFileURL.path
-        XCTAssertTrue(LibraryJoin.isAwaitingEntry(savedURL: md, folder: folder, in: [:]))
-        XCTAssertFalse(LibraryJoin.isAwaitingEntry(savedURL: md, folder: folder, in: [:], seen: [gone]))
-    }
 }
 
 private enum SidecarReadback {
@@ -691,6 +679,72 @@ final class FolderSafetyTests: ManagedLibraryCase {
     private func dir(_ path: String) throws -> URL {
         let url = folder.appendingPathComponent(path, isDirectory: true)
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        return url
+    }
+}
+
+
+// The "New" badge (LTR-61): saved by a transcription, not opened yet.
+final class NewBadgeTests: ManagedLibraryCase {
+    func testAFreshTranscriptionIsNewAndOldEntriesNeverAre() throws {
+        let written = try LibraryOperations.writeEntry(baseName: "Fresh", in: folder, markdown: markdown(), createdAt: created)
+        try makeEntry("Old")               // an entry.json without the field
+        try writePair("Legacy")            // a v0.6 transcript
+        let items = try scan().items
+        XCTAssertEqual(items.filter(\.isNew).map(\.title), ["Fresh"])
+        XCTAssertTrue(FileManager.default.fileExists(atPath: written.markdown.path))
+    }
+
+    func testOpeningClearsItOnDiskAndNothingElseChanges() throws {
+        _ = try LibraryOperations.writeEntry(baseName: "Fresh", in: folder, markdown: markdown(), createdAt: created)
+        let item = try entry("Fresh")
+        XCTAssertTrue(item.isNew)
+        let mdHash = try sha(item.markdownURL)
+        let opened = try LibraryOperations.markOpened(item)
+        XCTAssertFalse(opened.isNew)
+        let reread = try entry("Fresh")
+        XCTAssertFalse(reread.isNew, "survives a rescan, as it would a relaunch")
+        XCTAssertEqual(reread.createdAt, created)
+        XCTAssertEqual(try sha(reread.markdownURL), mdHash)
+        // Opening it again writes nothing.
+        let before = try snapshot()
+        _ = try LibraryOperations.markOpened(reread)
+        XCTAssertEqual(try snapshot(), before)
+    }
+
+    func testARecordingBecomesNewOnlyWhenItsTranscriptIsSaved() throws {
+        let staged = try write("recorded", "staging/recording.m4a")
+        let audio = try LibraryOperations.saveRecording(staged, baseName: "Rec", in: folder, startedAt: created)
+        let entryFolder = audio.deletingLastPathComponent()
+        XCTAssertEqual(EntryMetadata.read(in: entryFolder).metadata?.unopened, false, "audio alone is not a new transcript")
+        _ = try LibraryOperations.writeEntry(
+            baseName: "x", in: folder, existingFolder: entryFolder, markdown: markdown(name: audio.lastPathComponent), createdAt: Date())
+        XCTAssertEqual(EntryMetadata.read(in: entryFolder).metadata?.unopened, true)
+        XCTAssertEqual(EntryMetadata.read(in: entryFolder).metadata?.createdAt, created, "still the recording start")
+    }
+
+    func testOneBadgeStateForAPinnedEntryInItsFolder() throws {
+        _ = try LibraryOperations.writeEntry(baseName: "Fresh", in: try mkdir("Work"), markdown: markdown(), createdAt: created)
+        var item = try entry("Fresh")
+        item = try LibraryOperations.setPinned(item, true)
+        let sections = LibrarySections(try scan())
+        XCTAssertEqual(sections.pinned.map(\.isNew), [true])
+        XCTAssertEqual(sections.folders[0].entries.map(\.isNew), [true], "the Pinned row and the folder row are one entry")
+        _ = try LibraryOperations.markOpened(item)
+        let after = LibrarySections(try scan())
+        XCTAssertEqual(after.pinned.map(\.isNew) + after.folders[0].entries.map(\.isNew), [false, false])
+    }
+
+    func testTheFieldIsOptionalAndOmittedWhenFalse() throws {
+        let data = try EntryMetadata(createdAt: created, unopened: true).encoded()
+        XCTAssertTrue(String(decoding: data, as: UTF8.self).contains("\"unopened\" : true"))
+        XCTAssertFalse(String(decoding: try EntryMetadata(createdAt: created).encoded(), as: UTF8.self).contains("unopened"))
+        XCTAssertEqual(EntryMetadata.decode(Data(#"{"schemaVersion":1}"#.utf8)), .valid(EntryMetadata(createdAt: nil)))
+    }
+
+    private func mkdir(_ name: String) throws -> URL {
+        let url = folder.appendingPathComponent(name, isDirectory: true)
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: false)
         return url
     }
 }

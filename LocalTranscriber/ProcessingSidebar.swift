@@ -1,96 +1,39 @@
 import SwiftUI
 import AppKit
 
-// What the window can do for a job. The Processing section only draws; saving,
-// copying and opening need the window (panels, selection, notices).
+// What the window can do for the job. The Processing section only draws; saving,
+// copying and dismissing need the window (panels, notices, confirmation).
 struct ProcessingActions {
-    // The action that opens the job's transcript in the library, if it is listed there.
-    var openTarget: (TranscriptionJob) -> (() -> Void)?
-    // Saved, but not into the folder the library is listing.
-    var savedElsewhere: (TranscriptionJob) -> Bool
     var save: (TranscriptionJob) -> Void
     // Returns whether the pasteboard accepted the text.
     var copy: (TranscriptionJob) -> Bool
     var retry: (TranscriptionJob) -> Void
-    var remove: (TranscriptionJob) -> Void
-    var start: () -> Void
-    var applyLanguage: () -> Void
-    var clearFinished: () -> Void
-    var canStart: Bool
-    var canChangeLanguage: Bool
-    var defaultLanguageTitle: String
+    var dismiss: (TranscriptionJob) -> Void
 }
 
-// The sidebar's Processing section: the jobs of the app-wide queue, compact, with
-// the state of each, real progress where the recognizer gives it, and the actions
-// the old queue page offered. Shown whenever there is something to see or do.
+// The sidebar's Processing section: the one job the app is working on (or that
+// needs attention), with its stage, real progress where the recognizer gives it,
+// elapsed time, and the recovery actions. There is no waiting list: the section is
+// there only while the job's slot is taken.
 struct ProcessingSection: View {
     let queue: BatchQueue
     let jobs: [TranscriptionJob]
     let actions: ProcessingActions
 
     @State private var isExpanded = true
-    @State private var showsAll = false
-    @State private var openDetails: Set<UUID> = []
-
-    // A long batch must not push the library out of view.
-    private static let compactCount = 4
+    @State private var isDetailOpen = false
 
     var body: some View {
         Section(isExpanded: $isExpanded) {
-            if queue.unstartedCount > 0 {
-                Button(action: actions.start) {
-                    Label("Start \(queue.unstartedCount)", systemImage: "play.fill")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(Theme.wineFill)
-                .controlSize(.small)
-                .disabled(!actions.canStart)
-                .selectionDisabled()
-                .help(actions.canStart
-                      ? "Start the waiting jobs, one after the other."
-                      : "Jobs can’t start while recording or without an output folder.")
-            }
-            ForEach(shownJobs) { job in
+            ForEach(jobs) { job in
                 ProcessingRow(
                     job: job,
                     actions: actions,
-                    isDetailOpen: Binding(
-                        get: { openDetails.contains(job.id) },
-                        set: { open in
-                            if open { openDetails.insert(job.id) } else { openDetails.remove(job.id) }
-                        }))
-            }
-            if jobs.count > Self.compactCount {
-                Button(showsAll ? "Show fewer" : "Show \(jobs.count - Self.compactCount) more") {
-                    showsAll.toggle()
-                }
-                .buttonStyle(.plain)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .selectionDisabled()
+                    isDetailOpen: Binding(get: { isDetailOpen }, set: { isDetailOpen = $0 }))
             }
         } header: {
             header
         }
-    }
-
-    // Active work first, then what needs attention, then what waits.
-    private var orderedJobs: [TranscriptionJob] {
-        func rank(_ job: TranscriptionJob) -> Int {
-            switch job.state {
-            case .downloading, .transcribing: 0
-            case .failed: 1
-            case .complete: job.savedTranscriptURL == nil ? 1 : 3
-            case .waiting: 2
-            }
-        }
-        return jobs.enumerated().sorted { (rank($0.element), $0.offset) < (rank($1.element), $1.offset) }.map(\.element)
-    }
-
-    private var shownJobs: [TranscriptionJob] {
-        showsAll ? orderedJobs : Array(orderedJobs.prefix(Self.compactCount))
     }
 
     private var header: some View {
@@ -102,20 +45,6 @@ struct ProcessingSection: View {
                         .controlSize(.mini)
                         .accessibilityLabel("Processing")
                 }
-                Spacer()
-                Menu {
-                    Button("Apply Language to All Waiting") { actions.applyLanguage() }
-                        .disabled(queue.waitingCount < 2 || !actions.canChangeLanguage)
-                    Button("Clear Finished") { actions.clearFinished() }
-                        .disabled(!queue.canClear)
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                }
-                .menuStyle(.borderlessButton)
-                .menuIndicator(.hidden)
-                .fixedSize()
-                .help("Processing actions")
-                .accessibilityLabel("Processing actions")
             }
             Text(summary)
                 .font(.caption)
@@ -124,23 +53,13 @@ struct ProcessingSection: View {
         }
     }
 
-    // "1 running · 2 waiting · 1 failed", in plain counts.
     private var summary: String {
-        var running = 0, waiting = 0, failed = 0
-        for job in jobs {
-            switch job.state {
-            case .downloading, .transcribing: running += 1
-            case .waiting: waiting += 1
-            case .failed: failed += 1
-            case .complete: if job.savedTranscriptURL == nil { failed += 1 }
-            }
+        guard let job = jobs.first else { return "" }
+        switch job.state {
+        case .waiting, .downloading, .transcribing: return "1 running"
+        case .failed: return "Needs attention"
+        case .complete: return job.savedTranscriptURL == nil ? "Needs attention" : "Saved, with a warning"
         }
-        let parts = [
-            running > 0 ? "\(running) running" : nil,
-            waiting > 0 ? "\(waiting) waiting" : nil,
-            failed > 0 ? "\(failed) need attention" : nil,
-        ].compactMap { $0 }
-        return parts.isEmpty ? "Finishing" : parts.joined(separator: " · ")
     }
 }
 
@@ -225,11 +144,11 @@ private struct ProcessingRow: View {
     // The accurate stage, in the words of the processing steps.
     private var stage: String {
         switch job.state {
-        case .waiting: job.isStarted ? "Waiting for its turn" : "Ready to start"
+        case .waiting: "Starting…"
         case .downloading: "Acquiring media…"
         case .transcribing(let phase): phase?.label ?? "Transcribing…"
         case .complete:
-            job.savedTranscriptURL == nil ? "Not saved" : "Complete"
+            job.savedTranscriptURL == nil ? "Not saved" : "Saved, with a warning"
         case .failed(let message): "Failed · \(message)"
         }
     }
@@ -271,6 +190,8 @@ private struct ProcessingRow: View {
                     .font(.caption)
                     .foregroundStyle(.red)
                     .textSelection(.enabled)
+                    .help(message)
+                    .lineLimit(8)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
@@ -306,43 +227,19 @@ private struct ProcessingRow: View {
                     .buttonStyle(.plain)
                     .help("Show \(saved.lastPathComponent) in Finder")
                 }
-                if actions.savedElsewhere(job) {
-                    Text("Not in the current library: saved to another output folder.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
             }
 
             buttons
         }
         .padding(.vertical, 2)
+        // Show whole messages (errors, metrics) instead of cutting them to one line.
+        .fixedSize(horizontal: false, vertical: true)
     }
 
-    // The language can only change while the job waits.
-    @ViewBuilder
     private var languageLine: some View {
-        if job.isWaiting {
-            Picker("Language", selection: language) {
-                ForEach(TranscriptionLanguage.allCases) { language in
-                    Text(language.title).tag(language)
-                }
-            }
-            .pickerStyle(.menu)
-            .controlSize(.small)
-            .fixedSize()
-        } else {
-            Text(language.wrappedValue.title)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-    }
-
-    private var language: Binding<TranscriptionLanguage> {
-        Binding(
-            get: { TranscriptionLanguage.allCases.first { $0.locale == job.locale } ?? .english },
-            set: { job.locale = $0.locale }
-        )
+        Text(TranscriptionLanguage.allCases.first { $0.locale == job.locale }?.title ?? job.locale.identifier)
+            .font(.caption)
+            .foregroundStyle(.secondary)
     }
 
     private var buttons: some View {
@@ -355,11 +252,6 @@ private struct ProcessingRow: View {
 
     @ViewBuilder
     private var buttonItems: some View {
-        if let open = actions.openTarget(job) {
-            Button("Open", action: open)
-                .help("Open this transcript")
-                .accessibilityLabel("Open transcript")
-        }
         if case .complete = job.state {
             Button {
                 copied = actions.copy(job)
@@ -393,12 +285,15 @@ private struct ProcessingRow: View {
         case .youtube(_, let url):
             Button("Open Video") { NSWorkspace.shared.open(url) }
                 .help("Open on YouTube")
-        case .invalid:
-            EmptyView()
         }
-        if job.isWaiting {
-            Button("Remove", role: .destructive) { actions.remove(job) }
-                .accessibilityLabel("Remove from queue")
+        // Frees the slot of a job that failed or was not saved (the window asks before
+        // an unsaved transcript is dropped).
+        switch job.state {
+        case .failed, .complete:
+            Button("Dismiss") { actions.dismiss(job) }
+                .help("Remove this job from Processing")
+        default:
+            EmptyView()
         }
     }
 

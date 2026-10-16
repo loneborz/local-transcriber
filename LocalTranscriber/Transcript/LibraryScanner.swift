@@ -39,6 +39,8 @@ nonisolated struct LibraryTranscript: Identifiable, Equatable, Sendable {
     var isManaged: Bool { kind == .entry }
     var isPinned: Bool { metadata.metadata?.pinned ?? false }
     var isArchived: Bool { metadata.metadata?.archived ?? false }
+    // Saved by a transcription and not opened yet.
+    var isNew: Bool { metadata.metadata?.unopened ?? false }
     // The recorded creation time, if there is one.
     var createdAt: Date? { metadata.metadata?.createdAt }
     // What lists are ordered by: the creation time, else the save date.
@@ -214,33 +216,6 @@ nonisolated enum LibraryScanner {
             header: parsed.header,
             savedAt: modified ?? values.contentModificationDate ?? .distantPast
         )
-    }
-}
-
-// The library entry for a job that was saved: the item whose artifact is the
-// URL the job reports. A job that matches is shown as the library item, not
-// as a second row. Build the index once per scan; lookups are then cheap.
-nonisolated enum LibraryJoin {
-    typealias Index = [String: LibraryTranscript]
-
-    static func index(_ items: [LibraryTranscript]) -> Index {
-        Dictionary(items.map { ($0.artifactURL.standardizedFileURL.path, $0) }, uniquingKeysWith: { first, _ in first })
-    }
-
-    static func item(forSavedURL url: URL, in index: Index) -> LibraryTranscript? {
-        index[url.standardizedFileURL.path]
-    }
-
-    // A saved job stays in the In progress list only until its library entry
-    // appears: it was saved into the folder being listed and the scan has not
-    // listed it yet. Saved anywhere else (another output folder, a manual Save
-    // Transcript), it is not part of this library and is not listed.
-    // A file the library has listed before (`seen`) and no longer lists was renamed,
-    // moved or deleted since; it is not waiting for anything.
-    static func isAwaitingEntry(savedURL url: URL, folder: URL?, in index: Index, seen: Set<String> = []) -> Bool {
-        guard let folder else { return false }
-        let path = url.standardizedFileURL.path
-        return path.hasPrefix(folder.standardizedFileURL.path + "/") && index[path] == nil && !seen.contains(path)
     }
 }
 

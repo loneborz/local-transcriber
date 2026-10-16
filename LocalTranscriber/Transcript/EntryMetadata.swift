@@ -9,13 +9,16 @@ import UniformTypeIdentifiers
 //   "schemaVersion": 1,
 //   "createdAt": "2026-10-16T12:00:00Z",   (omitted when unknown)
 //   "pinned": true,                        (omitted when false)
-//   "archived": true                       (omitted when false)
+//   "archived": true,                      (omitted when false)
+//   "unopened": true                       (omitted when false)
 // }
 //
 // `createdAt` is written once, at creation: the start of a recording, the moment
 // an imported file's entry was created, or the moment a YouTube link was
 // acquired. It is never the file modification date. The title is the folder
-// name and is not stored.
+// name and is not stored. `unopened` marks a transcript the app saved and nobody has
+// opened yet (the "New" badge): set when a transcription is saved, cleared when the
+// transcript is opened. An entry without it was never new.
 nonisolated struct EntryMetadata: Codable, Equatable, Sendable {
     static let currentSchemaVersion = 1
     static let fileName = "entry.json"
@@ -26,15 +29,17 @@ nonisolated struct EntryMetadata: Codable, Equatable, Sendable {
     var createdAt: Date?
     var pinned: Bool
     var archived: Bool
+    var unopened: Bool
 
-    init(createdAt: Date?, pinned: Bool = false, archived: Bool = false) {
+    init(createdAt: Date?, pinned: Bool = false, archived: Bool = false, unopened: Bool = false) {
         schemaVersion = Self.currentSchemaVersion
         self.createdAt = createdAt
         self.pinned = pinned
         self.archived = archived
+        self.unopened = unopened
     }
 
-    private enum Keys: String, CodingKey { case schemaVersion, createdAt, pinned, archived }
+    private enum Keys: String, CodingKey { case schemaVersion, createdAt, pinned, archived, unopened }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: Keys.self)
@@ -42,6 +47,7 @@ nonisolated struct EntryMetadata: Codable, Equatable, Sendable {
         createdAt = try c.decodeIfPresent(Date.self, forKey: .createdAt)
         pinned = try c.decodeIfPresent(Bool.self, forKey: .pinned) ?? false
         archived = try c.decodeIfPresent(Bool.self, forKey: .archived) ?? false
+        unopened = try c.decodeIfPresent(Bool.self, forKey: .unopened) ?? false
     }
 
     func encode(to encoder: Encoder) throws {
@@ -50,6 +56,7 @@ nonisolated struct EntryMetadata: Codable, Equatable, Sendable {
         try c.encodeIfPresent(createdAt, forKey: .createdAt)
         if pinned { try c.encode(true, forKey: .pinned) }
         if archived { try c.encode(true, forKey: .archived) }
+        if unopened { try c.encode(true, forKey: .unopened) }
     }
 
     // Deterministic: sorted keys, trailing newline.

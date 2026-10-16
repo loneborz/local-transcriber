@@ -19,6 +19,8 @@ private enum LibraryPrompt {
     // The folder holds files the app did not create, so it is not trashed from here.
     case folderNeedsReview(LibraryFolder, names: [String])
     case failure(title: String, reason: String)
+    // The job's transcript was not saved; dismissing it loses the transcript.
+    case discardUnsaved(TranscriptionJob)
 }
 
 struct ContentView: View {
@@ -26,8 +28,6 @@ struct ContentView: View {
     let destination: OutputDestination
     // One queue for the whole app (see MyApp); every window shows and feeds it.
     let queue: BatchQueue
-    // This window; the jobs it adds open their transcript here, not in other windows.
-    @State private var windowID = UUID()
     @State private var recorder = Recorder()
     @State private var isTargeted = false
     @FocusState private var isImportZoneFocused: Bool
@@ -38,10 +38,6 @@ struct ContentView: View {
     // Bumped when the List deselects the selected row, so it draws the selection again.
     @State private var sidebarRefresh = 0
     @State private var columnVisibility = NavigationSplitViewVisibility.all
-    // A finished single job whose transcript should open as soon as the library lists it.
-    @State private var pendingOpen: PendingOpen?
-    // Jobs whose save has already been looked at, so each save is considered once.
-    @State private var announcedSaves: Set<UUID> = []
     // The window's only audio player (see AudioReviewPlayer).
     @State private var player = AudioReviewPlayer()
     @State private var prompt: LibraryPrompt?
@@ -64,7 +60,7 @@ struct ContentView: View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             WorkspaceSidebar(
                 queue: queue,
-                jobs: inProgressJobs,
+                jobs: queue.jobs,
                 processing: processingActions,
                 recordingBanner: recorder.isIdle ? nil : AnyView(recordingStatus(compact: true)),
                 library: library,
@@ -90,7 +86,7 @@ struct ContentView: View {
         .containerBackground(Theme.paper, for: .window)
         .contentShape(Rectangle())
         .dropDestination(for: URL.self) { urls, _ in
-            addDroppedFiles(urls)
+            addInput(urls)
         } isTargeted: { targeted in
             isTargeted = targeted
         }
@@ -128,9 +124,8 @@ struct ContentView: View {
         .onChange(of: folderBlocked) { _, blocked in
             if !blocked && notice == Self.folderBlockedNotice { notice = nil }
         }
-        .onChange(of: savedJobCount) { noteSavedJobs() }
-        // The scan that follows a save answers the pending open.
-        .onChange(of: library.revision) { resolvePendingOpen() }
+        // A transcript is new until it is opened: opening it (and only that) clears the badge.
+        .onChange(of: selection) { _, new in markOpened(new) }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             refreshLibrary()
         }
@@ -142,21 +137,6 @@ struct ContentView: View {
             if let id = new?.transcriptID, player.itemID == id { return }
             player.stop()
         }
-    }
-
-    // The live jobs, failed jobs and Complete jobs whose save failed. A job that
-    // was saved into the listed output folder is shown once, as a library item.
-    private var inProgressJobs: [TranscriptionJob] {
-        queue.jobs.filter { job in
-            guard case .complete = job.state else { return true }
-            guard let url = job.savedTranscriptURL else { return true }
-            return LibraryJoin.isAwaitingEntry(
-                savedURL: url, folder: library.folder, in: library.joinIndex, seen: library.seenPaths)
-        }
-    }
-
-    private var savedJobCount: Int {
-        queue.jobs.count { $0.savedTranscriptURL != nil }
     }
 
     private func refreshLibrary(recheckFolder: Bool = true) {
@@ -233,6 +213,8 @@ struct ContentView: View {
             }
         case .folderNeedsReview(let folder, _):
             NSWorkspace.shared.activateFileViewerSelecting([folder.url])
+        case .discardUnsaved(let job):
+            queue.dismiss(job)
         case .failure:
             break
         }
@@ -245,11 +227,6 @@ struct ContentView: View {
     // A folder was renamed: an open transcript inside it follows to its new path.
     private func followFolder(_ old: LibraryFolder, to new: LibraryFolder) {
         let oldPath = old.url.standardizedFileURL.path
-        for job in queue.jobs {
-            if let url = job.savedTranscriptURL, url.standardizedFileURL.path.hasPrefix(oldPath + "/") {
-                job.savedTranscriptURL = URL(fileURLWithPath: new.url.path + String(url.standardizedFileURL.path.dropFirst(oldPath.count)))
-            }
-        }
         guard let current = selection, let id = current.transcriptID, id.hasPrefix(oldPath + "/") else { return }
         if player.itemID == id { player.stop() }
         selection = current.replacingTranscript(with: new.url.standardizedFileURL.path + String(id.dropFirst(oldPath.count)))
@@ -258,43 +235,9 @@ struct ContentView: View {
     // A renamed or moved transcript keeps its place in the sidebar and in the
     // queue; its audio stops, because the file it was playing has moved.
     private func follow(_ old: LibraryTranscript, to new: LibraryTranscript) {
-        queue.relocate(from: old.markdownURL, to: new.markdownURL)
         guard let current = selection, current.transcriptID == old.id else { return }
         if player.itemID == old.id { player.stop() }
         selection = current.replacingTranscript(with: new.id)
-    }
-
-    private var isReviewingTranscript: Bool {
-        selection?.transcriptID != nil
-    }
-
-    // A saved job asks to open its transcript when it is the whole batch and the
-    // user is not reading another transcript. The request names the URL the save
-    // reported and waits for a scan that started after the save.
-    private func noteSavedJobs() {
-        let fresh = queue.jobs.filter {
-            $0.originWindow == windowID && $0.savedTranscriptURL != nil && !announcedSaves.contains($0.id)
-        }
-        announcedSaves.formUnion(fresh.map(\.id))
-        if fresh.count == 1, let job = fresh.first, let url = job.savedTranscriptURL,
-           AutoOpen.shouldRequest(
-               batchJobCount: queue.batchSize(of: job),
-               userIsReviewingTranscript: isReviewingTranscript) {
-            pendingOpen = PendingOpen(savedURL: url)
-        }
-        refreshLibrary(recheckFolder: false)
-    }
-
-    private func resolvePendingOpen() {
-        guard let pending = pendingOpen else { return }
-        pendingOpen = nil
-        if case .open(let item) = pending.resolve(in: library.joinIndex, userIsReviewingTranscript: isReviewingTranscript) {
-            selection = .transcript(item.id)
-        }
-    }
-
-    private func isSettled(_ job: TranscriptionJob) -> Bool {
-        if case .complete = job.state { job.savedTranscriptURL != nil } else { false }
     }
 
     private func showNewTranscription() {
@@ -329,35 +272,33 @@ struct ContentView: View {
 
     private var processingActions: ProcessingActions {
         ProcessingActions(
-            openTarget: { job in
-                job.savedTranscriptURL
-                    .flatMap { LibraryJoin.item(forSavedURL: $0, in: library.joinIndex) }
-                    .map { item in { selection = .transcript(item.id) } }
-            },
-            savedElsewhere: { job in
-                guard let url = job.savedTranscriptURL else { return false }
-                let entry = LibraryJoin.item(forSavedURL: url, in: library.joinIndex)
-                let awaiting = LibraryJoin.isAwaitingEntry(
-                    savedURL: url, folder: library.folder, in: library.joinIndex, seen: library.seenPaths)
-                return entry == nil && !awaiting
-            },
             save: { job in
                 if case .complete(let transcript, _) = job.state { saveTranscript(transcript, for: job) }
             },
             copy: { copyMarkdown(for: $0) },
             retry: { job in
+                // The output folder may have gone since; say so instead of failing again.
+                guard destination.isReady || destination.choose() else {
+                    notice = "Choose an output folder to retry."
+                    showNewTranscription()
+                    return
+                }
                 queue.retry(job)
-                // No output folder chosen: the job goes back to waiting for its Start.
-                if !startQueue(only: [job]) { job.isStarted = false }
             },
-            remove: { queue.remove($0) },
-            start: { startQueue() },
-            applyLanguage: { queue.applyLocale(selectedLanguage.locale) },
-            clearFinished: { queue.clearFinished(); notice = nil },
-            canStart: !destination.isRecording && !folderBlocked,
-            canChangeLanguage: destination.canChangeLanguage,
-            defaultLanguageTitle: selectedLanguage.title
+            dismiss: { job in
+                if case .complete = job.state, job.savedTranscriptURL == nil {
+                    prompt = .discardUnsaved(job)
+                } else {
+                    queue.dismiss(job)
+                }
+            }
         )
+    }
+
+    private func markOpened(_ selection: SidebarSelection?) {
+        guard let id = selection?.transcriptID,
+              let item = library.items.first(where: { $0.id == id }), item.isNew else { return }
+        try? library.markOpened(item)
     }
 
     private func selectionStillExists() {
@@ -529,7 +470,8 @@ struct ContentView: View {
 
     private var recordButton: some View {
         Button("Record", action: startRecording)
-            .disabled(!recorder.canRecord || folderBlocked)
+            .disabled(!recorder.canRecord || folderBlocked || queue.isBusy)
+            .help(queue.isBusy ? "Another transcription is running. Record when it has finished." : "")
     }
 
     // Starts from the visible selection; the app list is kept current by the
@@ -638,22 +580,24 @@ struct ContentView: View {
     }
 
     // The recording was saved as an entry folder holding its audio; the transcript
-    // is written into that same folder.
+    // is written into that same folder, and transcribing starts at once.
     private func addRecording(_ url: URL, startedAt: Date) {
-        let before = Set(queue.jobs.map(\.id))
-        _ = addDroppedFiles([url], recording: (url.deletingLastPathComponent(), startedAt))
-        // Stop is the user's start for the recording; other waiting jobs are not started with it.
-        startQueue(only: queue.jobs.filter { !before.contains($0.id) })
+        _ = addInput([url], recording: (url.deletingLastPathComponent(), startedAt))
     }
 
-    // Same path as a drop; the panel offers only the extensions a drop accepts.
+    // Same path as a drop; the panel offers only the extensions a drop accepts, and
+    // one file, because the app transcribes one at a time.
     private func chooseFiles() {
+        if let blocker = inputBlocker() {
+            prompt = .failure(title: blocker.title, reason: blocker.reason)
+            return
+        }
         let panel = NSOpenPanel()
-        panel.allowsMultipleSelection = true
+        panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
         panel.allowedContentTypes = supportedExtensions.compactMap { UTType(filenameExtension: $0) }
         guard panel.runModal() == .OK else { return }
-        _ = addDroppedFiles(panel.urls)
+        _ = addInput(panel.urls)
     }
 
     // Status, not controls: language and destination read quietly here, and
@@ -698,7 +642,7 @@ struct ContentView: View {
             .disabled(!destination.canChangeLanguage)
         }
         .help(destination.canChangeLanguage
-              ? "Language given to newly added and recorded items. Waiting items keep theirs unless you use Apply Language to All Waiting."
+              ? "Language given to each new transcription when it starts."
               : "The language can’t change while recording.")
     }
 
@@ -735,55 +679,78 @@ struct ContentView: View {
         }
     }
 
-    // No destination yet: ask once; cancelling starts nothing.
-    @discardableResult
-    private func startQueue(only jobs: [TranscriptionJob]? = nil) -> Bool {
-        guard destination.isReady || destination.choose() else { return false }
-        queue.start(jobs)
-        return true
+    // Why no new transcription input is taken right now, or nil. Nothing is ever
+    // queued behind a running job or a recording, and nothing is dropped silently.
+    private func inputBlocker() -> (title: String, reason: String)? {
+        if destination.isRecording {
+            return ("A recording is in progress",
+                    "Stop the recording first. It is transcribed as soon as you stop.")
+        }
+        if queue.isBusy {
+            return ("Another transcription is running",
+                    "Local Transcriber transcribes one file or link at a time. Add the next one when this one has finished, or dismiss it if it needs attention.")
+        }
+        return nil
     }
 
-    private func addDroppedFiles(_ urls: [URL], recording: (folder: URL, startedAt: Date)? = nil) -> Bool {
-        var sources: [JobSource] = []
-        var hasUnsupportedItem = false
-        for url in urls {
-            if url.isFileURL {
-                if supportedExtensions.contains(url.pathExtension.lowercased()) {
-                    sources.append(.file(url))
-                }
-            } else if let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https" {
-                sources.append(linkSource(for: url))
-            } else {
-                hasUnsupportedItem = true
-            }
+    // The one way an input becomes a job. Accepts exactly one file or link, and
+    // starts it at once with the language chosen now. Anything else is refused with
+    // the reason, and nothing is added.
+    @discardableResult
+    private func addInput(_ urls: [URL], recording: (folder: URL, startedAt: Date)? = nil) -> Bool {
+        guard !urls.isEmpty else { return false }
+        if urls.count > 1 {
+            prompt = .failure(
+                title: "One file at a time",
+                reason: "Local Transcriber transcribes one file or link at a time. Nothing was added; drop a single file or link.")
+            return false
+        }
+        let url = urls[0]
+
+        if recording == nil, let blocker = inputBlocker() {
+            prompt = .failure(title: blocker.title, reason: blocker.reason)
+            return false
+        }
+        if recording != nil, queue.isBusy {
+            prompt = .failure(
+                title: "The recording wasn’t transcribed",
+                reason: "It is saved in your library folder, but another transcription is running.")
+            return false
         }
 
-        guard !sources.isEmpty else {
-            if hasUnsupportedItem {
+        let source: JobSource
+        if url.isFileURL {
+            guard supportedExtensions.contains(url.pathExtension.lowercased()) else {
                 notice = "Not supported. Drop an MP4, MOV, M4A, MP3 or WAV file, or a YouTube link."
                 showNewTranscription()   // the notice lives on the input surface
+                return false
             }
+            source = .file(url)
+        } else if let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https" {
+            guard let video = YouTubeURL.parse(url) else {
+                prompt = .failure(title: "Only YouTube links are supported", reason: url.absoluteString)
+                return false
+            }
+            source = .youtube(videoID: video.videoID, url: video.canonical)
+        } else {
+            notice = "Not supported. Drop an MP4, MOV, M4A, MP3 or WAV file, or a YouTube link."
+            showNewTranscription()
+            return false
+        }
+
+        // No usable output folder yet: ask once; cancelling starts nothing.
+        guard destination.isReady || destination.choose() else {
+            notice = folderBlocked ? Self.folderBlockedNotice : "Choose an output folder to start transcribing."
+            showNewTranscription()
             return false
         }
 
         notice = nil
-        for job in queue.enqueue(sources, locale: selectedLanguage.locale, originWindow: windowID) {
-            job.recording = recording
-            if case .file(let url) = job.source {
-                Task {
-                    job.mediaInfo = await loadMediaInfo(for: url)
-                }
-            }
+        guard let job = queue.accept(source, locale: selectedLanguage.locale, recording: recording) else { return false }
+        if case .file(let url) = job.source {
+            Task { job.mediaInfo = await loadMediaInfo(for: url) }
         }
         return true
-    }
-
-    // Anything that is not a supported YouTube link becomes a Failed job.
-    private func linkSource(for url: URL) -> JobSource {
-        if let video = YouTubeURL.parse(url) {
-            return .youtube(videoID: video.videoID, url: video.canonical)
-        }
-        return .invalid(input: url.absoluteString, reason: "Only YouTube links are supported.")
     }
 
     private func pasteFromClipboard() {
@@ -799,7 +766,7 @@ struct ContentView: View {
             showNewTranscription()
             return
         }
-        _ = addDroppedFiles(urls)
+        addInput(urls)
     }
 
     private func loadMediaInfo(for url: URL) async -> MediaInfo {
@@ -895,6 +862,7 @@ struct ContentView: View {
                 encoding: .utf8
             )
             job.savedTranscriptURL = destination
+            queue.dismiss(job)   // saved by hand: the slot is free again
             notice = nil
         } catch {
             job.savedTranscriptURL = nil
@@ -985,6 +953,9 @@ private struct LibraryPromptModifier: ViewModifier {
             case .folderNeedsReview:
                 Button("Show in Finder") { commit(current) }
                 Button("Cancel", role: .cancel) {}
+            case .discardUnsaved:
+                Button("Discard Transcript", role: .destructive) { commit(current) }
+                Button("Cancel", role: .cancel) {}
             case .failure:
                 Button("OK", role: .cancel) {}
             }
@@ -1001,6 +972,7 @@ private struct LibraryPromptModifier: ViewModifier {
         case .trash(let item): "Move “\(item.title)” to the Trash?"
         case .trashFolder(let folder, _): "Move the folder “\(folder.name)” to the Trash?"
         case .folderNeedsReview(let folder, _): "“\(folder.name)” Has Other Files"
+        case .discardUnsaved: "Discard the unsaved transcript?"
         case .failure(let title, _): title
         case nil: ""
         }
@@ -1020,6 +992,8 @@ private struct LibraryPromptModifier: ViewModifier {
             let shown = names.prefix(4).map { "“\($0)”" }.joined(separator: ", ")
             let more = names.count > 4 ? " and \(names.count - 4) more" : ""
             return "It contains items Local Transcriber didn’t create: \(shown)\(more). Nothing was moved. Look through the folder in Finder first."
+        case .discardUnsaved(let job):
+            return "“\(job.displayName)” was transcribed but not saved. Use Save Transcript… to keep it; dismissing it loses the transcript."
         case .failure(_, let reason): return reason
         }
     }

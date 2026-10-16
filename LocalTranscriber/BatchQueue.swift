@@ -8,12 +8,10 @@ struct MediaInfo {
     let fileSize: String
 }
 
-// What a job was created from. An invalid source is a job that has already
-// failed, so it stays visible in the queue instead of silently disappearing.
+// What a job was created from.
 enum JobSource {
     case file(URL)
     case youtube(videoID: String, url: URL)
-    case invalid(input: String, reason: String)
 }
 
 @MainActor @Observable
@@ -40,9 +38,6 @@ final class TranscriptionJob: Identifiable {
     // Set when the Markdown was saved but its timing sidecar was not. The job
     // and the Markdown are unaffected; this is only a notice.
     var sidecarWarning: String?
-    // Which batch added this job (see BatchQueue.enqueue). Only the queue view
-    // uses it, to keep earlier finished work out of the way.
-    var batch = 0
     // Whether the automatic save used the source-package presentation. Fixed
     // when the save is attempted, so later changes to the preference cannot
     // change what Copy or the manual Save writes for this job.
@@ -50,12 +45,6 @@ final class TranscriptionJob: Identifiable {
     // Set for a recording: the entry folder that already holds its audio, and
     // when the recording started (the entry's creation time).
     var recording: (folder: URL, startedAt: Date)?
-    // Whether the user has started this job. A job added while the queue is
-    // running waits until the user starts it too, so its language can still be
-    // checked; the runner only takes started jobs.
-    var isStarted = false
-    // The window that added the job. Only that window opens its transcript on its own.
-    var originWindow: UUID?
     // When processing began (elapsed time is shown from this).
     var startedAt: Date?
     // How far into the audio the recognizer has delivered results (nil until the
@@ -65,16 +54,12 @@ final class TranscriptionJob: Identifiable {
     init(source: JobSource, locale: Locale) {
         self.source = source
         self.locale = locale
-        if case .invalid(_, let reason) = source {
-            state = .failed(reason)
-        }
     }
 
     var displayName: String {
         switch source {
         case .file(let url): url.lastPathComponent
         case .youtube(let videoID, _): metadata?.title ?? "YouTube · \(videoID)"
-        case .invalid(let input, _): input
         }
     }
 
@@ -92,20 +77,9 @@ final class TranscriptionJob: Identifiable {
         return .now
     }
 
-    // Waiting and not started yet: the user can still review and change it.
-    var isUnstarted: Bool { isWaiting && !isStarted }
-
     var isWaiting: Bool {
         if case .waiting = state { return true }
         return false
-    }
-
-    // Waiting, downloading or transcribing.
-    var isUnfinished: Bool {
-        switch state {
-        case .waiting, .downloading, .transcribing: true
-        case .complete, .failed: false
-        }
     }
 
     // The one place that decides how this job's transcript is presented:
@@ -114,15 +88,15 @@ final class TranscriptionJob: Identifiable {
         TranscriptMarkdownRenderer.render(transcript, source: exportedAsPackage ? metadata : nil)
     }
 
-    // A rejected link fails the same way every time, so only failures of a
-    // real source are worth retrying.
     var canRetry: Bool {
-        guard case .failed = state else { return false }
-        if case .invalid = source { return false }
-        return true
+        if case .failed = state { true } else { false }
     }
 }
 
+// The app's one transcription slot. At most one job exists at any time: it is
+// accepted only into an empty slot, starts at once, and leaves the slot when it
+// has been saved (or when the user dismisses a failed or unsaved one). There is no
+// waiting list. Owned by the app (MyApp), shared by every window.
 @MainActor @Observable
 final class BatchQueue {
     private(set) var jobs: [TranscriptionJob] = []
@@ -135,48 +109,34 @@ final class BatchQueue {
         self.destination = destination
     }
     private var isRunning = false
-    private var batchCounter = 0
-    // How many jobs each batch was given. Clearing finished jobs does not change it,
-    // so a multi-file batch is never taken for a single file.
-    private var batchSizes: [Int: Int] = [:]
     private static let log = Logger(subsystem: "nl.wavesweb.LocalTranscriber", category: "progress")
 
     var isProcessing: Bool { isRunning }
-    var hasWaitingJobs: Bool { jobs.contains(where: \.isWaiting) }
-    var waitingCount: Int { jobs.filter(\.isWaiting).count }
-    func batchSize(of job: TranscriptionJob) -> Int { batchSizes[job.batch] ?? 1 }
+    // The slot is taken: running, failed, or finished but not saved.
+    var isBusy: Bool { !jobs.isEmpty }
 
-    // Waiting jobs the user has not started yet.
-    var unstartedCount: Int { jobs.count(where: \.isUnstarted) }
+    // Takes the input into the empty slot and starts it. Returns nil, and changes
+    // nothing, when the slot is taken. The language is the one given here.
+    func accept(
+        _ source: JobSource,
+        locale: Locale,
+        recording: (folder: URL, startedAt: Date)? = nil
+    ) -> TranscriptionJob? {
+        guard jobs.isEmpty else { return nil }
+        let job = TranscriptionJob(source: source, locale: locale)
+        job.recording = recording
+        jobs = [job]
+        startRunner()
+        return job
+    }
 
-    // Only Waiting jobs are editable; active, Complete and Failed jobs keep
-    // the language they started with.
-    func applyLocale(_ locale: Locale) {
-        for job in jobs where job.isWaiting {
-            job.locale = locale
+    // Frees the slot of a failed job, or of one whose transcript was not saved (the
+    // caller asks first: the unsaved transcript is lost). A running job cannot be dismissed.
+    func dismiss(_ job: TranscriptionJob) {
+        switch job.state {
+        case .failed, .complete: jobs.removeAll { $0.id == job.id }
+        default: break
         }
-    }
-
-    // Adds jobs in the Waiting state (invalid sources start Failed), each
-    // owning the given locale. Nothing runs until `start` is called, also while
-    // another job is running; the running batch does not take them.
-    func enqueue(_ sources: [JobSource], locale: Locale, originWindow: UUID? = nil) -> [TranscriptionJob] {
-        let newJobs = sources.map { TranscriptionJob(source: $0, locale: locale) }
-        for job in newJobs { job.originWindow = originWindow }
-        // Files added while nothing is waiting or running begin a new batch; files
-        // added to unfinished work join it.
-        if !jobs.contains(where: \.isUnfinished) { batchCounter += 1 }
-        for job in newJobs { job.batch = batchCounter }
-        batchSizes[batchCounter, default: 0] += newJobs.count
-        jobs.append(contentsOf: newJobs)
-        return newJobs
-    }
-
-    // Only a Waiting job can be removed; the runner re-scans `jobs` on every
-    // pass, so a removed job never runs. Source media is never touched.
-    func remove(_ job: TranscriptionJob) {
-        guard job.isWaiting else { return }
-        jobs.removeAll { $0.id == job.id }
     }
 
     // Returns one Failed job to Waiting. Complete jobs are never touched, so
@@ -189,54 +149,19 @@ final class BatchQueue {
         job.exportedAsPackage = false
         job.startedAt = nil
         job.progress = nil
-        // Retry is the user's explicit start of this one job.
-        job.isStarted = true
         job.state = .waiting
-    }
-
-    // The library renamed or moved a saved transcript: the jobs that saved it
-    // follow the file.
-    func relocate(from old: URL, to new: URL) {
-        let oldPath = old.standardizedFileURL.path
-        for job in jobs where job.savedTranscriptURL?.standardizedFileURL.path == oldPath {
-            job.savedTranscriptURL = new
-        }
-    }
-
-    // Failed jobs and Complete jobs that were saved are finished and can be cleared;
-    // Waiting and active jobs, and jobs whose save failed, are not touched.
-    private func isClearable(_ job: TranscriptionJob) -> Bool {
-        switch job.state {
-        case .failed: true
-        case .complete: job.savedTranscriptURL != nil
-        default: false
-        }
-    }
-
-    var canClear: Bool { jobs.contains(where: isClearable) }
-
-    func clearFinished() {
-        jobs.removeAll(where: isClearable)
-    }
-
-    // Starts the given Waiting jobs, or every Waiting job. Jobs added later wait for
-    // their own start, also while this batch runs.
-    func start(_ only: [TranscriptionJob]? = nil) {
-        for job in only ?? jobs where job.isWaiting { job.isStarted = true }
         startRunner()
     }
 
-    // Used by Retry: only the retried job was started.
-    func startRunner() {
-        guard !isRunning, jobs.contains(where: { $0.isWaiting && $0.isStarted }) else { return }
+    private func startRunner() {
+        guard !isRunning, jobs.contains(where: \.isWaiting) else { return }
         isRunning = true
         Task { await run() }
     }
 
-    // Re-checks for started jobs on every pass; `isRunning` is cleared with no
-    // suspension point after the last check.
+    // `isRunning` is cleared with no suspension point after the last check.
     private func run() async {
-        while let job = jobs.first(where: { $0.isWaiting && $0.isStarted }) {
+        while let job = jobs.first(where: \.isWaiting) {
             await process(job)
         }
         isRunning = false
@@ -249,8 +174,7 @@ final class BatchQueue {
         case .file(let url):
             await transcribeAndSave(job, mediaURL: url)
         case .youtube(let videoID, let url):
-            // Resolved and downloaded only now, at job start. A failure here
-            // fails this job alone; the runner moves on to the next one.
+            // Resolved and downloaded only now, at job start.
             job.state = .downloading
             let acquired: AcquiredAudio
             do {
@@ -262,8 +186,6 @@ final class BatchQueue {
             defer { try? FileManager.default.removeItem(at: acquired.directory) }
             job.metadata = acquired.metadata
             await transcribeAndSave(job, mediaURL: acquired.audioURL)
-        case .invalid(_, let reason):
-            job.state = .failed(reason)
         }
     }
 
@@ -290,6 +212,12 @@ final class BatchQueue {
             )
             job.state = .complete(transcript, processingDuration: startedAt.duration(to: clock.now))
             save(transcript, for: job, mediaURL: mediaURL)
+            // Saved without a warning: nothing is left to do, the slot is free. The
+            // new transcript reaches every window's library by notification.
+            if job.saveError == nil, job.sidecarWarning == nil {
+                jobs.removeAll { $0.id == job.id }
+            }
+            NotificationCenter.default.post(name: .libraryDidChange, object: nil)
         } catch {
             job.state = .failed(error.localizedDescription)
         }

@@ -66,13 +66,16 @@ nonisolated enum LibraryOperations {
         }
 
         var warning: String?
-        if EntryMetadata.read(in: folder) == .missing {
-            do {
-                try writeMetadata(EntryMetadata(createdAt: createdAt), folder)
-            } catch {
-                warning = "Library details weren’t saved (\(EntryMetadata.fileName): \(error.localizedDescription)) "
-                    + "The transcript is saved; it is listed without a creation date until it is pinned or archived."
+        do {
+            if EntryMetadata.read(in: folder) == .missing {
+                try writeMetadata(EntryMetadata(createdAt: createdAt, unopened: true), folder)
+            } else {
+                // A recording's entry.json exists since Stop; the transcript makes it new.
+                try EntryMetadata.update(in: folder) { $0.unopened = true }
             }
+        } catch {
+            warning = "Library details weren’t saved (\(EntryMetadata.fileName): \(error.localizedDescription)) "
+                + "The transcript is saved; it is listed without a creation date until it is pinned or archived."
         }
         return WrittenEntry(folder: folder, markdown: markdownURL, metadataWarning: warning)
     }
@@ -203,6 +206,12 @@ nonisolated enum LibraryOperations {
         var updated = item
         updated.metadata = EntryMetadata.read(in: item.entryFolderURL)
         return updated
+    }
+
+    // The transcript was opened: it is no longer new. Nothing is written for one that is not.
+    static func markOpened(_ item: LibraryTranscript) throws -> LibraryTranscript {
+        guard item.isNew else { return item }
+        return try updateMetadata(item) { $0.unopened = false }
     }
 
     // Renames the entry folder, its Markdown file and its timing sidecar to the

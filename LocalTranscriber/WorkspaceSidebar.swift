@@ -238,10 +238,13 @@ private struct SidebarTranscriptRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 1) {
-            Text(item.title)
-                .font(.callout)
-                .lineLimit(1)
-                .truncationMode(.middle)
+            HStack(spacing: 6) {
+                Text(item.title)
+                    .font(.callout)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                if item.isNew { NewBadge() }
+            }
             Text(detail)
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(.secondary)
@@ -345,5 +348,23 @@ private struct PanelRow: View {
         .buttonStyle(.plain)
         .background(Color.accentColor.opacity(isHovered ? 0.18 : 0), in: RoundedRectangle(cornerRadius: 6))
         .onHover { isHovered = $0 }
+    }
+}
+
+// "New": saved by a transcription and not opened yet. Small and quiet; on a selected
+// row it turns white so it stays readable on the selection colour.
+private struct NewBadge: View {
+    @Environment(\.backgroundProminence) private var prominence
+
+    var body: some View {
+        Text("New")
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(prominence == .increased ? Color.white : Color.accentColor)
+            .padding(.horizontal, 5)
+            .padding(.vertical, 1)
+            .background(
+                (prominence == .increased ? Color.white : Color.accentColor).opacity(0.18),
+                in: Capsule())
+            .fixedSize()
     }
 }

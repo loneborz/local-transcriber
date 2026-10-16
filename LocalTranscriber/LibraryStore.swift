@@ -15,15 +15,11 @@ final class LibraryStore {
     private(set) var items: [LibraryTranscript] = []
     // The organization folders, empty ones included.
     private(set) var folders: [LibraryFolder] = []
-    // Every transcript this window has listed since the folder was chosen.
-    private(set) var seenPaths: Set<String> = []
     // Where `items` came from; nil when there is no usable output folder.
     private(set) var folder: URL?
     // Set when the folder could not be listed (items are then empty).
     private(set) var loadError: String?
     private(set) var isLoading = false
-    // Saved jobs find their library entry here.
-    private(set) var joinIndex: LibraryJoin.Index = [:]
     // Counts finished scans (success or failure), so a view can react to "the
     // library now reflects the disk" without comparing lists.
     private(set) var revision = 0
@@ -41,8 +37,6 @@ final class LibraryStore {
         if newFolder != folder {
             items = []
             folders = []
-            seenPaths = []
-            joinIndex = [:]
             loadError = nil
         }
         folder = newFolder
@@ -58,14 +52,12 @@ final class LibraryStore {
             let started = ContinuousClock.now
             let result = Result { try LibraryScanner.scanLibrary(folder: newFolder) }
             let elapsed = started.duration(to: .now)
-            let index = (try? result.get()).map { LibraryJoin.index($0.items) } ?? [:]
-            await self.apply(result, index: index, request: request, elapsed: elapsed)
+            await self.apply(result, request: request, elapsed: elapsed)
         }
     }
 
     private func apply(
         _ result: Result<LibraryListing, Error>,
-        index: LibraryJoin.Index,
         request: Int,
         elapsed: Duration
     ) {
@@ -76,15 +68,12 @@ final class LibraryStore {
         case .success(let scanned):
             items = scanned.items
             folders = scanned.folders
-            seenPaths.formUnion(index.keys)
-            joinIndex = index
             loadError = nil
             let milliseconds = Double(elapsed.components.attoseconds) / 1e15 + Double(elapsed.components.seconds) * 1000
             Self.log.info("library scan: \(scanned.items.count, privacy: .public) transcripts in \(milliseconds, format: .fixed(precision: 1), privacy: .public) ms")
         case .failure(let error):
             items = []
             folders = []
-            joinIndex = [:]
             loadError = error.localizedDescription
             Self.log.error("library scan failed: \(error.localizedDescription)")
         }
@@ -105,6 +94,12 @@ final class LibraryStore {
 
     func setPinned(_ item: LibraryTranscript, _ pinned: Bool) throws {
         replace(item, with: try LibraryOperations.setPinned(item, pinned))
+    }
+
+    // Opening a transcript clears its New badge, here and (by notification) in every window.
+    func markOpened(_ item: LibraryTranscript) throws {
+        guard item.isNew else { return }
+        replace(item, with: try LibraryOperations.markOpened(item))
     }
 
     func setArchived(_ item: LibraryTranscript, _ archived: Bool) throws {
@@ -137,7 +132,6 @@ final class LibraryStore {
         }
         folders = folders.map { $0.id == folder.id ? renamed : $0 }
             .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
-        seenPaths.formUnion(items.map(\.id))
         changed()
         return renamed
     }
@@ -163,7 +157,6 @@ final class LibraryStore {
         items.removeAll { $0.id == old.id }
         items.append(new)
         items.sort(by: LibraryScanner.isOrderedBefore)
-        seenPaths.insert(new.id)
         changed()
         return new
     }
