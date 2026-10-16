@@ -194,10 +194,14 @@ struct ContentView: View {
             promptText = folder.name
             prompt = .renameFolder(folder)
         case .trashFolder(let folder):
-            let contents = LibraryOperations.inspect(folder)
-            prompt = contents.isSafeToTrash
-                ? .trashFolder(folder, entries: contents.entryCount)
-                : .folderNeedsReview(folder, names: contents.unmanaged)
+            do {
+                let contents = try LibraryOperations.inspect(folder)
+                prompt = contents.isSafeToTrash
+                    ? .trashFolder(folder, entries: contents.entryCount)
+                    : .folderNeedsReview(folder, names: contents.unmanaged)
+            } catch {
+                prompt = .failure(title: "Couldn’t check the folder “\(folder.name)”", reason: error.localizedDescription)
+            }
         }
     }
 
@@ -367,15 +371,17 @@ struct ContentView: View {
         switch selection {
         case .job(let id) where !inProgressJobs.contains { $0.id == id }:
             selection = .newTranscription
-        case .transcript(let id) where !library.items.contains { $0.id == id }:
-            selection = .newTranscription
-        case .pinned(let id):
-            // Unpinned or archived: the Pinned row is gone, the transcript stays open.
+        case .pinned(let id), .transcript(let id):
+            // Keep the highlight on a row that exists: a pinned entry that was unpinned
+            // or archived leaves Pinned; a loose entry that was pinned leaves Recent.
             guard let item = library.items.first(where: { $0.id == id }) else {
                 selection = .newTranscription
                 return
             }
-            if !item.isPinned || item.isArchived { selection = .transcript(id) }
+            let inPinned = item.isPinned && !item.isArchived
+            let hasListRow = item.isArchived || item.group != nil || !item.isPinned
+            if case .pinned = selection, !inPinned { selection = .transcript(id) }
+            if case .transcript = selection, !hasListRow { selection = .pinned(id) }
         default:
             break
         }

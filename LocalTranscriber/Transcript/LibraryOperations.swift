@@ -104,56 +104,86 @@ nonisolated enum LibraryOperations {
         } catch let error as CocoaError where error.code == .fileWriteFileExists {
             throw LibraryError.nameTaken(name)
         }
-        return LibraryFolder(url: url)
+        return LibraryFolder.current(at: url)
     }
 
     // MARK: managing an organization folder
 
-    // What is inside a folder: transcripts the app manages (entry folders) and
-    // anything else. Hidden Finder housekeeping files are not "anything else".
+    // What is inside a folder: transcripts the app manages (entry folders that hold
+    // only what the app writes) and anything else.
     struct FolderContents: Equatable, Sendable {
         var entryCount = 0
-        // Names of items the app did not create (loose files, legacy transcripts, subfolders).
+        // Items the app did not create: loose files, legacy transcripts, subfolders,
+        // and anything extra inside an entry ("Entry/name").
         var unmanaged: [String] = []
         var isSafeToTrash: Bool { unmanaged.isEmpty }
     }
 
-    static func inspect(_ folder: LibraryFolder) -> FolderContents {
+    // Fails closed: a folder that cannot be listed is an error, never "empty".
+    static func inspect(_ folder: LibraryFolder) throws -> FolderContents {
         var found = FolderContents()
-        let children = (try? FileManager.default.contentsOfDirectory(
-            at: folder.url, includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey])) ?? []
-        for child in children {
+        for child in try contents(of: folder.url) {
             let name = child.lastPathComponent
             if name == ".DS_Store" { continue }
-            let values = try? child.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
-            let isEntry = values?.isDirectory == true && values?.isSymbolicLink != true
-                && (try? child.appendingPathComponent(EntryMetadata.fileName).checkResourceIsReachable()) == true
-            if isEntry { found.entryCount += 1 } else { found.unmanaged.append(name) }
+            if isDirectory(child), try isManagedEntry(child, unmanaged: &found.unmanaged) {
+                found.entryCount += 1
+            } else if !found.unmanaged.contains(name) {
+                found.unmanaged.append(name)
+            }
         }
         found.unmanaged.sort { $0.localizedStandardCompare($1) == .orderedAscending }
         return found
     }
 
+    private static func contents(of url: URL) throws -> [URL] {
+        try FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: nil)
+    }
+
+    // An entry folder holding only the files the app writes into one: its Markdown
+    // and sidecar, entry.json, source.json and audio. Foreign files inside are
+    // reported as "Entry/name" in `unmanaged` (and the entry still counts, so the
+    // folder is not trashed).
+    private static func isManagedEntry(_ folder: URL, unmanaged: inout [String]) throws -> Bool {
+        let isEntry: Bool
+        switch LibraryScanner.entryFolder(at: folder, group: nil) {
+        case .entry: isEntry = true
+        case .incomplete: isEntry = EntryMetadata.read(in: folder).metadata != nil
+        case .notAnEntry: isEntry = false
+        }
+        guard isEntry else { return false }
+        for child in try contents(of: folder) {
+            let name = child.lastPathComponent
+            let lower = name.lowercased()
+            let known = name == ".DS_Store" || name == EntryMetadata.fileName || name == SourcePackageFile.manifestName
+                || lower.hasSuffix(".md") || lower.hasSuffix("." + TranscriptSidecar.fileExtension)
+                || AudioResolution.supportedExtensions.contains((name as NSString).pathExtension.lowercased())
+            if !known || isDirectory(child) { unmanaged.append(folder.lastPathComponent + "/" + name) }
+        }
+        return true
+    }
+
     // Renames the folder; its contents are untouched. Refused (nothing changes)
-    // for an invalid name or a name that is taken in the output folder.
+    // for an invalid name, a name that is taken, or a folder that is no longer the
+    // one that was listed.
     static func renameFolder(_ folder: LibraryFolder, to raw: String) throws -> LibraryFolder {
         let name = try EntryName.validated(raw).get()
-        guard isDirectory(folder.url) else { throw LibraryError.missing(folder.name) }
+        guard isDirectory(folder.url), folder.isUnchanged else { throw LibraryError.missing(folder.name) }
         let target = folder.url.deletingLastPathComponent().appendingPathComponent(name, isDirectory: true)
         if folder.name == name { return folder }
         if exists(target), !isSame(target, folder.url) { throw LibraryError.nameTaken(name) }
         try rename(folder.url, to: target)
-        return LibraryFolder(url: target)
+        return LibraryFolder(url: target, fileNumber: folder.fileNumber)
     }
 
-    // Moves the folder and everything in it to the Trash, only when it holds
-    // nothing but managed transcripts. A failure deletes nothing.
+    // Moves the folder and everything in it to the Trash, only when it is the
+    // folder that was listed and holds nothing but managed transcripts. A failure
+    // deletes nothing.
     static func trashFolder(
         _ folder: LibraryFolder,
         using trasher: (URL) throws -> Void = { try FileManager.default.trashItem(at: $0, resultingItemURL: nil) }
     ) throws {
-        guard isDirectory(folder.url) else { throw LibraryError.missing(folder.name) }
-        guard inspect(folder).isSafeToTrash else { throw LibraryError.folderHasOtherFiles(folder.name) }
+        guard isDirectory(folder.url), folder.isUnchanged else { throw LibraryError.missing(folder.name) }
+        guard try inspect(folder).isSafeToTrash else { throw LibraryError.folderHasOtherFiles(folder.name) }
         try trasher(folder.url)
     }
 

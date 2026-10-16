@@ -49,8 +49,29 @@ nonisolated struct LibraryTranscript: Identifiable, Equatable, Sendable {
 // not itself an entry. Empty folders are listed too.
 nonisolated struct LibraryFolder: Identifiable, Equatable, Sendable {
     var url: URL
+    // The folder's identity on disk when it was listed. An action the user confirmed
+    // later is refused if another folder has taken that path since.
+    var fileNumber: UInt64?
     var id: String { url.standardizedFileURL.path }
     var name: String { url.lastPathComponent }
+
+    init(url: URL, fileNumber: UInt64? = nil) {
+        self.url = url
+        self.fileNumber = fileNumber
+    }
+
+    // The folder at `url` as it is now.
+    static func current(at url: URL) -> LibraryFolder {
+        let number = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.systemFileNumber] as? UInt64
+        return LibraryFolder(url: url, fileNumber: number)
+    }
+
+    // Whether the folder at this path is still the one that was listed.
+    var isUnchanged: Bool {
+        guard let fileNumber else { return true }
+        let now = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.systemFileNumber] as? UInt64
+        return now == fileNumber
+    }
 }
 
 nonisolated struct LibraryListing: Equatable, Sendable {
@@ -124,7 +145,7 @@ nonisolated enum LibraryScanner {
             case .incomplete: break
             case .notAnEntry:
                 guard group == nil else { return }
-                listing.folders.append(LibraryFolder(url: url))
+                listing.folders.append(LibraryFolder.current(at: url))
                 for child in (try? children(of: url)) ?? [] {
                     visit(child, group: url, into: &listing)
                 }
@@ -137,13 +158,13 @@ nonisolated enum LibraryScanner {
         }
     }
 
-    private enum EntryFolder {
+    enum EntryFolder {
         case entry(LibraryTranscript)
         case incomplete
         case notAnEntry
     }
 
-    private static func entryFolder(at folder: URL, group: URL?) -> EntryFolder {
+    static func entryFolder(at folder: URL, group: URL?) -> EntryFolder {
         let names = ((try? children(of: folder)) ?? []).filter {
             (try? $0.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey]))?.isRegularFile == true
         }.map(\.lastPathComponent)

@@ -593,7 +593,7 @@ final class FolderActionTests: ManagedLibraryCase {
     func testAFolderOfManagedTranscriptsGoesToTheTrashWhole() throws {
         try makeEntry("A", in: "Work", audio: true); try makeEntry("B", in: "Work")
         let work = LibraryFolder(url: folder.appendingPathComponent("Work"))
-        XCTAssertEqual(LibraryOperations.inspect(work), .init(entryCount: 2, unmanaged: []))
+        XCTAssertEqual(try LibraryOperations.inspect(work), .init(entryCount: 2, unmanaged: []))
         var trashed: [URL] = []
         try LibraryOperations.trashFolder(work) { trashed.append($0) }
         XCTAssertEqual(trashed, [work.url])
@@ -605,7 +605,7 @@ final class FolderActionTests: ManagedLibraryCase {
         try writePair("Legacy", in: "Work")
         try write("x", "Work/.DS_Store")
         let work = LibraryFolder(url: folder.appendingPathComponent("Work"))
-        let contents = LibraryOperations.inspect(work)
+        let contents = try LibraryOperations.inspect(work)
         XCTAssertEqual(contents.entryCount, 1)
         XCTAssertEqual(Set(contents.unmanaged), ["Legacy.md", "Legacy.timing.json", "notes.txt"])
         XCTAssertThrowsError(try LibraryOperations.trashFolder(work) { _ in XCTFail("must not trash") }) {
@@ -629,5 +629,68 @@ final class FolderActionTests: ManagedLibraryCase {
         var trashed = 0
         try LibraryOperations.trashFolder(empty) { _ in trashed += 1 }
         XCTAssertEqual(trashed, 1)
+    }
+}
+
+
+// Fixes for the independent review of the UI pass (Codex, 2026-10-17).
+final class FolderSafetyTests: ManagedLibraryCase {
+    func testInspectionFailsClosedWhenTheFolderCannotBeListed() throws {
+        try makeEntry("A", in: "Work")
+        let work = LibraryFolder.current(at: folder.appendingPathComponent("Work"))
+        try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: work.url.path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: work.url.path) }
+        XCTAssertThrowsError(try LibraryOperations.inspect(work))
+        XCTAssertThrowsError(try LibraryOperations.trashFolder(work) { _ in XCTFail("must not trash") })
+    }
+
+    func testAForeignFolderWithAnEntryJsonIsNotAManagedTranscript() throws {
+        try write("{ nope", "Work/Foreign/entry.json")
+        try write("report", "Work/Foreign/report.docx")
+        try write(#"{"schemaVersion":1}"#, "Work/Lookalike/entry.json")
+        try write("report", "Work/Lookalike/report.docx")
+        let work = LibraryFolder.current(at: folder.appendingPathComponent("Work"))
+        let contents = try LibraryOperations.inspect(work)
+        // Garbage entry.json: not ours. A well-formed one with a foreign file inside: the file is reported.
+        XCTAssertEqual(contents.entryCount, 1)
+        XCTAssertEqual(Set(contents.unmanaged), ["Foreign", "Lookalike/report.docx"])
+        XCTAssertThrowsError(try LibraryOperations.trashFolder(work) { _ in XCTFail("must not trash") })
+    }
+
+    func testAnIncompleteRecordingEntryIsManagedButExtraFilesInsideAnEntryAreNot() throws {
+        try EntryMetadata.create(EntryMetadata(createdAt: created), try dir("Work/Recording"))
+        try write("audio", "Work/Recording/Recording.m4a")
+        try makeEntry("Done", in: "Work")
+        let work = LibraryFolder.current(at: folder.appendingPathComponent("Work"))
+        XCTAssertEqual(try LibraryOperations.inspect(work), .init(entryCount: 2, unmanaged: []))
+        try write("mine", "Work/Done/notes.txt")
+        XCTAssertEqual(try LibraryOperations.inspect(work).unmanaged, ["Done/notes.txt"])
+        XCTAssertThrowsError(try LibraryOperations.trashFolder(work) { _ in XCTFail("must not trash") })
+    }
+
+    func testFolderActionsRefuseAReplacementThatTookThePath() throws {
+        try makeEntry("A", in: "Work")
+        let listed = LibraryFolder.current(at: folder.appendingPathComponent("Work"))
+        try FileManager.default.moveItem(at: listed.url, to: folder.appendingPathComponent("Elsewhere"))
+        try write("unrelated", "Work/keep.txt")   // a different folder now sits at the path
+        XCTAssertThrowsError(try LibraryOperations.renameFolder(listed, to: "Renamed"))
+        XCTAssertThrowsError(try LibraryOperations.trashFolder(listed) { _ in XCTFail("must not trash") })
+        XCTAssertTrue(FileManager.default.fileExists(atPath: folder.appendingPathComponent("Work/keep.txt").path))
+    }
+
+    func testSelectionRowRules() throws {
+        // A loose pinned entry has only its Pinned row; a pinned entry in a folder has both.
+        try makeEntry("Loose", pinned: true); try makeEntry("Filed", in: "F", pinned: true)
+        let items = try scan().items
+        let loose = try XCTUnwrap(items.first { $0.title == "Loose" }), filed = try XCTUnwrap(items.first { $0.title == "Filed" })
+        func hasListRow(_ i: LibraryTranscript) -> Bool { i.isArchived || i.group != nil || !i.isPinned }
+        XCTAssertFalse(hasListRow(loose))
+        XCTAssertTrue(hasListRow(filed))
+    }
+
+    private func dir(_ path: String) throws -> URL {
+        let url = folder.appendingPathComponent(path, isDirectory: true)
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        return url
     }
 }
