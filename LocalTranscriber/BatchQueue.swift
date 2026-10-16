@@ -136,11 +136,16 @@ final class BatchQueue {
     }
     private var isRunning = false
     private var batchCounter = 0
+    // How many jobs each batch was given. Clearing finished jobs does not change it,
+    // so a multi-file batch is never taken for a single file.
+    private var batchSizes: [Int: Int] = [:]
     private static let log = Logger(subsystem: "nl.wavesweb.LocalTranscriber", category: "progress")
 
     var isProcessing: Bool { isRunning }
     var hasWaitingJobs: Bool { jobs.contains(where: \.isWaiting) }
     var waitingCount: Int { jobs.filter(\.isWaiting).count }
+    func batchSize(of job: TranscriptionJob) -> Int { batchSizes[job.batch] ?? 1 }
+
     // Waiting jobs the user has not started yet.
     var unstartedCount: Int { jobs.count(where: \.isUnstarted) }
 
@@ -162,6 +167,7 @@ final class BatchQueue {
         // added to unfinished work join it.
         if !jobs.contains(where: \.isUnfinished) { batchCounter += 1 }
         for job in newJobs { job.batch = batchCounter }
+        batchSizes[batchCounter, default: 0] += newJobs.count
         jobs.append(contentsOf: newJobs)
         return newJobs
     }

@@ -278,7 +278,7 @@ struct ContentView: View {
         announcedSaves.formUnion(fresh.map(\.id))
         if fresh.count == 1, let job = fresh.first, let url = job.savedTranscriptURL,
            AutoOpen.shouldRequest(
-               batchJobCount: queue.jobs.count { $0.batch == job.batch },
+               batchJobCount: queue.batchSize(of: job),
                userIsReviewingTranscript: isReviewingTranscript) {
             pendingOpen = PendingOpen(savedURL: url)
         }
@@ -347,7 +347,8 @@ struct ContentView: View {
             copy: { copyMarkdown(for: $0) },
             retry: { job in
                 queue.retry(job)
-                startQueue(only: [job])
+                // No output folder chosen: the job goes back to waiting for its Start.
+                if !startQueue(only: [job]) { job.isStarted = false }
             },
             remove: { queue.remove($0) },
             start: { startQueue() },
@@ -735,9 +736,11 @@ struct ContentView: View {
     }
 
     // No destination yet: ask once; cancelling starts nothing.
-    private func startQueue(only jobs: [TranscriptionJob]? = nil) {
-        guard destination.isReady || destination.choose() else { return }
+    @discardableResult
+    private func startQueue(only jobs: [TranscriptionJob]? = nil) -> Bool {
+        guard destination.isReady || destination.choose() else { return false }
         queue.start(jobs)
+        return true
     }
 
     private func addDroppedFiles(_ urls: [URL], recording: (folder: URL, startedAt: Date)? = nil) -> Bool {

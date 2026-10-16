@@ -385,6 +385,17 @@ private struct ProcessingRow: View {
         if job.canRetry {
             Button("Retry") { actions.retry(job) }
         }
+        // The original, as the queue page's job name offered.
+        switch job.source {
+        case .file(let url):
+            Button("Show Original") { NSWorkspace.shared.activateFileViewerSelecting([url]) }
+                .help("Reveal the original file in Finder")
+        case .youtube(_, let url):
+            Button("Open Video") { NSWorkspace.shared.open(url) }
+                .help("Open on YouTube")
+        case .invalid:
+            EmptyView()
+        }
         if job.isWaiting {
             Button("Remove", role: .destructive) { actions.remove(job) }
                 .accessibilityLabel("Remove from queue")
