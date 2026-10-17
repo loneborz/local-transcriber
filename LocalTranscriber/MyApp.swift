@@ -10,6 +10,7 @@ import SwiftUI
         // Nothing is running yet, so anything in the acquisition directory is
         // left over from a crashed or killed run. Children are also terminated
         // on a normal quit.
+        AppAppearance.apply()
         YouTubeAcquirer.sweepStaleDirectories()
         NotificationCenter.default.addObserver(
             forName: NSApplication.willTerminateNotification,

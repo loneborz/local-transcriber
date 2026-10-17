@@ -17,6 +17,7 @@ struct SettingsView: View {
 private struct GeneralSettings: View {
     let destination: OutputDestination
     @AppStorage(BatchQueue.sourcePackageModeKey) private var savesSourcePackages = false
+    @AppStorage(AppAppearance.key) private var appearance = AppAppearance.system
 
     var body: some View {
         Form {
@@ -29,6 +30,13 @@ private struct GeneralSettings: View {
                     .disabled(!destination.canChangeFolder)
                 }
             }
+
+            Picker("Appearance", selection: $appearance) {
+                ForEach(AppAppearance.allCases) { Text($0.title).tag($0) }
+            }
+            .pickerStyle(.menu)
+            .fixedSize()
+            .onChange(of: appearance) { AppAppearance.apply() }
 
             Toggle("Save YouTube Links as Source Packages", isOn: $savesSourcePackages)
                 .disabled(!destination.canChangeSourcePackage)

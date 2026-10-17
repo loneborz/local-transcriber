@@ -55,3 +55,24 @@ extension View {
             }
     }
 }
+
+// The one appearance preference (LTR-63). It is set on the application, so every
+// open and future window, Settings included, follows it; System (nil) follows macOS live.
+enum AppAppearance: String, CaseIterable, Identifiable {
+    case system, light, dark
+
+    static let key = "appearance"
+    var id: Self { self }
+
+    var title: String { rawValue.capitalized }
+
+    // Reads the stored choice; a missing or unknown value is System.
+    static func apply() {
+        let stored = AppAppearance(rawValue: UserDefaults.standard.string(forKey: key) ?? "") ?? .system
+        NSApplication.shared.appearance = switch stored {
+        case .system: nil
+        case .light: NSAppearance(named: .aqua)
+        case .dark: NSAppearance(named: .darkAqua)
+        }
+    }
+}
