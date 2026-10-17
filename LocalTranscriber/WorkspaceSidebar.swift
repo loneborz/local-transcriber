@@ -170,22 +170,16 @@ struct WorkspaceSidebar: View {
         } else { base }
     }
 
-    @ViewBuilder
     private func folderRow(_ group: LibrarySections.Group) -> some View {
-        // An empty folder has nothing to expand: no chevron, just the folder.
-        if group.entries.isEmpty {
+        DisclosureGroup(isExpanded: Binding(
+            get: { !collapsedFolders.contains(group.folder.id) },
+            set: { open in
+                if open { collapsedFolders.remove(group.folder.id) } else { collapsedFolders.insert(group.folder.id) }
+            })
+        ) {
+            ForEach(group.entries) { row($0, showsFolder: false, tag: .transcript($0.id)) }
+        } label: {
             folderLabel(group.folder)
-        } else {
-            DisclosureGroup(isExpanded: Binding(
-                get: { !collapsedFolders.contains(group.folder.id) },
-                set: { open in
-                    if open { collapsedFolders.remove(group.folder.id) } else { collapsedFolders.insert(group.folder.id) }
-                })
-            ) {
-                ForEach(group.entries) { row($0, showsFolder: false, tag: .transcript($0.id)) }
-            } label: {
-                folderLabel(group.folder)
-            }
         }
     }
 
