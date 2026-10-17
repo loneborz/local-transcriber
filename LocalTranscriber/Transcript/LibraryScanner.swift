@@ -2,6 +2,18 @@ import Foundation
 
 // A completed transcript found in the output folder. It is a snapshot of what
 // the files said at scan time; nothing about it is stored anywhere.
+extension URL {
+    // The path an entry or folder is identified by. `standardizedFileURL` drops the
+    // `/private` of `/tmp`, `/var` and `/etc` only while the file exists, so the same
+    // entry had two ids once it moved. This drops it always.
+    nonisolated var libraryKey: String {
+        let path = standardizedFileURL.path
+        guard path.hasPrefix("/private/") else { return path }
+        let rest = path.dropFirst("/private".count)
+        return ["/tmp", "/var", "/etc"].contains { rest == $0 || rest.hasPrefix($0 + "/") } ? String(rest) : path
+    }
+}
+
 nonisolated struct LibraryTranscript: Identifiable, Equatable, Sendable {
     // `flat` and `package` are the layouts of v0.6.x: listed and readable, never
     // changed by the app. `entry` is the managed layout: a folder named after
@@ -19,7 +31,7 @@ nonisolated struct LibraryTranscript: Identifiable, Equatable, Sendable {
     // What `entry.json` said (entries only).
     var metadata: EntryMetadata.State = .missing
 
-    var id: String { markdownURL.standardizedFileURL.path }
+    var id: String { markdownURL.libraryKey }
 
     // An entry is named by its folder, so an in-app or Finder rename shows at once.
     var title: String { kind == .entry ? entryFolderURL.lastPathComponent : header.title }
@@ -54,7 +66,7 @@ nonisolated struct LibraryFolder: Identifiable, Equatable, Sendable {
     // The folder's identity on disk when it was listed. An action the user confirmed
     // later is refused if another folder has taken that path since.
     var fileNumber: UInt64?
-    var id: String { url.standardizedFileURL.path }
+    var id: String { url.libraryKey }
     var name: String { url.lastPathComponent }
 
     init(url: URL, fileNumber: UInt64? = nil) {
@@ -243,7 +255,7 @@ nonisolated struct LibrarySections: Equatable, Sendable {
                 continue
             }
             if item.isPinned { pinned.append(item) }
-            if let group = item.group, let slot = index[group.standardizedFileURL.path] {
+            if let group = item.group, let slot = index[group.libraryKey] {
                 folders[slot].entries.append(item)
             } else if !item.isPinned {
                 recent.append(item)

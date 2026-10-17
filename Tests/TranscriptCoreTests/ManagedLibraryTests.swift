@@ -470,6 +470,29 @@ final class LibraryActionTests: ManagedLibraryCase {
         XCTAssertEqual(try snapshot(), snap)
     }
 
+    // /tmp is a symlink to /private/tmp. An id built with standardizedFileURL lost the
+    // /private prefix only while the file existed, so a moved entry's old id differed
+    // from the id it had before the move and the open selection could not follow it.
+    func testEntryIdsDoNotChangeWhenTheFileIsGoneInASymlinkedLocation() throws {
+        let root = URL(fileURLWithPath: "/private/tmp/ltr-id-\(UUID().uuidString)")
+        let work = root.appendingPathComponent("Work")
+        try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let entryFolder = root.appendingPathComponent("Talk")
+        try FileManager.default.createDirectory(at: entryFolder, withIntermediateDirectories: true)
+        try markdown(name: "Talk.m4a").write(to: entryFolder.appendingPathComponent("Talk.md"), atomically: true, encoding: .utf8)
+        try EntryMetadata.create(EntryMetadata(createdAt: created), entryFolder)
+
+        let before = try XCTUnwrap(LibraryScanner.scanLibrary(folder: root).items.first)
+        let moved = try LibraryOperations.move(before, to: work, root: root)
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: before.markdownURL.path))
+        XCTAssertEqual(before.id, try XCTUnwrap(LibraryScanner.scanLibrary(folder: root).items.first { $0.group != nil }).id.replacingOccurrences(of: "/Work", with: ""))
+        XCTAssertEqual(moved.id, try XCTUnwrap(LibraryScanner.scanLibrary(folder: root).items.first).id)
+        XCTAssertEqual(URL(fileURLWithPath: "/private/tmp/x").libraryKey, "/tmp/x")
+        XCTAssertEqual(URL(fileURLWithPath: "/private/other/x").libraryKey, "/private/other/x")
+    }
+
     func testMovingRefusesTakenNamesAndDestinationsOutsideTheLibrary() throws {
         try makeEntry("Talk"); try makeEntry("Talk", in: "Work")
         let before = try snapshot()

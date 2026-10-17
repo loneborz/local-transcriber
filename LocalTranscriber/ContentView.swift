@@ -207,7 +207,7 @@ struct ContentView: View {
             }
         case .trashFolder(let folder, _):
             attempt("Couldn’t move the folder “\(folder.name)” to the Trash") {
-                let inside = selection?.transcriptID?.hasPrefix(folder.url.standardizedFileURL.path + "/") == true
+                let inside = selection?.transcriptID?.hasPrefix(folder.url.libraryKey + "/") == true
                 try library.trashFolder(folder)
                 if inside { player.stop(); showNewTranscription() }
             }
@@ -226,10 +226,10 @@ struct ContentView: View {
 
     // A folder was renamed: an open transcript inside it follows to its new path.
     private func followFolder(_ old: LibraryFolder, to new: LibraryFolder) {
-        let oldPath = old.url.standardizedFileURL.path
+        let oldPath = old.url.libraryKey
         guard let current = selection, let id = current.transcriptID, id.hasPrefix(oldPath + "/") else { return }
         if player.itemID == id { player.stop() }
-        selection = current.replacingTranscript(with: new.url.standardizedFileURL.path + String(id.dropFirst(oldPath.count)))
+        selection = current.replacingTranscript(with: new.url.libraryKey + String(id.dropFirst(oldPath.count)))
     }
 
     // A renamed or moved transcript keeps its place in the sidebar and in the
