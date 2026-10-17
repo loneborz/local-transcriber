@@ -261,7 +261,8 @@ kbd {
 
 /* Hero ------------------------------------------------------------------ */
 
-.hero { padding: clamp(2.25rem, 5vw, 4rem) 0 clamp(3rem, 6vw, 4.5rem); overflow: clip; }
+/* overflow-x only: the screenshot's drop shadow must not be clipped at the bottom. */
+.hero { padding: clamp(2.25rem, 5vw, 4rem) 0 clamp(3rem, 6vw, 4.5rem); overflow-x: clip; }
 
 .hero-grid {
   display: grid;
@@ -298,7 +299,9 @@ kbd {
 .hero-visual { position: relative; }
 
 .shot img {
+  vertical-align: top;
   width: 100%;
+  height: auto;
   filter: var(--shot-shadow);
 }
 
@@ -336,21 +339,22 @@ kbd {
 .md-k { font-weight: 600; }
 .md-dim { color: var(--muted); }
 
-/* Overlaps only the empty lower part of the window, below the job rows. */
-.file-float {
-  position: relative;
-  width: min(19rem, 88%);
-  margin: -2rem 0 0 1rem;
-}
-.file-float pre { white-space: pre-wrap; font-size: 0.72rem; line-height: 1.5; padding: 0.85rem 1rem 1rem; }
+/* The Markdown file is a supporting card: beside the headline on wide screens,
+   below the window on narrow ones. It never overlaps the window. */
+.file-float { width: min(26rem, 100%); }
+.file-float pre { white-space: pre-wrap; font-size: 0.78rem; line-height: 1.55; padding: 0.9rem 1.05rem 1.05rem; }
 
 @media (min-width: 960px) {
-  .hero-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 4rem; }
+  .hero-grid {
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+    grid-template-areas: "copy file" "shot shot";
+    gap: 2.5rem 4rem;
+    align-items: center;
+  }
   .hero h1 { font-size: min(6.2vw, 5rem); }
-  .hero-grid { align-items: start; }
-  .hero-copy { padding-top: 2.5rem; }
-  .hero-visual { margin-right: -4rem; }
-  .file-float { margin: -3.75rem 0 0 -2rem; }
+  .hero-copy { grid-area: copy; }
+  .file-float { grid-area: file; justify-self: end; }
+  .hero-visual { grid-area: shot; width: 100%; max-width: 64rem; justify-self: center; }
 }
 
 /* Sections -------------------------------------------------------------- */

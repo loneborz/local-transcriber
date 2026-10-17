@@ -6,10 +6,10 @@ Local Transcriber is a native macOS app that turns audio, video, YouTube links a
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://transcribe.wavesweb.nl/assets/library-dark.webp">
-  <img src="https://transcribe.wavesweb.nl/assets/library-light.webp" alt="Local Transcriber transcribing a long file, with its progress in the sidebar's Processing section, while the Library shows folders and an open transcript with its player.">
+  <img src="https://transcribe.wavesweb.nl/assets/library-light.webp" alt="The Local Transcriber window: Processing shows a long file being transcribed with its progress, while the Library lists pinned and recent transcripts and folders, and the open Weekly Product Review transcript plays with the current line highlighted.">
 </picture>
 
-*One file is transcribing in the background (Processing, top of the sidebar) while the Library, with a pinned transcript and two folders, stays open on a transcript and its player.*
+*One file is transcribing in the background (Processing, top of the sidebar) while the Library, with pinned and recent transcripts, New badges and folders, stays open on a transcript: timestamped lines, a player, and the line being played highlighted. The same transcript is saved as a Markdown file you keep.*
 
 ## Download
 
