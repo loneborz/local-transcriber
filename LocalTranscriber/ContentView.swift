@@ -134,7 +134,7 @@ struct ContentView: View {
         .onChange(of: library.items) { selectionStillExists() }
         // Audio belongs to the open transcript only: any other selection silences it.
         .onChange(of: selection) { _, new in
-            if let id = new?.transcriptID, player.itemID == id { return }
+            if let id = new?.transcriptID, player.itemID == id || player.isCarrying(to: id) { return }
             player.stop()
         }
     }
@@ -233,10 +233,11 @@ struct ContentView: View {
     }
 
     // A renamed or moved transcript keeps its place in the sidebar and in the
-    // queue; its audio stops, because the file it was playing has moved.
+    // queue; its audio is reloaded from the new path at the same position, playing
+    // or paused as it was (AudioReviewPlayer.carryOver).
     private func follow(_ old: LibraryTranscript, to new: LibraryTranscript) {
         guard let current = selection, current.transcriptID == old.id else { return }
-        if player.itemID == old.id { player.stop() }
+        player.carryOver(from: old.id, to: new.id)
         selection = current.replacingTranscript(with: new.id)
     }
 

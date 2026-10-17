@@ -42,6 +42,10 @@ final class AudioReviewPlayer {
     @ObservationIgnored private var statusObservation: NSKeyValueObservation?
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private var fileName = ""
+    // The transcript this player's one is about to be reloaded for after a move or rename
+    // of its file: `prepare` then carries the playhead and the playing state over.
+    @ObservationIgnored private var carriedTo: LibraryTranscript.ID?
+    @ObservationIgnored private var carriedState: (time: Double, playing: Bool)?
 
     private static let log = Logger(subsystem: "nl.wavesweb.LocalTranscriber", category: "player")
 
@@ -52,7 +56,14 @@ final class AudioReviewPlayer {
     // Prepares the audio of `item` (stopping whatever was loaded before). Never
     // plays. File and metadata access happens off the main thread.
     func prepare(for item: LibraryTranscript, transcriptDuration: Double?, lines: [ReviewLine]) async {
-        stop()
+        // The same transcript at its new place: remember where it was and whether it played.
+        // Read now, because the old player keeps running until it is replaced.
+        // The view can reload more than once after a move (the rescan changes the item again),
+        // so `carriedTo` stays until the selection leaves this transcript (`stop()`).
+        // A reload that interrupts a reload still in flight reuses what the first one read.
+        if carriedTo == item.id, phase == .ready { carriedState = (currentTime, isPlaying) }
+        let carried = carriedTo == item.id ? carriedState : nil
+        teardown()
         generation += 1
         let mine = generation
         itemID = item.id
@@ -79,6 +90,10 @@ final class AudioReviewPlayer {
         case .ready(let seconds):
             install(url: url, duration: seconds)
             phase = .ready
+            if let carried {
+                seek(to: carried.time)
+                if carried.playing { play() }
+            }
             Self.log.info("player: \(name, privacy: .public) ready, \(seconds, format: .fixed(precision: 2), privacy: .public) s")
         }
     }
@@ -135,6 +150,15 @@ final class AudioReviewPlayer {
         }
     }
 
+    // The open transcript's file moved (or was renamed) and its id is now `new`: the view
+    // reloads the audio from the new path, and the playhead and play state survive it.
+    func carryOver(from old: LibraryTranscript.ID, to new: LibraryTranscript.ID) {
+        guard itemID == old, phase == .ready else { return }
+        carriedTo = new
+    }
+
+    func isCarrying(to id: LibraryTranscript.ID) -> Bool { carriedTo == id }
+
     // MARK: transport
 
     func play() {
@@ -181,6 +205,12 @@ final class AudioReviewPlayer {
     // Pauses and forgets everything: another transcript, New Transcription,
     // a closing window. Invalidates any load still in flight.
     func stop() {
+        carriedTo = nil
+        carriedState = nil
+        teardown()
+    }
+
+    private func teardown() {
         generation += 1
         if isPlaying { Self.log.info("player: stop \(self.fileName, privacy: .public)") }
         if let timeObserver { player?.removeTimeObserver(timeObserver) }
