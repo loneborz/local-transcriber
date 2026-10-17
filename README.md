@@ -5,11 +5,11 @@
 Local Transcriber is a native macOS app that turns audio, video, YouTube links and your own recordings into timestamped Markdown transcripts. I built it because the media was already on my Mac and I didn't want to send it somewhere else to get text back. Speech recognition runs on your Mac with Apple's on-device speech stack. There is no cloud service, no account and no model picker.
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://transcribe.wavesweb.nl/assets/queue-dark.webp">
-  <img src="https://transcribe.wavesweb.nl/assets/queue-light.webp" alt="Local Transcriber showing a saved transcript while audio plays, with the current line highlighted.">
+  <source media="(prefers-color-scheme: dark)" srcset="https://transcribe.wavesweb.nl/assets/library-dark.webp">
+  <img src="https://transcribe.wavesweb.nl/assets/library-light.webp" alt="Local Transcriber transcribing a long file, with its progress in the sidebar's Processing section, while the Library shows folders and an open transcript with its player.">
 </picture>
 
-*Reviewing a transcript: the sidebar lists what is in the output folder, and the line being played is highlighted.*
+*One file is transcribing in the background (Processing, top of the sidebar) while the Library, with a pinned transcript and two folders, stays open on a transcript and its player.*
 
 ## Download
 
