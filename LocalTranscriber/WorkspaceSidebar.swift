@@ -123,6 +123,14 @@ struct WorkspaceSidebar: View {
         .background(Theme.sidebar)
         .safeAreaInset(edge: .top, spacing: 0) { newButton }
         .accessibilityLabel("Transcription sidebar")
+        // isTargeted is not always told when a drag ends away from its target (a drop beside
+        // the row, a cancel), so the highlight also ends once no mouse button is down.
+        .task(id: dropTarget) {
+            while dropTarget != nil, !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(150))
+                if NSEvent.pressedMouseButtons == 0 { dropTarget = nil }
+            }
+        }
         // The Delete key asks to move the selected transcript to the Trash.
         .onDeleteCommand {
             if let id = selection?.transcriptID,
@@ -148,7 +156,18 @@ struct WorkspaceSidebar: View {
             .contextMenu { entryMenu(item) }
         // The entry's id (its path) is the payload. Legacy v0.6 layouts are never
         // changed by the app, so they are not draggable.
-        if item.isManaged { base.draggable(item.id) } else { base }
+        // A small title-only preview: the default one is the whole row (selection blue
+        // included), which covers the folders it is being dragged over.
+        if item.isManaged {
+            base.draggable(item.id) {
+                Text(item.title)
+                    .font(.callout)
+                    .lineLimit(1)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 6))
+            }
+        } else { base }
     }
 
     @ViewBuilder
@@ -175,6 +194,9 @@ struct WorkspaceSidebar: View {
             .font(.callout)
             .lineLimit(1)
             .truncationMode(.middle)
+            // The whole row, not just the icon and the name, is the drop target.
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
             .background(Color.accentColor.opacity(dropTarget == folder.id ? 0.18 : 0), in: RoundedRectangle(cornerRadius: 6))
             // Organization folders are the only drop targets. The drop is the same
             // request as Move to, so its guards, collision rule and errors apply.
