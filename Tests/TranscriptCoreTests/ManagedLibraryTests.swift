@@ -448,6 +448,28 @@ final class LibraryActionTests: ManagedLibraryCase {
         XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: work.url.path), [])
     }
 
+    func testMovingKeepsPinnedArchivedAndNewStateAndNoOpsInsideTheSameFolder() throws {
+        let talk = try makeEntry("Talk"); try makeEntry("Other", in: "Work")
+        try EntryMetadata(createdAt: created, unopened: true).encoded()
+            .write(to: talk.deletingLastPathComponent().appendingPathComponent("entry.json"))
+        let work = try XCTUnwrap(scan().folders.first)
+        _ = try LibraryOperations.setPinned(try entry("Talk"), true)
+        _ = try LibraryOperations.setArchived(try entry("Talk"), true)
+        let before = try entry("Talk")
+        XCTAssertTrue(before.isNew)
+
+        let moved = try LibraryOperations.move(before, to: work.url, root: folder)
+        let after = try entry("Talk")
+        XCTAssertEqual(after.group, work.url)
+        XCTAssertTrue(after.isPinned && after.isArchived && after.isNew)
+        XCTAssertEqual(after.metadata, before.metadata)
+
+        // Dropping on the folder it is already in changes nothing on disk.
+        let snap = try snapshot()
+        XCTAssertEqual(try LibraryOperations.move(moved, to: work.url, root: folder), moved)
+        XCTAssertEqual(try snapshot(), snap)
+    }
+
     func testMovingRefusesTakenNamesAndDestinationsOutsideTheLibrary() throws {
         try makeEntry("Talk"); try makeEntry("Talk", in: "Work")
         let before = try snapshot()

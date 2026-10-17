@@ -62,6 +62,8 @@ struct WorkspaceSidebar: View {
 
     @State private var collapsedFolders: Set<String> = []
     @State private var archiveExpanded = false
+    // The folder a drag is currently over, for the quiet highlight.
+    @State private var dropTarget: String?
 
     var body: some View {
         let sections = library.sections
@@ -139,10 +141,14 @@ struct WorkspaceSidebar: View {
         .background(Theme.sidebar)
     }
 
+    @ViewBuilder
     private func row(_ item: LibraryTranscript, showsFolder: Bool, tag: SidebarSelection) -> some View {
-        SidebarTranscriptRow(item: item, showsFolder: showsFolder)
+        let base = SidebarTranscriptRow(item: item, showsFolder: showsFolder)
             .tag(tag)
             .contextMenu { entryMenu(item) }
+        // The entry's id (its path) is the payload. Legacy v0.6 layouts are never
+        // changed by the app, so they are not draggable.
+        if item.isManaged { base.draggable(item.id) } else { base }
     }
 
     @ViewBuilder
@@ -169,6 +175,19 @@ struct WorkspaceSidebar: View {
             .font(.callout)
             .lineLimit(1)
             .truncationMode(.middle)
+            .background(Color.accentColor.opacity(dropTarget == folder.id ? 0.18 : 0), in: RoundedRectangle(cornerRadius: 6))
+            // Organization folders are the only drop targets. The drop is the same
+            // request as Move to, so its guards, collision rule and errors apply.
+            .dropDestination(for: String.self) { ids, _ in
+                guard ids.count == 1,
+                      let item = library.items.first(where: { $0.id == ids[0] }), item.isManaged else { return false }
+                // Already there: nothing to change on disk.
+                if item.group?.standardizedFileURL == folder.url.standardizedFileURL { return false }
+                onRequest(.move(item, to: folder))
+                return true
+            } isTargeted: { targeted in
+                if targeted { dropTarget = folder.id } else if dropTarget == folder.id { dropTarget = nil }
+            }
             .contextMenu {
                 Button("Rename Folder…") { onRequest(.renameFolder(folder)) }
                 Button("Reveal in Finder") {
