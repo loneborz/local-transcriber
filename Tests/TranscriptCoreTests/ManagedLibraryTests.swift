@@ -491,6 +491,12 @@ final class LibraryActionTests: ManagedLibraryCase {
         XCTAssertEqual(moved.id, try XCTUnwrap(LibraryScanner.scanLibrary(folder: root).items.first).id)
         XCTAssertEqual(URL(fileURLWithPath: "/private/tmp/x").libraryKey, "/tmp/x")
         XCTAssertEqual(URL(fileURLWithPath: "/private/other/x").libraryKey, "/private/other/x")
+        XCTAssertEqual(URL(fileURLWithPath: "/private/var/folders/x").libraryKey, "/var/folders/x")
+        XCTAssertEqual(URL(fileURLWithPath: "/private/etc").libraryKey, "/etc")
+        // Only the three macOS aliases: a longer name or another directory below /private stays distinct.
+        XCTAssertEqual(URL(fileURLWithPath: "/private/tmpfoo/x").libraryKey, "/private/tmpfoo/x")
+        XCTAssertEqual(URL(fileURLWithPath: "/private/varnish").libraryKey, "/private/varnish")
+        XCTAssertNotEqual(URL(fileURLWithPath: "/private/other/x").libraryKey, URL(fileURLWithPath: "/other/x").libraryKey)
     }
 
     func testMovingRefusesTakenNamesAndDestinationsOutsideTheLibrary() throws {
