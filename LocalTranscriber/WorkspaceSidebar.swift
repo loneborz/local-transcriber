@@ -179,6 +179,9 @@ struct WorkspaceSidebar: View {
             // Organization folders are the only drop targets. The drop is the same
             // request as Move to, so its guards, collision rule and errors apply.
             .dropDestination(for: String.self) { ids, _ in
+                // A drop ends the targeting whatever the outcome (isTargeted may not report
+                // the end when the move raises a prompt right away).
+                dropTarget = nil
                 guard ids.count == 1,
                       let item = library.items.first(where: { $0.id == ids[0] }), item.isManaged else { return false }
                 // Already there: nothing to change on disk.
