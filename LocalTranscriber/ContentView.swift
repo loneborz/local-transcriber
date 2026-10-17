@@ -647,6 +647,11 @@ struct ContentView: View {
               : "The language can’t change while recording.")
     }
 
+    private var folderLockReason: String {
+        destination.isRecording ? "The output folder can’t change while recording."
+                                : "The output folder can’t change while the queue is running."
+    }
+
     private var destinationStatus: some View {
         HStack(spacing: 6) {
             switch destination.status {
@@ -657,15 +662,25 @@ struct ContentView: View {
                 .buttonStyle(.link)
                 .disabled(!destination.canChangeFolder)
             case .ready(let url):
+                let path = url.path(percentEncoded: false)
                 Button {
-                    NSWorkspace.shared.activateFileViewerSelecting([url])
+                    destination.choose()
                 } label: {
-                    Text("Saves to \(url.lastPathComponent)")
+                    Text("Saves to \(url.lastPathComponent)…")
                         .lineLimit(1)
                         .truncationMode(.middle)
                 }
-                .buttonStyle(.plain)
-                .help("Show \(url.path(percentEncoded: false)) in Finder")
+                .buttonStyle(.link)
+                .disabled(!destination.canChangeFolder)
+                .help(destination.canChangeFolder ? "\(path)\nClick to choose another folder." : "\(path)\n\(folderLockReason)")
+                .accessibilityValue(path)
+                .accessibilityHint(destination.canChangeFolder ? "Chooses another output folder." : folderLockReason)
+                .contextMenu {
+                    // Reveal never changes the destination, so it stays available while locked.
+                    Button("Reveal in Finder") {
+                        NSWorkspace.shared.activateFileViewerSelecting([url])
+                    }
+                }
             case .unavailable(let message):
                 Text(message)
                     .foregroundStyle(.red)
