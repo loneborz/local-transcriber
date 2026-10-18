@@ -65,8 +65,18 @@ final class Recorder {
     private(set) var error: String?
     private(set) var silenceWarning: String?
     // A finalized recording still in staging because it could not be saved
-    // to the output folder. Kept for this session only.
+    // to the output folder. Closing the window and quitting stay blocked until
+    // it is saved (RecordingCloseGuard); it is not recovered after a crash.
     private(set) var unsavedRecording: URL?
+    // The audio file the last save moved into the output folder.
+    private(set) var lastSavedAudio: URL?
+    // The staging folder of a capture whose finalization failed and that still
+    // holds data. Nothing in it is validated or saved; it only keeps closing the
+    // window and quitting from forgetting it unasked (`acknowledgeFailure`).
+    private(set) var failedStaging: URL?
+    // Whether a save hands the file on (`onSaved`). Quitting saves the audio
+    // only: nothing is queued that the session-only queue could not finish.
+    private var handOff = true
     // What the current or last recording captures, for example "Safari + Microphone".
     private(set) var recordingLabel = ""
 
@@ -86,6 +96,20 @@ final class Recorder {
     var isIdle: Bool {
         if case .idle = state { return true }
         return false
+    }
+
+    // Why closing the window or quitting would lose a recording, if it would.
+    enum Protection {
+        case starting, recording, finishing, unsaved, failed
+    }
+
+    var protection: Protection? {
+        switch state {
+        case .starting: .starting
+        case .recording: .recording
+        case .finishing: .finishing
+        case .idle: unsavedRecording != nil ? .unsaved : failedStaging != nil ? .failed : nil
+        }
     }
 
     var canRecord: Bool {
@@ -128,6 +152,8 @@ final class Recorder {
         }
         session += 1
         let id = session
+        handOff = true
+        lastSavedAudio = nil
 
         let app = selectedApp
         let withMicrophone = includesMicrophone
@@ -226,6 +252,10 @@ final class Recorder {
             guard id == session else { return }
             // The staged files are left alone, never enqueued.
             self.error = "Recording failed and wasn’t queued: \(error.localizedDescription)"
+            if let staging = stagingDirectory, Self.hasData(in: staging) {
+                failedStaging = staging
+                self.error?.append(" Part of the recording may remain in \((staging.path as NSString).abbreviatingWithTildeInPath).")
+            }
         }
         state = .idle
         if unsavedRecording == nil {
@@ -233,6 +263,26 @@ final class Recorder {
         } else {
             saveUnsavedRecording()
         }
+    }
+
+    // Stops, saves and, with `handOff`, queues the recording for the guard that
+    // protects closing and quitting. Waits for a start or a finish in progress
+    // rather than cancelling it. Returns the saved audio only after the file is
+    // seen in the output folder; nil means nothing was saved and the window must
+    // stay (the error or the "Choose Folder and Save Recording…" button shows why).
+    func stopAndSave(handOff: Bool) async -> URL? {
+        self.handOff = handOff
+        while true {
+            switch state {
+            case .starting, .finishing: try? await Task.sleep(for: .milliseconds(100)); continue
+            case .recording: await stop()
+            case .idle: if unsavedRecording != nil { saveUnsavedRecording() }
+            }
+            break
+        }
+        guard unsavedRecording == nil, let saved = lastSavedAudio,
+              let size = try? saved.resourceValues(forKeys: [.fileSizeKey]).fileSize, size > 0 else { return nil }
+        return saved
     }
 
     // The owning window closed: stop capturing now and make sure an in-flight
@@ -251,6 +301,16 @@ final class Recorder {
         release()
     }
 
+    // The user chose to close or quit knowing the failed capture stays in staging.
+    func acknowledgeFailure() {
+        failedStaging = nil
+    }
+
+    private static func hasData(in directory: URL) -> Bool {
+        let files = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.fileSizeKey])) ?? []
+        return files.contains { ((try? $0.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0) > 0 }
+    }
+
     // Drops what only a pending recording needs.
     private func release() {
         destination = nil
@@ -267,18 +327,20 @@ final class Recorder {
             let saved = try destination.saveRecording(file, baseName: baseName, startedAt: startedAt)
             try? FileManager.default.removeItem(at: file.deletingLastPathComponent())
             unsavedRecording = nil
+            lastSavedAudio = saved
             error = nil
-            onSaved(saved, startedAt)
+            if handOff { onSaved(saved, startedAt) }
             release()
         } catch OutputError.notConfigured {
-            self.error = "The output folder is unavailable. The recording wasn’t saved or queued; it is kept until you quit."
+            self.error = "The output folder is unavailable. The recording wasn’t saved or queued. Closing the window and quitting stay blocked until it is saved."
         } catch {
-            self.error = "The recording couldn’t be saved to the output folder (\(error.localizedDescription)). It wasn’t queued; it is kept until you quit."
+            self.error = "The recording couldn’t be saved to the output folder (\(error.localizedDescription)). It wasn’t queued. Closing the window and quitting stay blocked until it is saved."
         }
     }
 
-    func chooseFolderAndSave() {
+    func chooseFolderAndSave(handOff: Bool = true) {
         guard let destination, destination.choose() else { return }
+        self.handOff = handOff
         saveUnsavedRecording()
     }
 

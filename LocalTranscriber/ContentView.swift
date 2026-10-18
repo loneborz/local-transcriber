@@ -85,6 +85,8 @@ struct ContentView: View {
         // The paper continues under the title bar.
         .containerBackground(Theme.paper, for: .window)
         .contentShape(Rectangle())
+        // Closing the window while it records asks first (RecordingCloseGuard).
+        .background(RecordingCloseGuard(recorder: recorder))
         .dropDestination(for: URL.self) { urls, _ in
             addInput(urls)
         } isTargeted: { targeted in

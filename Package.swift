@@ -15,7 +15,7 @@ let package = Package(
             // renderer takes for source packages.
             exclude: [
                 "Assets.xcassets", "AudioReviewPlayer.swift", "BatchQueue.swift", "ContentView.swift", "Credits.rtf",
-                "LibraryStore.swift", "MyApp.swift", "OutputDestination.swift", "Recorder.swift",
+                "LibraryStore.swift", "MyApp.swift", "OutputDestination.swift", "Recorder.swift", "RecordingCloseGuard.swift",
                 "SettingsView.swift", "SourcePackage.swift", "Theme.swift", "TranscriptReviewView.swift",
                 "TranscriptionService.swift", "WorkspaceSidebar.swift",
             ],

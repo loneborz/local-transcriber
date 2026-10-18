@@ -54,6 +54,8 @@ final class OutputDestination {
     // App-wide, across all windows.
     var isTranscribing: Bool { queues.contains { $0.value?.isProcessing == true } }
     var isRecording: Bool { recorders.contains { $0.value?.isIdle == false } }
+    // Recordings that closing a window or quitting would lose (RecordingCloseGuard).
+    var protectedRecorders: [Recorder] { recorders.compactMap(\.value).filter { $0.protection != nil } }
 
     // The folder receives job saves and the recording at Stop; the source-package
     // mode is read at each YouTube save; a recording takes the default language

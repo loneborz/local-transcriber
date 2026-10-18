@@ -11,6 +11,7 @@ import SwiftUI
         // left over from a crashed or killed run. Children are also terminated
         // on a normal quit.
         AppAppearance.apply()
+        QuitGuard.destination = destination
         YouTubeAcquirer.sweepStaleDirectories()
         NotificationCenter.default.addObserver(
             forName: NSApplication.willTerminateNotification,
@@ -26,6 +27,9 @@ import SwiftUI
     // The one transcription queue: every window shows and feeds it, and a closed
     // window does not take its work with it. Not kept across quitting the app.
     @State private var queue: BatchQueue
+
+    // Cmd+Q and Quit in the Dock go through the delegate's applicationShouldTerminate.
+    @NSApplicationDelegateAdaptor(QuitGuard.self) private var quitGuard
 
     @FocusedValue(\.pasteLinks) private var pasteLinks
     @FocusedValue(\.refreshTranscripts) private var refreshTranscripts
