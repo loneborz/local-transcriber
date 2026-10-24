@@ -1,0 +1,6 @@
+project: LocalTranscriber.xcodeproj
+schemes:
+- LocalTranscriber
+retain_swift_ui_previews: true
+relative_results: true
+retain_encodable_properties: true
