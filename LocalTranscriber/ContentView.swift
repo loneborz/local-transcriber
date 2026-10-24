@@ -4,9 +4,23 @@ import AppKit
 import UniformTypeIdentifiers
 
 extension FocusedValues {
-    @Entry var pasteLinks: (() -> Void)?
-    @Entry var refreshTranscripts: (() -> Void)?
+    @Entry var pasteLinks: WindowAction?
+    @Entry var refreshTranscripts: WindowAction?
     @Entry var libraryCommands: LibraryCommands?
+}
+
+// A window's menu action. Every body pass publishes its focused values again, and a
+// closure never equals the previous one: the menus would rebuild, the window would
+// update and publish again, every frame, for as long as it is frontmost (LTR-68).
+// So a value equals the last one from the same window; the action itself stays the
+// same, since it reaches the window's state through its @State storage.
+struct WindowAction: Equatable {
+    let window: UUID
+    let perform: () -> Void
+
+    func callAsFunction() { perform() }
+
+    static func == (a: Self, b: Self) -> Bool { a.window == b.window }
 }
 
 // A question the library asks before it acts, or a failure it reports.
@@ -42,6 +56,8 @@ struct ContentView: View {
     @State private var player = AudioReviewPlayer()
     @State private var prompt: LibraryPrompt?
     @State private var promptText = ""
+    // Tells this window's menu actions from another window's (see WindowAction).
+    @State private var windowID = UUID()
 
     init(destination: OutputDestination, queue: BatchQueue) {
         self.destination = destination
@@ -92,10 +108,10 @@ struct ContentView: View {
         } isTargeted: { targeted in
             isTargeted = targeted
         }
-        .focusedSceneValue(\.pasteLinks, pasteFromClipboard)
-        .focusedSceneValue(\.refreshTranscripts) { refreshLibrary() }
+        .focusedSceneValue(\.pasteLinks, WindowAction(window: windowID, perform: pasteFromClipboard))
+        .focusedSceneValue(\.refreshTranscripts, WindowAction(window: windowID) { refreshLibrary() })
         .focusedSceneValue(\.libraryCommands, LibraryCommands(
-            selected: selectedTranscript, canCreateFolder: destination.isReady, request: handle))
+            window: windowID, selected: selectedTranscript, canCreateFolder: destination.isReady, request: handle))
         .modifier(LibraryPromptModifier(prompt: $prompt, text: $promptText, commit: commit))
         // Another window changed files: look again.
         .onReceive(NotificationCenter.default.publisher(for: .libraryDidChange)) { note in

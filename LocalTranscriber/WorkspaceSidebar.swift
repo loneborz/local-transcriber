@@ -37,11 +37,18 @@ enum LibraryRequest {
     case trashFolder(LibraryFolder)
 }
 
-// What the Transcript menu can act on: the open transcript, if any.
-struct LibraryCommands {
+// What the Transcript menu can act on: the open transcript, if any. Equal when the
+// menu would show the same, from the same window; `request` is left out, like
+// WindowAction's closure (LTR-68).
+struct LibraryCommands: Equatable {
+    var window: UUID
     var selected: LibraryTranscript?
     var canCreateFolder: Bool
     var request: (LibraryRequest) -> Void
+
+    static func == (a: Self, b: Self) -> Bool {
+        a.window == b.window && a.selected == b.selected && a.canCreateFolder == b.canCreateFolder
+    }
 }
 
 // One sidebar for the live queue and the saved transcripts (doc-3). Native list
