@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>0.7.0: Where transcripts live - Local Transcriber Journal</title>
+<meta name="description" content="0.6.0 could read and play a transcript but not keep transcripts in order. 0.7.0 gives each one its own folder in a library you can organize, and starts a transcription as soon as you add something. The speech recognition is unchanged.">
+<meta name="theme-color" content="#f3f0ea">
+<link rel="canonical" href="https://transcribe.wavesweb.nl/journal/0.7.0/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Local Transcriber">
+<meta property="og:locale" content="en_US">
+<meta property="og:url" content="https://transcribe.wavesweb.nl/journal/0.7.0/">
+<meta property="og:title" content="0.7.0: Where transcripts live - Local Transcriber Journal">
+<meta property="og:description" content="0.6.0 could read and play a transcript but not keep transcripts in order. 0.7.0 gives each one its own folder in a library you can organize, and starts a transcription as soon as you add something. The speech recognition is unchanged.">
+<meta property="og:image" content="https://transcribe.wavesweb.nl/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Local Transcriber: Media in. Markdown out. The Local Transcriber window with a transcription in progress, pinned and recent transcripts and folders, and an open transcript with its current line highlighted.">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="stylesheet" href="/styles.css">
+<script>
+  // Light unless the visitor explicitly saved dark. The OS appearance is ignored.
+  (function () {
+    var root = document.documentElement;
+    root.classList.add("js");
+    try {
+      if (localStorage.getItem("lt-theme") === "dark") {
+        root.setAttribute("data-theme", "dark");
+        document.querySelector('meta[name="theme-color"]').content = "#171214";
+      }
+    } catch (e) {}
+  })();
+</script>
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="nav">
+  <div class="wrap nav-inner">
+    <a class="brand" href="/">
+      <svg class="mark" viewBox="0 0 66 52" width="24" height="19" aria-hidden="true" focusable="false">
+        <rect x="0" y="19" width="6" height="14" rx="3"/>
+        <rect x="10" y="13" width="6" height="26" rx="3"/>
+        <rect x="20" y="7" width="6" height="38" rx="3"/>
+        <rect x="30" y="0" width="6" height="52" rx="3"/>
+        <rect x="40" y="7" width="6" height="38" rx="3"/>
+        <rect x="50" y="13" width="6" height="26" rx="3"/>
+        <rect x="60" y="19" width="6" height="14" rx="3"/>
+      </svg>
+      Local Transcriber
+    </a>
+    <nav class="nav-links" aria-label="Sections">
+      <a href="/#how">How it works</a>
+      <a href="/#output">Output</a>
+      <a href="/#local">Local and network</a>
+      <a href="/#download">Download</a>
+    </nav>
+    <div class="nav-tools">
+      <a class="nav-gh" href="/">Home</a>
+      <a class="nav-gh" href="https://github.com/loneborz/local-transcriber" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <button class="theme-toggle" type="button" data-theme-toggle aria-pressed="false" aria-label="Dark theme">
+        <svg class="icon-sun" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4"/><path d="M12 3.2v1.9M12 18.9v1.9M3.2 12h1.9M18.9 12h1.9M5.8 5.8l1.3 1.3M16.9 16.9l1.3 1.3M5.8 18.2l1.3-1.3M16.9 7.1l1.3-1.3"/></svg>
+        <svg class="icon-moon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M18.6 14.8A7.4 7.4 0 1 1 9.2 5.4a6 6 0 0 0 9.4 9.4z"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main id="main" class="section journal">
+  <div class="wrap">
+    <article class="journal-grid" id="top">
+      <div>
+        <a class="back" href="/journal/">&larr; Journal</a>
+        <p class="journal-meta">0.7.0<br>Oct 15–17, 2026<br>GitHub Release</p>
+      </div>
+      <div>
+        <h1>Where transcripts live</h1>
+        <p class="lead">0.6.0 let me read a transcript while I listened to it. 0.7.0 is about everything around that: every transcript now gets its own folder in a library I can organize, and a transcription starts the moment I hand the app something. The speech recognition and the Markdown are the same as in 0.6.</p>
+        <div class="prose">
+          <h2>A library that could only look</h2>
+          <p>0.6.0 could already open a transcript, show its timestamps and play the recording from any line. What it couldn't do was keep transcripts in order. The sidebar was a view of the output folder, and every transcript in it was a loose Markdown file with its timing file beside it. A recording was an M4A with a date in its name, sitting next to them. Only a YouTube source package got a folder of its own.</p>
+          <p>The list showed the Markdown's modification date as the day it was saved, so a file I had touched looked newer than it was. And the app couldn't do anything with a transcript except open it. Renaming one, sorting them or clearing out old ones meant going to Finder. There, renaming the Markdown on its own meant it opened without its timestamps, because the app finds the timing file by the Markdown's name.</p>
+          <h2>One folder per transcript</h2>
+          <p>Now every new transcription gets its own folder, named after the media. It holds the Markdown and its timing file, and for a recording the audio too. Next to them sits a small <code>entry.json</code>: when the transcript was created, and whether it is pinned, archived or not opened yet. It's a few hundred bytes and it lives inside the folder, so a rename or a move in Finder takes it along. The title is simply the folder's name.</p>
+          <p>With that in place, the rest was straightforward. Rename changes the folder, the Markdown file and the timing file to the same new name, never the text, and the creation date stays. Pin keeps a transcript at the top. Archive tucks it away and changes nothing on disk except <code>entry.json</code>. Move to Trash asks first and never deletes anything permanently. Folders I create in the app are ordinary folders in the output folder, so Finder shows them too; in this version I move a transcript into one from its context menu.</p>
+          <p>There is still no database. The app scans the output folder and the folders directly inside it, nothing deeper, and a change made in Finder shows up after a refresh. Transcripts from 0.6 and earlier are listed and open as they are. Nothing is migrated.</p>
+          <h2>Hand it something and it starts</h2>
+          <p>The queue dates from 0.2, when one file at a time wasn't enough. It had its own page and its own steps: add items, give each one a language, press Start, apply one language to everything waiting, clear what had finished. For 0.7.0 I decided that Local Transcriber is not a batch queue manager. The queue page is gone, and so are Start, Apply Language to All Waiting, Clear Queue and the per-item language.</p>
+          <p>Instead, one transcription runs at a time for the whole app. It starts as soon as a file, a YouTube link or a finished recording is accepted, using the language chosen at the bottom of the window at that moment. While it runs, or while a failed or unsaved job is still waiting, any other input is refused with an explanation. It is never queued or dropped without saying so, and Record isn't offered. That way, a finished recording goes straight into transcription without another step.</p>
+          <p>The running job sits in a Processing section above the library, so the library stays usable while it works. It shows the stage, and how far the recognizer has got through the audio against the total length. That number never goes backwards, and there is no guess at when it will finish. English moves every few seconds. Dutch comes in steps of about a minute of audio, because that is how often the recognizer reports back. When it's done, the transcript appears in the library with a New badge until I open it. The app doesn't jump to it, so I can keep reading something else.</p>
+          <p>This has a cost. I can't line up a stack of files and walk away anymore: dropping several at once is refused as a whole. Quitting the app while a transcription runs ends it without asking, and the job isn't picked up again at the next launch. What goes is the transcription in progress, not anything already on disk. The original local media file is untouched. A recording's audio is already saved in its own folder, while a temporary YouTube download is cleaned up at the next launch. Adding the same input again starts over.</p>
+          <p>The window got calmer in the same release, with one New control and a title bar that says where I am. And Dutch transcripts can still come back thin. The problem 0.6.0 started with is still there.</p>
+        </div>
+        <nav aria-label="Journal">
+          <a class="back" href="/journal/">&larr; Back to the Journal</a>
+          <a class="back" href="/journal/0.6.0/" rel="prev">Earlier story: 0.6.0</a>
+        </nav>
+      </div>
+    </article>
+  </div>
+</main>
+
+<footer class="footer">
+  <div class="wrap footer-inner">
+    <p>
+      Local Transcriber is open source under the
+      <a href="https://github.com/loneborz/local-transcriber/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT License</a>.
+      A <a href="https://wavesweb.nl/">Wavesweb</a> Labs project.
+    </p>
+    <nav aria-label="Footer">
+      <a href="/journal/">Journal</a>
+      <a href="https://github.com/loneborz/local-transcriber" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <a href="https://github.com/loneborz/local-transcriber#readme" target="_blank" rel="noopener noreferrer">README</a>
+      <a href="#top">Back to top</a>
+    </nav>
+  </div>
+</footer>
+
+<script>
+  (function () {
+    var root = document.documentElement;
+    var button = document.querySelector("[data-theme-toggle]");
+    var meta = document.querySelector('meta[name="theme-color"]');
+    function sync() {
+      var dark = root.getAttribute("data-theme") === "dark";
+      button.setAttribute("aria-pressed", dark ? "true" : "false");
+      meta.content = dark ? "#171214" : "#f3f0ea";
+    }
+    button.addEventListener("click", function () {
+      var next = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
+      // Switch with transitions off, so the change lands at once.
+      root.classList.add("theme-switching");
+      root.setAttribute("data-theme", next);
+      getComputedStyle(root).colorScheme;
+      root.classList.remove("theme-switching");
+      try { localStorage.setItem("lt-theme", next); } catch (e) {}
+      sync();
+    });
+    sync();
+  })();
+</script>
+
+</body>
+</html>
