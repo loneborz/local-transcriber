@@ -63,7 +63,6 @@ struct WorkspaceSidebar: View {
     let library: LibraryStore
     let destination: OutputDestination.Status
     @Binding var selection: SidebarSelection?
-    let onNewTranscription: () -> Void
     let onRefresh: () -> Void
     let onRequest: (LibraryRequest) -> Void
 
@@ -75,6 +74,12 @@ struct WorkspaceSidebar: View {
     var body: some View {
         let sections = library.sections
         List(selection: $selection) {
+            // The New Transcription workspace, as a row: the List selects it while
+            // that workspace is shown, and choosing it goes through the same rule.
+            Label("Transcribe", systemImage: "waveform")
+                .font(.callout)
+                .tag(SidebarSelection.newTranscription)
+
             if let recordingBanner {
                 Section("Recording") {
                     recordingBanner.selectionDisabled()
@@ -149,9 +154,7 @@ struct WorkspaceSidebar: View {
         // One warm ground for both appearances (see Theme.sidebar).
         .scrollContentBackground(.hidden)
         .background(Theme.sidebar)
-        // Before the inset, so the Home button keeps its own name.
         .accessibilityLabel("Transcription sidebar")
-        .safeAreaInset(edge: .top, spacing: 0) { homeButton }
         // isTargeted is not always told when a drag ends away from its target (a drop beside
         // the row, a cancel), so the highlight also ends once no mouse button is down.
         .task(id: dropTarget) {
@@ -171,22 +174,6 @@ struct WorkspaceSidebar: View {
 
     private var canAddFolder: Bool {
         if case .ready = destination { true } else { false }
-    }
-
-    // Back to New Transcription, the same move as choosing it in the list.
-    private var homeButton: some View {
-        Button(action: onNewTranscription) {
-            Label("Home", systemImage: "house.fill")
-                .frame(maxWidth: .infinity)
-        }
-        .buttonStyle(.borderedProminent)
-        .buttonBorderShape(.roundedRectangle(radius: 10))
-        .controlSize(.large)
-        .help("Show New Transcription")
-        .padding(.horizontal, 12)
-        .padding(.top, 8)
-        .padding(.bottom, 12)
-        .background(Theme.sidebar)
     }
 
     @ViewBuilder

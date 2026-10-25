@@ -86,7 +86,6 @@ struct ContentView: View {
                 library: library,
                 destination: destination.status,
                 selection: sidebarSelection,
-                onNewTranscription: { userSelects(.newTranscription) },
                 onRefresh: { refreshLibrary() },
                 onRequest: handle
             )
