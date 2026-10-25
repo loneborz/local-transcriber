@@ -511,6 +511,7 @@ struct ContentView: View {
             }
             .menuStyle(.button)
             .buttonStyle(.borderedProminent)
+            .buttonBorderShape(.roundedRectangle(radius: 10))   // New's shape (NewControl.radius)
             .controlSize(.large)
             .fixedSize()
             .padding(.vertical, 2)

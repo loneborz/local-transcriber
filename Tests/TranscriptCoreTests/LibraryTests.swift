@@ -319,11 +319,11 @@ final class RecentChoicesTests: XCTestCase {
         XCTAssertEqual(RecentChoices.choosing("German", in: ["English", "Dutch"]), ["German", "English", "Dutch"])
     }
 
-    func testFiveAtMostTheLeastRecentDropsOutAndNothingRepeats() {
-        let full = ["English", "Dutch", "Russian", "German", "French"]
+    func testThreeAtMostTheLeastRecentDropsOutAndNothingRepeats() {
+        let full = ["English", "Dutch", "Russian"]
         let italian = RecentChoices.choosing("Italian", in: full)
-        XCTAssertEqual(italian, ["Italian", "English", "Dutch", "Russian", "German"])
-        XCTAssertEqual(RecentChoices.choosing("Dutch", in: italian), ["Dutch", "Italian", "English", "Russian", "German"])
+        XCTAssertEqual(italian, ["Italian", "English", "Dutch"])
+        XCTAssertEqual(RecentChoices.choosing("Dutch", in: italian), ["Dutch", "Italian", "English"])
         XCTAssertEqual(Set(italian).count, italian.count)
     }
 }

@@ -135,10 +135,12 @@ final class BatchQueue {
     private(set) var pending: [PendingInput] = []
     // The last job whose transcript was saved automatically.
     private(set) var lastSaved: TranscriptionJob?
-    // Most recently chosen first, at most five (RecentChoices), for the language menu.
+    // Most recently chosen first, at most three (RecentChoices), for the language menu.
     // Remembered, never preselected; changed only when a language starts a job.
-    private(set) var recentLanguages: [TranscriptionLanguage] =
-        (UserDefaults.standard.stringArray(forKey: BatchQueue.recentLanguagesKey) ?? []).compactMap(TranscriptionLanguage.init)
+    // A longer list saved by an earlier build is cut to the limit.
+    private(set) var recentLanguages: [TranscriptionLanguage] = Array(
+        (UserDefaults.standard.stringArray(forKey: BatchQueue.recentLanguagesKey) ?? [])
+            .compactMap(TranscriptionLanguage.init).prefix(RecentChoices.limit))
     static let recentLanguagesKey = "recentLanguages"
     // Recordings removed from `pending` this session; the library does not offer them
     // again until the next launch.
