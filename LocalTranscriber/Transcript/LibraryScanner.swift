@@ -91,6 +91,16 @@ nonisolated struct LibraryFolder: Identifiable, Equatable, Sendable {
 nonisolated struct LibraryListing: Equatable, Sendable {
     var items: [LibraryTranscript] = []
     var folders: [LibraryFolder] = []
+    // Recordings saved without a transcript yet (LTR-72), oldest first.
+    var untranscribed: [UntranscribedRecording] = []
+}
+
+// An incomplete entry shaped like a saved recording: `<name>/entry.json` and
+// `<name>/<name>.m4a`, no transcript. Its transcript is written into the same folder.
+nonisolated struct UntranscribedRecording: Equatable, Sendable {
+    var folder: URL
+    var audio: URL
+    var createdAt: Date?
 }
 
 // Finds the transcripts in an output folder. Read-only and stateless: a scan
@@ -102,8 +112,8 @@ nonisolated struct LibraryListing: Equatable, Sendable {
 // A folder is an entry when it holds `entry.json` and a valid Markdown, when it
 // holds a v0.6.x `transcript.md`, or when it holds a valid `<folder>.md`. A folder
 // with `entry.json` but no valid Markdown is an incomplete entry (a recording that
-// is not transcribed yet) and is skipped. Every other folder is an organization
-// folder.
+// is not transcribed yet): it is not a transcript, but one that holds its recording
+// is listed as untranscribed. Every other folder is an organization folder.
 nonisolated enum LibraryScanner {
     // The header of a transcript is a few hundred bytes; the file name caps the title.
     static let headerBytes = 16 * 1024
@@ -122,6 +132,7 @@ nonisolated enum LibraryScanner {
         }
 
         listing.items.sort(by: isOrderedBefore)
+        listing.untranscribed.sort { ($0.createdAt ?? .distantPast, $0.folder.path) < ($1.createdAt ?? .distantPast, $1.folder.path) }
         listing.folders.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
         return listing
     }
@@ -156,7 +167,12 @@ nonisolated enum LibraryScanner {
             guard values.isPackage != true else { return }
             switch entryFolder(at: url, group: group) {
             case .entry(let item): listing.items.append(item)
-            case .incomplete: break
+            case .incomplete:
+                let audio = url.appendingPathComponent(url.lastPathComponent + ".m4a")
+                if (try? audio.resourceValues(forKeys: [.isRegularFileKey]))?.isRegularFile == true {
+                    listing.untranscribed.append(UntranscribedRecording(
+                        folder: url, audio: audio, createdAt: EntryMetadata.read(in: url).metadata?.createdAt))
+                }
             case .notAnEntry:
                 guard group == nil else { return }
                 listing.folders.append(LibraryFolder.current(at: url))

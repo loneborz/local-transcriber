@@ -15,6 +15,8 @@ final class LibraryStore {
     private(set) var items: [LibraryTranscript] = []
     // The organization folders, empty ones included.
     private(set) var folders: [LibraryFolder] = []
+    // Recordings saved without a transcript (LTR-72); the queue offers them again.
+    private(set) var untranscribed: [UntranscribedRecording] = []
     // Where `items` came from; nil when there is no usable output folder.
     private(set) var folder: URL?
     // Set when the folder could not be listed (items are then empty).
@@ -37,6 +39,7 @@ final class LibraryStore {
         if newFolder != folder {
             items = []
             folders = []
+            untranscribed = []
             loadError = nil
         }
         folder = newFolder
@@ -68,12 +71,14 @@ final class LibraryStore {
         case .success(let scanned):
             items = scanned.items
             folders = scanned.folders
+            untranscribed = scanned.untranscribed
             loadError = nil
             let milliseconds = Double(elapsed.components.attoseconds) / 1e15 + Double(elapsed.components.seconds) * 1000
             Self.log.info("library scan: \(scanned.items.count, privacy: .public) transcripts in \(milliseconds, format: .fixed(precision: 1), privacy: .public) ms")
         case .failure(let error):
             items = []
             folders = []
+            untranscribed = []
             loadError = error.localizedDescription
             Self.log.error("library scan failed: \(error.localizedDescription)")
         }

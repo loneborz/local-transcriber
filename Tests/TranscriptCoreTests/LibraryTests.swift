@@ -274,3 +274,35 @@ final class SidebarSelectionRuleTests: XCTestCase {
         XCTAssertEqual(SidebarSelectionRule.next(current: Optional<String>.none, proposed: "talk"), "talk")
     }
 }
+
+// LTR-72: the transcript a window asked for opens once its request settles, and
+// never against the user's own navigation.
+final class ReviewAutoOpenTests: XCTestCase {
+    let a = URL(fileURLWithPath: "/lib/A/A.md"), b = URL(fileURLWithPath: "/lib/B/B.md")
+
+    func testTheLastSavedTranscriptOpensOnceQuietAndListedAndOnlyOnce() {
+        var open = ReviewAutoOpen()
+        open.languageChosen(); open.saved(a)
+        open.languageChosen(); open.saved(b)
+        XCTAssertNil(open.transcriptToOpen(isQuiet: false, isListed: { _ in true }))   // still choosing or running
+        XCTAssertNil(open.transcriptToOpen(isQuiet: true, isListed: { _ in false }))   // not rescanned yet
+        XCTAssertEqual(open.transcriptToOpen(isQuiet: true, isListed: { _ in true }), b)
+        XCTAssertNil(open.transcriptToOpen(isQuiet: true, isListed: { _ in true }))
+    }
+
+    func testUserNavigationWinsOverACompletion() {
+        var open = ReviewAutoOpen()
+        open.languageChosen(); open.userNavigated(); open.saved(a)
+        XCTAssertNil(open.transcriptToOpen(isQuiet: true, isListed: { _ in true }))
+        open.languageChosen(); open.saved(a); open.userNavigated()
+        XCTAssertNil(open.transcriptToOpen(isQuiet: true, isListed: { _ in true }))
+    }
+
+    func testNothingOpensWithoutARequestOrAfterOnlyFailures() {
+        var open = ReviewAutoOpen()
+        open.saved(a)            // a job this window did not ask for
+        XCTAssertNil(open.transcriptToOpen(isQuiet: true, isListed: { _ in true }))
+        open.languageChosen()    // its job failed: nothing was saved
+        XCTAssertNil(open.transcriptToOpen(isQuiet: true, isListed: { _ in true }))
+    }
+}

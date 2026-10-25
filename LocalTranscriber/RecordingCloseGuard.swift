@@ -7,7 +7,7 @@ import SwiftUI
 // existing "Choose Folder and Save Recording…" button is the way out.
 //   - Window close: save, queue the recording (it keeps transcribing in the
 //     app-wide queue after the window is gone), then close.
-//   - Quit: save the audio only, say that transcription was skipped, then quit.
+//   - Quit: save the audio only, say that it waits for its language, then quit.
 //     The queue is session-only, so a started job would be lost at once.
 
 // NSAlert binds Escape only to a button titled "Cancel". These alerts name their
@@ -103,7 +103,7 @@ private enum CloseGuardAlert {
         let path = (audio.path as NSString).abbreviatingWithTildeInPath
         let alert = make(
             "Recording saved",
-            "Saved to \(path). Transcription was skipped. Add the file to Local Transcriber later to transcribe it.",
+            "Saved to \(path). It was not transcribed; Local Transcriber asks for its language the next time it opens.",
             ["Quit", "Show in Finder and Quit"])
         alert.buttons[0].keyEquivalent = "\r"
         return alert

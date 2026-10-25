@@ -53,6 +53,9 @@ final class TranscriptionJob: Identifiable {
     // How far into the audio the recognizer has delivered results (nil until the
     // first result). Coverage of the audio only: no estimate of the work left.
     var progress: RecognitionProgress?
+    // The window whose language choice made this job; that window opens the
+    // transcript when the request settles (ReviewAutoOpen).
+    var requester: UUID?
 
     init(source: JobSource, locale: Locale) {
         self.source = source
@@ -107,8 +110,8 @@ final class TranscriptionJob: Identifiable {
 }
 
 // An input that waits for its language (LTR-72). Session only: an imported file
-// that was not started is forgotten on quit, and a recording's audio is already
-// saved in its entry folder.
+// that was not started is forgotten on quit. A recording's audio is already saved
+// in its entry folder, and the library offers it again after a relaunch (`offer`).
 struct PendingInput: Identifiable {
     let id = UUID()
     let source: JobSource
@@ -130,6 +133,15 @@ struct PendingInput: Identifiable {
 final class BatchQueue {
     private(set) var jobs: [TranscriptionJob] = []
     private(set) var pending: [PendingInput] = []
+    // The last job whose transcript was saved automatically.
+    private(set) var lastSaved: TranscriptionJob?
+    // Most recently chosen first, for the language menu. Remembered, never preselected.
+    private(set) var recentLanguages: [TranscriptionLanguage] =
+        (UserDefaults.standard.stringArray(forKey: BatchQueue.recentLanguagesKey) ?? []).compactMap(TranscriptionLanguage.init)
+    static let recentLanguagesKey = "recentLanguages"
+    // Recordings removed from `pending` this session; the library does not offer them
+    // again until the next launch.
+    private var removedRecordings: Set<String> = []
     // UserDefaults key of the "save YouTube links as source packages" mode.
     static let sourcePackageModeKey = "sourcePackageMode"
     // UserDefaults key of the "add YAML frontmatter" setting (LTR-37).
@@ -144,23 +156,43 @@ final class BatchQueue {
     private static let log = Logger(subsystem: "nl.wavesweb.LocalTranscriber", category: "progress")
 
     var isProcessing: Bool { isRunning }
+    // Nothing is pending, waiting or running; jobs that need attention may remain.
+    var isQuiet: Bool { pending.isEmpty && jobs.allSatisfy(\.isSettled) }
 
     func stage(_ source: JobSource, recording: (folder: URL, startedAt: Date)? = nil) {
         pending.append(PendingInput(source: source, recording: recording))
     }
 
+    // Recordings the library lists without a transcript (after a quit, for example)
+    // wait for their language again, unless they are already here, were removed this
+    // session, or have been transcribed since that scan.
+    func offer(_ recordings: [UntranscribedRecording]) {
+        let known = Set((pending.compactMap(\.recording) + jobs.compactMap(\.recording)).map(\.folder.libraryKey))
+        for recording in recordings {
+            let key = recording.folder.libraryKey
+            let transcript = recording.folder.appendingPathComponent(recording.folder.lastPathComponent + ".md")
+            guard !known.contains(key), !removedRecordings.contains(key),
+                  !FileManager.default.fileExists(atPath: transcript.path) else { continue }
+            stage(.file(recording.audio), recording: (recording.folder, recording.createdAt ?? .now))
+        }
+    }
+
     // Forgets a pending input. Its media is not touched.
     func discard(_ input: PendingInput) {
         pending.removeAll { $0.id == input.id }
+        if let recording = input.recording { removedRecordings.insert(recording.folder.libraryKey) }
     }
 
     // Turns a pending input into a job with the language chosen for it. It starts at
     // once, or after the jobs before it. Nil if the input is no longer pending.
-    func start(_ input: PendingInput, locale: Locale) -> TranscriptionJob? {
+    func start(_ input: PendingInput, language: TranscriptionLanguage, requester: UUID) -> TranscriptionJob? {
         guard let index = pending.firstIndex(where: { $0.id == input.id }) else { return nil }
         pending.remove(at: index)
-        let job = TranscriptionJob(source: input.source, locale: locale)
+        recentLanguages = [language] + recentLanguages.filter { $0 != language }.prefix(2)
+        UserDefaults.standard.set(recentLanguages.map(\.rawValue), forKey: Self.recentLanguagesKey)
+        let job = TranscriptionJob(source: input.source, locale: language.locale)
         job.recording = input.recording
+        job.requester = requester
         jobs.append(job)
         startRunner()
         return job
@@ -249,6 +281,7 @@ final class BatchQueue {
             )
             job.state = .complete(transcript, processingDuration: startedAt.duration(to: clock.now))
             save(transcript, for: job, mediaURL: mediaURL)
+            if job.savedTranscriptURL != nil { lastSaved = job }
             // Saved without a warning: nothing is left to do, the slot is free. The
             // new transcript reaches every window's library by notification.
             if job.saveError == nil, job.sidecarWarning == nil {

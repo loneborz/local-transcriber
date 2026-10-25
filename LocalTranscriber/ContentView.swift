@@ -60,6 +60,8 @@ struct ContentView: View {
     @State private var promptText = ""
     // Tells this window's menu actions from another window's (see WindowAction).
     @State private var windowID = UUID()
+    // Opens the transcript this window asked for once the request settles (LTR-72).
+    @State private var autoOpen = ReviewAutoOpen()
 
     init(destination: OutputDestination, queue: BatchQueue) {
         self.destination = destination
@@ -84,7 +86,7 @@ struct ContentView: View {
                 library: library,
                 destination: destination.status,
                 selection: sidebarSelection,
-                onNewTranscription: showNewTranscription,
+                onNewTranscription: { userSelects(.newTranscription) },
                 onRefresh: { refreshLibrary() },
                 onRequest: handle
             )
@@ -143,6 +145,20 @@ struct ContentView: View {
         }
         .onChange(of: folderBlocked) { _, blocked in
             if !blocked && notice == Self.folderBlockedNotice { notice = nil }
+        }
+        // A saved job of this window's request, the queue settling and a rescan can each
+        // be the last thing the automatic open waits for. A rescan also offers
+        // recordings that were saved but never transcribed (after a quit, for example).
+        .onChange(of: queue.lastSaved?.id) {
+            if let job = queue.lastSaved, job.requester == windowID, let url = job.savedTranscriptURL {
+                autoOpen.saved(url)
+            }
+            openFinishedTranscript()
+        }
+        .onChange(of: queue.isQuiet) { openFinishedTranscript() }
+        .onChange(of: library.revision) {
+            queue.offer(library.untranscribed)
+            openFinishedTranscript()
         }
         // A transcript is new until it is opened: opening it (and only that) clears the badge.
         .onChange(of: selection) { _, new in markOpened(new) }
@@ -275,8 +291,21 @@ struct ContentView: View {
                 // The selection did not change, so the List is told to show it again.
                 guard let chosen = SidebarSelectionRule.next(current: selection, proposed: newValue) else { return }
                 if newValue == nil { sidebarRefresh += 1 }
-                if chosen == .newTranscription { showNewTranscription() } else { selection = chosen }
+                userSelects(chosen)
             })
+    }
+
+    // A move the user made: a job finishing later must not take the window elsewhere.
+    private func userSelects(_ chosen: SidebarSelection) {
+        if chosen != selection { autoOpen.userNavigated() }
+        selection = chosen
+    }
+
+    // Opens the transcript of this window's settled request once the library lists it.
+    private func openFinishedTranscript() {
+        let listed = Set(library.items.map(\.id))
+        guard let url = autoOpen.transcriptToOpen(isQuiet: queue.isQuiet, isListed: { listed.contains($0.libraryKey) }) else { return }
+        selection = .transcript(url.libraryKey)
     }
 
     // The native title bar says where the user is.
@@ -351,22 +380,13 @@ struct ContentView: View {
     }
 
     // New Transcription is an input surface: mark and tagline above one surface
-    // with two inputs, import on the left and record on the right. While an input
-    // waits for its language, that choice takes the mark's place. The work itself
+    // with two inputs, import on the left and record on the right. The work itself
     // is listed in the sidebar's Processing section.
     private var content: some View {
         VStack(spacing: 24) {
-            if let input = queue.pending.first {
-                LanguageChoice(
-                    input: input,
-                    waitingAfter: queue.pending.count - 1,
-                    choose: { start(input, in: $0) },
-                    remove: { queue.discard(input) })
-            } else {
-                VStack(spacing: 12) {
-                    BrandMark()
-                    BrandLine()
-                }
+            VStack(spacing: 12) {
+                BrandMark()
+                BrandLine()
             }
 
             HStack(spacing: 0) {
@@ -408,8 +428,23 @@ struct ContentView: View {
         }
     }
 
-    // The drop target is also the file picker.
+    // The import half: the drop target and file picker, or, while an input waits
+    // for its language, that question in the same place (LTR-72).
+    @ViewBuilder
     private var importZone: some View {
+        if let input = queue.pending.first {
+            pendingZone(input)
+        } else {
+            dropZone
+        }
+    }
+
+    private var importBackground: AnyShapeStyle {
+        isTargeted ? AnyShapeStyle(Color.accentColor.opacity(0.12)) : AnyShapeStyle(Theme.recessed)
+    }
+
+    // The drop target is also the file picker.
+    private var dropZone: some View {
         Button(action: chooseFiles) {
             VStack(spacing: 6) {
                 Text(isTargeted ? "Drop to add" : "Drop media")
@@ -417,12 +452,12 @@ struct ContentView: View {
                 Text("or click to choose files")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                Text("⌘V pastes a YouTube link")
+                Text("⌘V pastes media or a YouTube link")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(isTargeted ? AnyShapeStyle(Color.accentColor.opacity(0.12)) : AnyShapeStyle(Theme.recessed))
+            .background(importBackground)
             .contentShape(Rectangle())
         }
         // The system ring is drawn on the button's rectangle and would stick out
@@ -439,7 +474,64 @@ struct ContentView: View {
         .buttonStyle(.plain)
         .disabled(!recorder.isIdle)
         .accessibilityLabel("Choose files")
-        .accessibilityHint("Or drop media, or press Command V to paste a YouTube link")
+        .accessibilityHint("Or drop media, or press Command V to paste media or a YouTube link")
+    }
+
+    // Which input waits, and one menu whose choice starts it: no language is
+    // preselected and there is no Start button. Drops and ⌘V still add more.
+    private func pendingZone(_ input: PendingInput) -> some View {
+        VStack(spacing: 6) {
+            Text("Which language is spoken in")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            // Two lines: a recording is told apart by the time in its long name.
+            Text(input.name)
+                .font(.headline)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .truncationMode(.middle)
+                .help(input.name)
+            if input.recording != nil {
+                Text("Saved in your library folder")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Menu("Choose Language") {
+                if queue.recentLanguages.isEmpty {
+                    languageButtons(TranscriptionLanguage.byTitle, for: input)
+                } else {
+                    Section("Recent") { languageButtons(queue.recentLanguages, for: input) }
+                    Section("All Languages") { languageButtons(TranscriptionLanguage.byTitle, for: input) }
+                }
+            }
+            .fixedSize()
+            .padding(.vertical, 2)
+            .accessibilityLabel("Choose the language spoken in \(input.name)")
+
+            HStack(spacing: 10) {
+                Button("Remove") { queue.discard(input) }
+                    .help(input.recording != nil
+                          ? "Don’t transcribe it now. The recording stays in your library folder."
+                          : "Don’t transcribe it. The original is not changed.")
+                Button("Add Files…", action: chooseFiles)
+                if queue.pending.count > 1 {
+                    Text("\(queue.pending.count - 1) more waiting")
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .buttonStyle(.borderless)
+            .font(.caption)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(importBackground)
+    }
+
+    private func languageButtons(_ languages: [TranscriptionLanguage], for input: PendingInput) -> some View {
+        ForEach(languages) { language in
+            Button(language.title) { start(input, in: language) }
+        }
     }
 
     // Record is one more input: the finished recording is saved to the output
@@ -736,9 +828,10 @@ struct ContentView: View {
     }
 
     // The language was chosen for this input: it becomes a job and starts, or waits
-    // for the jobs before it.
+    // for the jobs before it. This window opens the transcript when the request settles.
     private func start(_ input: PendingInput, in language: TranscriptionLanguage) {
-        guard let job = queue.start(input, locale: language.locale) else { return }
+        autoOpen.languageChosen()
+        guard let job = queue.start(input, language: language, requester: windowID) else { return }
         if case .file(let url) = job.source {
             Task { job.mediaInfo = await loadMediaInfo(for: url) }
         }
@@ -904,8 +997,8 @@ enum TranscriptionLanguage: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var locale: Locale { Locale(identifier: rawValue) }
 
-    // Offered as buttons; the rest are in a menu.
-    static let prominent: [Self] = [.dutch, .english, .russian]
+    // The language menu's full list.
+    static let byTitle = allCases.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
 
     var title: String {
         switch self {
@@ -923,62 +1016,6 @@ enum TranscriptionLanguage: String, CaseIterable, Identifiable {
     }
 }
 
-
-// The language of the first input that waits for one (LTR-72). Choosing it is the
-// start: there is no default language and no Start button.
-private struct LanguageChoice: View {
-    let input: PendingInput
-    let waitingAfter: Int
-    let choose: (TranscriptionLanguage) -> Void
-    let remove: () -> Void
-
-    var body: some View {
-        VStack(spacing: 10) {
-            VStack(spacing: 2) {
-                Text("Choose the language spoken in")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Text(input.name)
-                    .font(.headline)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                    .help(input.name)
-            }
-
-            HStack(spacing: 8) {
-                ForEach(TranscriptionLanguage.prominent) { language in
-                    Button(language.title) { choose(language) }
-                }
-                Menu("Other") {
-                    ForEach(TranscriptionLanguage.allCases.filter { !TranscriptionLanguage.prominent.contains($0) }) { language in
-                        Button(language.title) { choose(language) }
-                    }
-                }
-                .fixedSize()
-            }
-
-            HStack(spacing: 12) {
-                if input.recording != nil {
-                    Text("The recording is saved in your library folder.")
-                }
-                if waitingAfter > 0 {
-                    Text(waitingAfter == 1 ? "1 more waits for its language" : "\(waitingAfter) more wait for their language")
-                }
-                Button("Remove", action: remove)
-                    .controlSize(.small)
-                    .help(input.recording != nil
-                          ? "Don’t transcribe it now. The recording stays in your library folder."
-                          : "Don’t transcribe it. The original is not changed.")
-            }
-            .font(.caption)
-            .foregroundStyle(.secondary)
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity)
-        .background(Theme.raised)
-        .surface()
-    }
-}
 
 // The alerts of the library actions: a name to type, a Trash confirmation, a failure.
 private struct LibraryPromptModifier: ViewModifier {

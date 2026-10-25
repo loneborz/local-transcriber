@@ -271,6 +271,30 @@ final class ManagedScanTests: ManagedLibraryCase {
         XCTAssertEqual(listing.folders, [])
     }
 
+    // LTR-72: a recording left waiting for its language (for example at quit) is found
+    // again, at the top level and in an organization folder, oldest first.
+    func testASavedRecordingWithoutATranscriptIsListedAsUntranscribed() throws {
+        let top = try makeFolder("Recording A")
+        try EntryMetadata.create(EntryMetadata(createdAt: created.addingTimeInterval(60)), top)
+        try write("audio", "Recording A/Recording A.m4a")
+        try FileManager.default.createDirectory(at: folder.appendingPathComponent("Work/Recording B"), withIntermediateDirectories: true)
+        try EntryMetadata.create(EntryMetadata(createdAt: created), folder.appendingPathComponent("Work/Recording B"))
+        try write("audio", "Work/Recording B/Recording B.m4a")
+        try EntryMetadata.create(EntryMetadata(createdAt: created), try makeFolder("Half"))    // no audio of its name
+        let listing = try scan()
+        XCTAssertEqual(listing.items, [])
+        XCTAssertEqual(listing.untranscribed.map(\.audio.lastPathComponent), ["Recording B.m4a", "Recording A.m4a"])
+        XCTAssertEqual(listing.untranscribed.map(\.folder.lastPathComponent), ["Recording B", "Recording A"])
+        XCTAssertEqual(listing.untranscribed.map(\.createdAt), [created, created.addingTimeInterval(60)])
+
+        // Its transcript goes into that folder; then it is an entry, not untranscribed.
+        try LibraryOperations.writeEntry(baseName: "ignored", in: folder, existingFolder: top, markdown: markdown(), createdAt: created)
+        let after = try scan()
+        XCTAssertEqual(after.items.map(\.markdownURL.lastPathComponent), ["Recording A.md"])
+        XCTAssertEqual(after.untranscribed.map(\.folder.lastPathComponent), ["Recording B"])
+        XCTAssertTrue(FileManager.default.fileExists(atPath: top.appendingPathComponent("Recording A.m4a").path))
+    }
+
     func testSymbolicLinksAreNeverFollowedInsideFoldersEither() throws {
         let outside = FileManager.default.temporaryDirectory.appendingPathComponent("outside-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: false)
