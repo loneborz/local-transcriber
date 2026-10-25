@@ -1,4 +1,5 @@
 import AVFoundation
+import os
 import Speech
 
 enum TranscriptionPhase: Sendable {
@@ -16,6 +17,8 @@ enum TranscriptionPhase: Sendable {
 }
 
 enum TranscriptionService {
+    private static let log = Logger(subsystem: "nl.wavesweb.LocalTranscriber", category: "assets")
+
     static func transcribe(
         url: URL,
         locale: Locale,
@@ -108,12 +111,17 @@ enum TranscriptionService {
             throw TranscriptionError.unsupportedLocale(transcriptLocaleIdentifier)
         }
 
+        // The installation request reserves the locale if it is not yet reserved, and
+        // throws when the app's reservations are used up (LTR-73).
+        let assetLocale = speechLocale ?? dictationLocale ?? locale
+        await Self.makeRoomForReservation(of: assetLocale)
         if let installationRequest = try await AssetInventory.assetInstallationRequest(
             supporting: [transcriber]
         ) {
             onPhaseChange(.preparingLanguage)
             try await installationRequest.downloadAndInstall()
         }
+        Self.recordUse(of: assetLocale)
 
         let analyzer = SpeechAnalyzer(modules: [transcriber])
         async let segments = try await collectSegments()
@@ -139,6 +147,32 @@ enum TranscriptionService {
             segments: collected.segments,
             recognition: collected.recognition
         )
+    }
+
+    // UserDefaults key: the locales prepared by this app, most recently used first.
+    private static let localeUseKey = "speechLocalesByUse"
+
+    // Releases the least recently used other reservations when the app's allowance
+    // would not fit this locale; nothing while there is room, so prepared languages
+    // keep their assets. Jobs run one at a time (BatchQueue), so no recognition is
+    // using a released locale. A release that fails leaves the request to throw.
+    private static func makeRoomForReservation(of locale: Locale) async {
+        let reserved = await AssetInventory.reservedLocales
+        let release = LocaleReservations.toRelease(
+            needed: locale.identifier,
+            reserved: reserved.map(\.identifier),
+            maximum: AssetInventory.maximumReservedLocales,
+            recentlyUsed: UserDefaults.standard.stringArray(forKey: localeUseKey) ?? []
+        )
+        log.info("assets: need \(locale.identifier, privacy: .public); reserved \(reserved.map(\.identifier), privacy: .public) of \(AssetInventory.maximumReservedLocales, privacy: .public); releasing \(release, privacy: .public)")
+        for reservedLocale in reserved where release.contains(reservedLocale.identifier) {
+            await AssetInventory.release(reservedLocale: reservedLocale)
+        }
+    }
+
+    private static func recordUse(of locale: Locale) {
+        let used = UserDefaults.standard.stringArray(forKey: localeUseKey) ?? []
+        UserDefaults.standard.set(LocaleReservations.used(locale.identifier, in: used), forKey: localeUseKey)
     }
 
     private static func exactSupportedLocale(
