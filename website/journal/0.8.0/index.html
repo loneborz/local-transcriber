@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>0.8.0: Nothing lost on the way out - Local Transcriber Journal</title>
+<meta name="description" content="0.7.0 gave transcripts a place to live. 0.8.0 makes sure a recording survives closing the window, lets you drag transcripts into folders, adds an optional YAML header for Obsidian and stops the idle window from keeping a CPU core busy.">
+<meta name="theme-color" content="#f3f0ea">
+<link rel="canonical" href="https://transcribe.wavesweb.nl/journal/0.8.0/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Local Transcriber">
+<meta property="og:locale" content="en_US">
+<meta property="og:url" content="https://transcribe.wavesweb.nl/journal/0.8.0/">
+<meta property="og:title" content="0.8.0: Nothing lost on the way out - Local Transcriber Journal">
+<meta property="og:description" content="0.7.0 gave transcripts a place to live. 0.8.0 makes sure a recording survives closing the window, lets you drag transcripts into folders, adds an optional YAML header for Obsidian and stops the idle window from keeping a CPU core busy.">
+<meta property="og:image" content="https://transcribe.wavesweb.nl/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Local Transcriber: Media in. Markdown out. The Local Transcriber window with a transcription in progress, pinned and recent transcripts and folders, and an open transcript with its current line highlighted.">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="stylesheet" href="/styles.css">
+<script>
+  // Light unless the visitor explicitly saved dark. The OS appearance is ignored.
+  (function () {
+    var root = document.documentElement;
+    root.classList.add("js");
+    try {
+      if (localStorage.getItem("lt-theme") === "dark") {
+        root.setAttribute("data-theme", "dark");
+        document.querySelector('meta[name="theme-color"]').content = "#171214";
+      }
+    } catch (e) {}
+  })();
+</script>
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="nav">
+  <div class="wrap nav-inner">
+    <a class="brand" href="/">
+      <svg class="mark" viewBox="0 0 66 52" width="24" height="19" aria-hidden="true" focusable="false">
+        <rect x="0" y="19" width="6" height="14" rx="3"/>
+        <rect x="10" y="13" width="6" height="26" rx="3"/>
+        <rect x="20" y="7" width="6" height="38" rx="3"/>
+        <rect x="30" y="0" width="6" height="52" rx="3"/>
+        <rect x="40" y="7" width="6" height="38" rx="3"/>
+        <rect x="50" y="13" width="6" height="26" rx="3"/>
+        <rect x="60" y="19" width="6" height="14" rx="3"/>
+      </svg>
+      Local Transcriber
+    </a>
+    <nav class="nav-links" aria-label="Sections">
+      <a href="/#how">How it works</a>
+      <a href="/#output">Output</a>
+      <a href="/#local">Local and network</a>
+      <a href="/#download">Download</a>
+    </nav>
+    <div class="nav-tools">
+      <a class="nav-gh" href="/">Home</a>
+      <a class="nav-gh" href="https://github.com/loneborz/local-transcriber" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <button class="theme-toggle" type="button" data-theme-toggle aria-pressed="false" aria-label="Dark theme">
+        <svg class="icon-sun" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4"/><path d="M12 3.2v1.9M12 18.9v1.9M3.2 12h1.9M18.9 12h1.9M5.8 5.8l1.3 1.3M16.9 16.9l1.3 1.3M5.8 18.2l1.3-1.3M16.9 7.1l1.3-1.3"/></svg>
+        <svg class="icon-moon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M18.6 14.8A7.4 7.4 0 1 1 9.2 5.4a6 6 0 0 0 9.4 9.4z"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main id="main" class="section journal">
+  <div class="wrap">
+    <article class="journal-grid" id="top">
+      <div>
+        <a class="back" href="/journal/">&larr; Journal</a>
+        <p class="journal-meta">0.8.0<br>Oct 17–25, 2026<br>GitHub Release</p>
+      </div>
+      <div>
+        <h1>Nothing lost on the way out</h1>
+        <p class="lead">0.7.0 gave every transcript a place to live. 0.8.0 is a set of smaller changes that came from using it: a recording survives closing the window, transcripts move by dragging them onto a folder, the output folder sits where it is used, and a transcript can start with a YAML header for Obsidian. The speech recognition is the same as in 0.7, and so is the Markdown unless I turn that header on.</p>
+        <div class="prose">
+          <h2>A recording could disappear</h2>
+          <p>Until now, closing the window while it was recording ended the recording without asking, and so did quitting the app. What had been captured never reached the output folder. For a tool whose whole job is to keep what was said, that was the worst kind of failure: silent.</p>
+          <p>Now both ask first. Keep Recording is the default, and Escape picks it too. Stop and Save stops, saves the audio and waits until the file is really in the output folder before it lets go. Closing the window then transcribes the recording in the background, as if I had pressed Stop. Quitting saves only the audio and says so: the app is about to go away, so it doesn't start a transcription it can't finish, and I can add the audio again later like any other file. If the save fails, for example because the output folder is gone, the window stays open until I choose another folder.</p>
+          <p>A crash or a force quit still loses a recording. That is a different problem, and this version doesn't solve it.</p>
+          <h2>Things where they are used</h2>
+          <p>The output folder used to be a row in Settings, far from where it matters. It now sits in the footer of the window as "Saves to" and the folder's name, next to the language menu that decides how the next transcript is made. A click chooses another folder, a right-click shows it in Finder, and while something is transcribing or recording it can't change.</p>
+          <p>Folders in the library came with 0.7.0, but moving a transcript into one meant a context menu. Now I drag it onto the folder, from Recent, from Pinned or from another folder. The files and their metadata go along unchanged, a name that already exists in the folder is refused with a message, and a transcript that is open stays open. If it is playing, it keeps playing from the same point.</p>
+          <p>Settings also got an Appearance choice. System follows macOS; Light and Dark stay put whatever macOS does.</p>
+          <h2>A header for Obsidian</h2>
+          <p>Obsidian reads a YAML block at the top of a note as its properties, so in Settings there is now Add YAML Frontmatter to New Transcripts. It is off by default. When it's on, a new transcript starts with the source, the language, the transcriber, the duration in seconds and, when the app knows it, when a recording was made or when a YouTube video was published. There is no title, because the folder's name already is one, and a value the app doesn't know is left out rather than guessed.</p>
+          <p>Below the block is exactly the Markdown the app would have written without it. Turning the setting on or off never touches transcripts that already exist. Copy leaves the block out, so pasting a transcript somewhere else gives the text and not the metadata.</p>
+          <h2>A window that was busy doing nothing</h2>
+          <p>While working on this release I saw the app use close to a full CPU core whenever its window was in front, even with nothing happening. The menu commands were being rebuilt on every pass of SwiftUI, and each rebuild caused another pass. With that fixed, the idle window uses practically nothing. The fix briefly broke something else, ⌘V right after a language change used the old language, and that is fixed too. Neither problem reached a public version before this one.</p>
+          <p>Dutch transcripts can still come back thin.</p>
+        </div>
+        <nav aria-label="Journal">
+          <a class="back" href="/journal/">&larr; Back to the Journal</a>
+          <a class="back" href="/journal/0.7.0/" rel="prev">Earlier story: 0.7.0</a>
+        </nav>
+      </div>
+    </article>
+  </div>
+</main>
+
+<footer class="footer">
+  <div class="wrap footer-inner">
+    <p>
+      Local Transcriber is open source under the
+      <a href="https://github.com/loneborz/local-transcriber/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT License</a>.
+      A <a href="https://wavesweb.nl/">Wavesweb</a> Labs project.
+    </p>
+    <nav aria-label="Footer">
+      <a href="/journal/">Journal</a>
+      <a href="https://github.com/loneborz/local-transcriber" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <a href="https://github.com/loneborz/local-transcriber#readme" target="_blank" rel="noopener noreferrer">README</a>
+      <a href="#top">Back to top</a>
+    </nav>
+  </div>
+</footer>
+
+<script>
+  (function () {
+    var root = document.documentElement;
+    var button = document.querySelector("[data-theme-toggle]");
+    var meta = document.querySelector('meta[name="theme-color"]');
+    function sync() {
+      var dark = root.getAttribute("data-theme") === "dark";
+      button.setAttribute("aria-pressed", dark ? "true" : "false");
+      meta.content = dark ? "#171214" : "#f3f0ea";
+    }
+    button.addEventListener("click", function () {
+      var next = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
+      // Switch with transitions off, so the change lands at once.
+      root.classList.add("theme-switching");
+      root.setAttribute("data-theme", next);
+      getComputedStyle(root).colorScheme;
+      root.classList.remove("theme-switching");
+      try { localStorage.setItem("lt-theme", next); } catch (e) {}
+      sync();
+    });
+    sync();
+  })();
+</script>
+
+</body>
+</html>
