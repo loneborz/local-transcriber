@@ -961,20 +961,15 @@ struct ContentView: View {
     }
 }
 
-// The brand mark: the website's seven-bar geometry. Static and decorative.
+// The brand mark: the SF Symbol waveform (LTR-55). Static and decorative.
 private struct BrandMark: View {
-    private let barHeights: [CGFloat] = [14, 26, 38, 52, 38, 26, 14]
-
     var body: some View {
-        HStack(spacing: 4) {
-            ForEach(barHeights.indices, id: \.self) { index in
-                Capsule()
-                    .fill(.primary)
-                    .frame(width: 6, height: barHeights[index])
-            }
-        }
-        .frame(width: 66, height: 52)
-        .accessibilityHidden(true)
+        Image(systemName: "waveform")
+            .font(.system(size: 44, weight: .medium))
+            .foregroundStyle(.primary)
+            // The former mark's height, so the spacing to the headline stays.
+            .frame(height: 52)
+            .accessibilityHidden(true)
     }
 }
 

@@ -174,7 +174,7 @@ struct WorkspaceSidebar: View {
     // Back to New Transcription, the same move as choosing it in the list.
     private var homeButton: some View {
         Button(action: onNewTranscription) {
-            Label("Home", systemImage: "house")
+            Label("Home", systemImage: "house.fill")
                 .frame(maxWidth: .infinity)
         }
         .buttonStyle(.borderedProminent)
