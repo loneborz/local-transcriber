@@ -12,15 +12,18 @@ extension FocusedValues {
 // A window's menu action. Every body pass publishes its focused values again, and a
 // closure never equals the previous one: the menus would rebuild, the window would
 // update and publish again, every frame, for as long as it is frontmost (LTR-68).
-// So a value equals the last one from the same window; the action itself stays the
-// same, since it reaches the window's state through its @State storage.
+// So a value equals the last one from the same window, and the menu keeps calling
+// the first action. That action reads the window's @State live, but any other view
+// state (such as @AppStorage) as it was then: such state goes in `inputs`, so a
+// change publishes a new action (LTR-70).
 struct WindowAction: Equatable {
     let window: UUID
+    var inputs: AnyHashable? = nil
     let perform: () -> Void
 
     func callAsFunction() { perform() }
 
-    static func == (a: Self, b: Self) -> Bool { a.window == b.window }
+    static func == (a: Self, b: Self) -> Bool { a.window == b.window && a.inputs == b.inputs }
 }
 
 // A question the library asks before it acts, or a failure it reports.
@@ -108,7 +111,7 @@ struct ContentView: View {
         } isTargeted: { targeted in
             isTargeted = targeted
         }
-        .focusedSceneValue(\.pasteLinks, WindowAction(window: windowID, perform: pasteFromClipboard))
+        .focusedSceneValue(\.pasteLinks, WindowAction(window: windowID, inputs: selectedLanguage, perform: pasteFromClipboard))
         .focusedSceneValue(\.refreshTranscripts, WindowAction(window: windowID) { refreshLibrary() })
         .focusedSceneValue(\.libraryCommands, LibraryCommands(
             window: windowID, selected: selectedTranscript, canCreateFolder: destination.isReady, request: handle))
