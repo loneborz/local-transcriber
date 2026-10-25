@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>0.9.0: Transcription, in your language - Local Transcriber Journal</title>
+<meta name="description" content="0.8.0 kept recordings safe on the way out. 0.9.0 asks which language is spoken in every file, link and recording, keeps a recording until it has one, opens the transcript when it is done, and tidies the place where it all starts.">
+<meta name="theme-color" content="#f3f0ea">
+<link rel="canonical" href="https://transcribe.wavesweb.nl/journal/0.9.0/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Local Transcriber">
+<meta property="og:locale" content="en_US">
+<meta property="og:url" content="https://transcribe.wavesweb.nl/journal/0.9.0/">
+<meta property="og:title" content="0.9.0: Transcription, in your language - Local Transcriber Journal">
+<meta property="og:description" content="0.8.0 kept recordings safe on the way out. 0.9.0 asks which language is spoken in every file, link and recording, keeps a recording until it has one, opens the transcript when it is done, and tidies the place where it all starts.">
+<meta property="og:image" content="https://transcribe.wavesweb.nl/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Local Transcriber: Media in. Markdown out. The Local Transcriber window with Transcribe selected, a transcription in progress, pinned and recent transcripts and folders.">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="stylesheet" href="/styles.css">
+<script>
+  // Light unless the visitor explicitly saved dark. The OS appearance is ignored.
+  (function () {
+    var root = document.documentElement;
+    root.classList.add("js");
+    try {
+      if (localStorage.getItem("lt-theme") === "dark") {
+        root.setAttribute("data-theme", "dark");
+        document.querySelector('meta[name="theme-color"]').content = "#171214";
+      }
+    } catch (e) {}
+  })();
+</script>
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="nav">
+  <div class="wrap nav-inner">
+    <a class="brand" href="/">
+      <svg class="mark" viewBox="0 0 66 52" width="24" height="19" aria-hidden="true" focusable="false">
+        <rect x="0" y="19" width="6" height="14" rx="3"/>
+        <rect x="10" y="13" width="6" height="26" rx="3"/>
+        <rect x="20" y="7" width="6" height="38" rx="3"/>
+        <rect x="30" y="0" width="6" height="52" rx="3"/>
+        <rect x="40" y="7" width="6" height="38" rx="3"/>
+        <rect x="50" y="13" width="6" height="26" rx="3"/>
+        <rect x="60" y="19" width="6" height="14" rx="3"/>
+      </svg>
+      Local Transcriber
+    </a>
+    <nav class="nav-links" aria-label="Sections">
+      <a href="/#how">How it works</a>
+      <a href="/#output">Output</a>
+      <a href="/#local">Local and network</a>
+      <a href="/#download">Download</a>
+    </nav>
+    <div class="nav-tools">
+      <a class="nav-gh" href="/">Home</a>
+      <a class="nav-gh" href="https://github.com/loneborz/local-transcriber" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <button class="theme-toggle" type="button" data-theme-toggle aria-pressed="false" aria-label="Dark theme">
+        <svg class="icon-sun" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4"/><path d="M12 3.2v1.9M12 18.9v1.9M3.2 12h1.9M18.9 12h1.9M5.8 5.8l1.3 1.3M16.9 16.9l1.3 1.3M5.8 18.2l1.3-1.3M16.9 7.1l1.3-1.3"/></svg>
+        <svg class="icon-moon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M18.6 14.8A7.4 7.4 0 1 1 9.2 5.4a6 6 0 0 0 9.4 9.4z"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main id="main" class="section journal">
+  <div class="wrap">
+    <article class="journal-grid" id="top">
+      <div>
+        <a class="back" href="/journal/">&larr; Journal</a>
+        <p class="journal-meta">0.9.0<br>Oct 25, 2026<br>GitHub Release</p>
+      </div>
+      <div>
+        <h1>Transcription, in your language</h1>
+        <p class="lead">Until now the language was a menu in the footer. Whatever it said when a file arrived was the language that file got, so files in different languages one after another meant changing the menu in between, and forgetting it meant a transcript in the wrong language. 0.9.0 asks for every file, link and recording instead. The speech recognition is the same as in 0.8; what changed is how a file gets to it.</p>
+        <div class="prose">
+          <h2>One question per file</h2>
+          <p>When I drop a file, paste one or a YouTube link with ⌘V, or choose files from the window, the New Transcription area asks which language is spoken in it. It shows the name and one Choose Language menu, and nothing is preselected: the app doesn't guess. Choosing a language starts the transcription. The three languages I used most recently sit at the top of the menu, so switching between them is one click, and every other supported language is right below.</p>
+          <p>Several files at once are offered one at a time. I can give the next one its language while the first is still transcribing; they run one after another, in order. Remove skips a file without touching the original.</p>
+          <h2>Record first, decide later</h2>
+          <p>A recording is now saved to its own folder before the app asks for its language. If I quit before answering, nothing is lost: the next time the app opens, it offers the recording again and writes the transcript next to the audio. Closing the window while recording still asks first, and the saved recording waits for its language in another window. A crash or a force quit during a recording still loses it.</p>
+          <h2>The transcript comes to me</h2>
+          <p>In 0.7 and 0.8 a finished transcript only appeared in the library with a New badge. Now, when everything I started in a window is done, that window opens the last transcript it saved. If I have opened something else in the meantime, it leaves me there, and a run that only failed opens nothing.</p>
+          <h2>A calmer place to start</h2>
+          <p>The New Transcription screen is one compact surface: the drop area, and below it a single row to record an app's audio, the microphone or both, under the waveform mark. Transcribe at the top of the sidebar brings me back to it and stays selected while it is shown. New Folder is the plus button next to Folders. The footer keeps only the output folder and Settings.</p>
+          <h2>The sixth language</h2>
+          <p>While testing all of this, a transcription in a sixth different language failed with "Too many allocated locales". Apple lets an app keep only a few languages reserved at a time, five on my Mac, and the app never gave one back. Now, when a new language needs room, it releases the one it used least recently. macOS may then remove that language's files, so using it again can mean another download, and until then it may not work offline.</p>
+          <p>The app still doesn't detect the language by itself, and the recognition is Apple's. Dutch transcripts can still come back thin.</p>
+        </div>
+        <nav aria-label="Journal">
+          <a class="back" href="/journal/">&larr; Back to the Journal</a>
+          <a class="back" href="/journal/0.8.0/" rel="prev">Earlier story: 0.8.0</a>
+        </nav>
+      </div>
+    </article>
+  </div>
+</main>
+
+<footer class="footer">
+  <div class="wrap footer-inner">
+    <p>
+      Local Transcriber is open source under the
+      <a href="https://github.com/loneborz/local-transcriber/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT License</a>.
+      A <a href="https://wavesweb.nl/">Wavesweb</a> Labs project.
+    </p>
+    <nav aria-label="Footer">
+      <a href="/journal/">Journal</a>
+      <a href="https://github.com/loneborz/local-transcriber" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <a href="https://github.com/loneborz/local-transcriber#readme" target="_blank" rel="noopener noreferrer">README</a>
+      <a href="#top">Back to top</a>
+    </nav>
+  </div>
+</footer>
+
+<script>
+  (function () {
+    var root = document.documentElement;
+    var button = document.querySelector("[data-theme-toggle]");
+    var meta = document.querySelector('meta[name="theme-color"]');
+    function sync() {
+      var dark = root.getAttribute("data-theme") === "dark";
+      button.setAttribute("aria-pressed", dark ? "true" : "false");
+      meta.content = dark ? "#171214" : "#f3f0ea";
+    }
+    button.addEventListener("click", function () {
+      var next = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
+      // Switch with transitions off, so the change lands at once.
+      root.classList.add("theme-switching");
+      root.setAttribute("data-theme", next);
+      getComputedStyle(root).colorScheme;
+      root.classList.remove("theme-switching");
+      try { localStorage.setItem("lt-theme", next); } catch (e) {}
+      sync();
+    });
+    sync();
+  })();
+</script>
+
+</body>
+</html>
