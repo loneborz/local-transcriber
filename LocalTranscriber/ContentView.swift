@@ -394,7 +394,6 @@ struct ContentView: View {
                 Theme.rule.frame(width: 1).accessibilityHidden(true)
                 recordZone
                     .frame(width: 260)
-                    .frame(maxHeight: .infinity)
                     .background(Theme.raised)
             }
             .fixedSize(horizontal: false, vertical: true)
@@ -439,6 +438,10 @@ struct ContentView: View {
         }
     }
 
+    // Both halves start their content at this inset from the surface's top
+    // edge, so the import and record headings share one line (LTR-55).
+    private static let inputInset: CGFloat = 16
+
     private var importBackground: AnyShapeStyle {
         isTargeted ? AnyShapeStyle(Color.accentColor.opacity(0.12)) : AnyShapeStyle(Theme.recessed)
     }
@@ -456,7 +459,8 @@ struct ContentView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(Self.inputInset)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .background(importBackground)
             .contentShape(Rectangle())
         }
@@ -531,8 +535,8 @@ struct ContentView: View {
             .buttonStyle(.borderless)
             .font(.caption)
         }
-        .padding(16)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(Self.inputInset)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(importBackground)
     }
 
@@ -553,8 +557,7 @@ struct ContentView: View {
                     Text("Record audio")
                         .font(.headline)
                         .accessibilityAddTraits(.isHeader)
-                    appPicker(maxWidth: 200)
-                    micToggle
+                    sourceControls
                     recordButton
                         .controlSize(.large)
                         .padding(.top, 2)
@@ -564,13 +567,31 @@ struct ContentView: View {
                 recordingStatus(compact: false)
             }
         }
-        .padding(16)
+        .padding(Self.inputInset)
         // The idle controls' height, so the surface keeps its size while
         // starting, recording and saving.
-        .frame(minHeight: 148)
+        .frame(minHeight: 148, maxHeight: .infinity, alignment: .top)
     }
 
-    private func appPicker(maxWidth: CGFloat) -> some View {
+    // Mic beside the picker; below it only when one row cannot fit. The row's
+    // picker has a fixed ideal width, so a long app name truncates instead of
+    // switching the layout, and then fills what Mic leaves.
+    private var sourceControls: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 8) {
+                appPicker
+                    .frame(minWidth: 120, idealWidth: 120, maxWidth: .infinity)
+                micToggle
+            }
+            VStack(spacing: 10) {
+                appPicker
+                    .frame(maxWidth: 200)
+                micToggle
+            }
+        }
+    }
+
+    private var appPicker: some View {
         Picker("App audio", selection: $recorder.selectedAppID) {
             Text("No app audio").tag(String?.none)
             Divider()
@@ -580,7 +601,6 @@ struct ContentView: View {
         }
         .labelsHidden()
         .pickerStyle(.menu)
-        .frame(maxWidth: maxWidth)
         // The full name of a selected app, which the picker may truncate.
         .help(recorder.apps.first { $0.id == recorder.selectedAppID }?.name ?? "")
     }
