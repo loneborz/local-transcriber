@@ -22,15 +22,17 @@ Drag media onto the window, paste a YouTube link with ⌘V, or press Record. The
 
 - Local files: MP4, MOV, M4A, MP3 and WAV. For video, AVFoundation first extracts the audio to a temporary M4A.
 - YouTube links: `youtube.com` (including `www.`, `m.` and `music.`) and `youtu.be` watch, shorts, live and embed links. A link transcribes one video, so playlist parameters are dropped.
-- Recordings: the microphone, one running app's audio, or both. Nothing is captured until you press Record, and macOS asks for the microphone and Screen & System Audio Recording permissions the first time you need them, not at launch. Stop saves the M4A in its own folder, `Recording <date> <time> (<source>)/`, in the output folder and transcribes it like any dropped file; the transcript is written into the same folder. The recording stays there, and the app never deletes it by itself (Move to Trash in the sidebar moves the whole folder to the Trash, after asking). Whole-system audio is not offered, and the app keeps no video or screen recordings.
+- Recordings: the microphone, one running app's audio, or both. Nothing is captured until you press Record, and macOS asks for the microphone and Screen & System Audio Recording permissions the first time you need them, not at launch. Stop saves the M4A in its own folder, `Recording <date> <time> (<source>)/`, in the output folder and transcribes it like any dropped file; the transcript is written into the same folder. The recording stays there, and the app never deletes it by itself (Move to Trash in the sidebar moves the whole folder to the Trash, after asking). Closing the window or quitting while you record asks first: Keep Recording, or Stop and Save. Closing saves the recording and transcribes it in the background; quitting saves only the audio and skips the transcription. Whole-system audio is not offered, and the app keeps no video or screen recordings.
 
 Each job has its own language, taken from the footer's language menu when the job is accepted: English (`en-US`), Dutch (`nl-NL`), German (`de-DE`), French (`fr-FR`), Russian (`ru-RU`), Spanish (`es-ES`), Italian (`it-IT`), Portuguese (`pt-BR`), Turkish (`tr-TR`) or Swedish (`sv-SE`). Changing the menu later doesn't affect a job that has started. For the language you pick, the app uses whichever Apple speech module supports it, and macOS may download Apple's language assets the first time you use one.
 
 There is no waiting queue. While a job is running, or a failed or unsaved one is still showing in Processing, other files and links are refused with an explanation instead of being queued, and Record is unavailable; dropping several files at once is refused as a whole. A failed job offers Retry, Show Original and Dismiss. If an automatic save fails, the job stays complete and offers Save Transcript…, Copy and Dismiss. Finishing a job never opens or selects the transcript for you.
 
+Settings (⌘,) has Appearance: System follows macOS, while Light and Dark keep the app in that look whatever macOS uses.
+
 ## Output
 
-The first time you transcribe, the app asks for an output folder and remembers it. It never overwrites anything: each transcript gets its own folder named after the media (`Weekly Meeting/`), and a name that already exists becomes `Weekly Meeting 2/`, `Weekly Meeting 3/` and so on.
+The first time you transcribe, the app asks for an output folder and remembers it. To change it, click "Saves to …" in the window's footer (right-click it to show the folder in Finder); it can't change while something is transcribing or recording. The app never overwrites anything: each transcript gets its own folder named after the media (`Weekly Meeting/`), and a name that already exists becomes `Weekly Meeting 2/`, `Weekly Meeting 3/` and so on.
 
 Each transcript is one Markdown file, ordered by audio time and grouped by minute:
 
@@ -63,7 +65,7 @@ Every new transcript is a folder with the same name inside:
 
 A YouTube link is saved the same way, named after the video's title. In that form the `Source` line names the downloaded audio file, not the video URL, and the audio is not kept.
 
-For research or archiving, turn on Save YouTube Links as Source Packages in Settings › General. The folder then also holds the audio and where it came from:
+For research or archiving, turn on Save YouTube Links as Source Packages in Settings. The folder then also holds the audio and where it came from:
 
 ```text
 <output folder>/
@@ -76,7 +78,7 @@ For research or archiving, turn on Save YouTube Links as Source Packages in Sett
 
 `source.json` is a small versioned file that the app defines itself (schema version 1). It holds the video's URL, ID, title, channel, publication date and duration, when it was fetched, the audio file name and the transcription language. `entry.json` (schema version 1) holds `createdAt` (the start of a recording, the moment a file was added, or the moment a link was fetched), and `pinned` and `archived` when set. An existing folder is never reused, and a folder that can't be completed isn't left half-written. Transcripts saved by v0.6 and earlier (a loose `.md`, or a source package with `transcript.md`) stay listed and readable and are never changed or moved; they can only be managed in Finder.
 
-For Obsidian Properties or other Markdown tools, turn on Add YAML Frontmatter to New Transcripts in Settings › General (off by default). Transcripts saved after that start with a YAML block, followed by the same Markdown as before:
+For Obsidian Properties or other Markdown tools, turn on Add YAML Frontmatter to New Transcripts in Settings (off by default). Transcripts saved after that start with a YAML block, followed by the same Markdown as before:
 
 ```yaml
 ---
@@ -92,7 +94,7 @@ Only values that are known are written: `source` (the file name, or the video's 
 
 ## Library and review
 
-The sidebar lists what is in your output folder: Pinned, Folders (real folders you create with the folder button or ⇧⌘N), Recent (transcripts in no folder) and Archive, with the one in progress above them. Right-click a transcript (or use the Transcript menu) to rename it, pin it, archive it, move it to a folder, or move it to the Trash. Rename changes the folder and file name only; archive changes nothing on disk except `entry.json`; Move to Trash asks first and never deletes permanently. The app scans the output folder and the folders directly inside it, nothing deeper. Nothing is imported and no database or index is created, so changes made in Finder show up after a refresh (⌘R). Select a transcript to read it in the window. The Markdown file stays the source of truth, and Copy puts all of it on the clipboard, except a YAML block at the top of the file.
+The sidebar lists what is in your output folder: Pinned, Folders (real folders you create with the folder button or ⇧⌘N), Recent (transcripts in no folder) and Archive, with the one in progress above them. Right-click a transcript (or use the Transcript menu) to rename it, pin it, archive it, move it to a folder, or move it to the Trash. You can also drag a transcript onto a folder to move it there; an open transcript stays open and keeps playing. Rename changes the folder and file name only; archive changes nothing on disk except `entry.json`; Move to Trash asks first and never deletes permanently. The app scans the output folder and the folders directly inside it, nothing deeper. Nothing is imported and no database or index is created, so changes made in Finder show up after a refresh (⌘R). Select a transcript to read it in the window. The Markdown file stays the source of truth, and Copy puts all of it on the clipboard, except a YAML block at the top of the file.
 
 Each new transcript also gets a `Name.timing.json` next to its Markdown (`transcript.timing.json` inside a source package) with the recognizer's timing. The Markdown itself doesn't change. The timing is used only when it belongs to that Markdown, by its checksum and the text of its lines. Otherwise the transcript opens as plain Markdown with a short note, which is also how transcripts made before 0.6 open.
 
@@ -110,7 +112,7 @@ YouTube audio is fetched by a small helper bundled in the app: a pinned [yt-dlp]
 - Recognition quality is Apple's. Dutch Dictation output can be sparse, and I haven't fixed that.
 - YouTube is the only link source (no other sites, playlists or channels), and a single download is limited to 30 minutes.
 - Retrying a job that fails for a lasting reason, such as an unavailable video, simply fails again. There is no retry limit or backoff.
-- The microphone is the system default input. A recording that hasn't been saved yet, for example because the output folder was unavailable, is not recovered if the app quits or crashes.
+- The microphone is the system default input. Closing or quitting asks before it ends a recording, but a recording is not recovered after a crash or a force quit, and quitting while a file is transcribing loses that job.
 - A failed write of a source package has been tested only for failure at folder creation, not later in the write.
 
 The app does not summarize, search, edit or correct transcripts, and it has no cloud transcription, accounts or model picker.
