@@ -94,9 +94,10 @@ private struct ProcessingRow: View {
                     .font(.callout)
                     .lineLimit(1)
                     .truncationMode(.middle)
-                Text(stage)
+                // The language this job was accepted with, not the current preference.
+                Text("\(language) · \(Text(stage).foregroundStyle(isFailure ? Color.red : Color.secondary))")
                     .font(.caption)
-                    .foregroundStyle(isFailure ? Color.red : Color.secondary)
+                    .foregroundStyle(.secondary)
                     .lineLimit(isFailure ? 2 : 1)
                 progress
             }
@@ -173,8 +174,6 @@ private struct ProcessingRow: View {
 
     private var details: some View {
         VStack(alignment: .leading, spacing: 6) {
-            languageLine
-
             if let metadata = job.metadata {
                 Text(metadata.detailText)
                     .font(.caption.monospacedDigit())
@@ -236,10 +235,8 @@ private struct ProcessingRow: View {
         .fixedSize(horizontal: false, vertical: true)
     }
 
-    private var languageLine: some View {
-        Text(TranscriptionLanguage.allCases.first { $0.locale == job.locale }?.title ?? job.locale.identifier)
-            .font(.caption)
-            .foregroundStyle(.secondary)
+    private var language: String {
+        TranscriptionLanguage.allCases.first { $0.locale == job.locale }?.title ?? job.locale.identifier
     }
 
     private var buttons: some View {

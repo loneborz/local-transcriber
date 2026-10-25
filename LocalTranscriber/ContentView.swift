@@ -400,11 +400,12 @@ struct ContentView: View {
         }
     }
 
-    // The drop target is also the file picker.
+    // The drop target is also the file picker. The language it will use is shown,
+    // and can be changed, before anything is added.
     private var importZone: some View {
         Button(action: chooseFiles) {
             VStack(spacing: 6) {
-                Text(isTargeted ? "Drop to add" : "Drop media")
+                Text(isTargeted ? "Drop to transcribe in \(selectedLanguage.title)" : "Drop media")
                     .font(.headline)
                 Text("or click to choose files")
                     .font(.caption)
@@ -413,6 +414,8 @@ struct ContentView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            // Room for the language row below.
+            .padding(.bottom, 30)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(isTargeted ? AnyShapeStyle(Color.accentColor.opacity(0.12)) : AnyShapeStyle(Theme.recessed))
             .contentShape(Rectangle())
@@ -432,6 +435,17 @@ struct ContentView: View {
         .disabled(!recorder.isIdle)
         .accessibilityLabel("Choose files")
         .accessibilityHint("Or drop media, or press Command V to paste a YouTube link")
+        // Over the button, not in it: a click on the menu must not open the file panel.
+        .overlay(alignment: .bottom) {
+            HStack(spacing: 6) {
+                Text("Language:")
+                languageMenu
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .controlSize(.small)
+            .padding(.bottom, 14)
+        }
     }
 
     // Record is one more input: the finished recording is saved to the output
@@ -649,21 +663,26 @@ struct ContentView: View {
         .padding(.vertical, 8)
     }
 
-    // The default language for newly added and recorded items (waiting items keep
-    // theirs). Locked while a recording runs; same preference as before.
     private var languagePicker: some View {
         HStack(spacing: 6) {
             Text("New items:")
-            Picker("Language for new items", selection: $selectedLanguage) {
-                ForEach(TranscriptionLanguage.allCases) { language in
-                    Text(language.title).tag(language)
-                }
-            }
-            .labelsHidden()
-            .pickerStyle(.menu)
-            .fixedSize()
-            .disabled(!destination.canChangeLanguage)
+            languageMenu
         }
+    }
+
+    // The language for newly added and recorded items; a started job keeps its own.
+    // The footer and the import zone show this one menu on the one preference, so
+    // they cannot disagree. Locked while a recording runs.
+    private var languageMenu: some View {
+        Picker("Language for new items", selection: $selectedLanguage) {
+            ForEach(TranscriptionLanguage.allCases) { language in
+                Text(language.title).tag(language)
+            }
+        }
+        .labelsHidden()
+        .pickerStyle(.menu)
+        .fixedSize()
+        .disabled(!destination.canChangeLanguage)
         .help(destination.canChangeLanguage
               ? "Language given to each new transcription when it starts."
               : "The language can’t change while recording.")
