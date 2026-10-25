@@ -48,7 +48,6 @@ struct ContentView: View {
     @State private var recorder = Recorder()
     @State private var isTargeted = false
     @FocusState private var isImportZoneFocused: Bool
-    @AppStorage("defaultLanguage") private var selectedLanguage = TranscriptionLanguage.english
     @State private var notice: String?
     @State private var library = LibraryStore()
     @State private var selection: SidebarSelection? = .newTranscription
@@ -111,7 +110,7 @@ struct ContentView: View {
         } isTargeted: { targeted in
             isTargeted = targeted
         }
-        .focusedSceneValue(\.pasteLinks, WindowAction(window: windowID, inputs: selectedLanguage, perform: pasteFromClipboard))
+        .focusedSceneValue(\.pasteLinks, WindowAction(window: windowID, perform: pasteFromClipboard))
         .focusedSceneValue(\.refreshTranscripts, WindowAction(window: windowID) { refreshLibrary() })
         .focusedSceneValue(\.libraryCommands, LibraryCommands(
             window: windowID, selected: selectedTranscript, canCreateFolder: destination.isReady, request: handle))
@@ -352,13 +351,22 @@ struct ContentView: View {
     }
 
     // New Transcription is an input surface: mark and tagline above one surface
-    // with two inputs, import on the left and record on the right. The work itself
+    // with two inputs, import on the left and record on the right. While an input
+    // waits for its language, that choice takes the mark's place. The work itself
     // is listed in the sidebar's Processing section.
     private var content: some View {
         VStack(spacing: 24) {
-            VStack(spacing: 12) {
-                BrandMark()
-                BrandLine()
+            if let input = queue.pending.first {
+                LanguageChoice(
+                    input: input,
+                    waitingAfter: queue.pending.count - 1,
+                    choose: { start(input, in: $0) },
+                    remove: { queue.discard(input) })
+            } else {
+                VStack(spacing: 12) {
+                    BrandMark()
+                    BrandLine()
+                }
             }
 
             HStack(spacing: 0) {
@@ -400,12 +408,11 @@ struct ContentView: View {
         }
     }
 
-    // The drop target is also the file picker. The language it will use is shown,
-    // and can be changed, before anything is added.
+    // The drop target is also the file picker.
     private var importZone: some View {
         Button(action: chooseFiles) {
             VStack(spacing: 6) {
-                Text(isTargeted ? "Drop to transcribe in \(selectedLanguage.title)" : "Drop media")
+                Text(isTargeted ? "Drop to add" : "Drop media")
                     .font(.headline)
                 Text("or click to choose files")
                     .font(.caption)
@@ -414,8 +421,6 @@ struct ContentView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            // Room for the language row below.
-            .padding(.bottom, 30)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(isTargeted ? AnyShapeStyle(Color.accentColor.opacity(0.12)) : AnyShapeStyle(Theme.recessed))
             .contentShape(Rectangle())
@@ -435,17 +440,6 @@ struct ContentView: View {
         .disabled(!recorder.isIdle)
         .accessibilityLabel("Choose files")
         .accessibilityHint("Or drop media, or press Command V to paste a YouTube link")
-        // Over the button, not in it: a click on the menu must not open the file panel.
-        .overlay(alignment: .bottom) {
-            HStack(spacing: 6) {
-                Text("Language:")
-                languageMenu
-            }
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .controlSize(.small)
-            .padding(.bottom, 14)
-        }
     }
 
     // Record is one more input: the finished recording is saved to the output
@@ -506,9 +500,8 @@ struct ContentView: View {
 
     private var recordButton: some View {
         Button("Record", action: startRecording)
-            .disabled(!recorder.canRecord || folderBlocked || queue.isBusy || destination.isRecording)
-            .help(queue.isBusy ? "Another transcription is running. Record when it has finished."
-                  : destination.isRecording ? "Another window is recording." : "")
+            .disabled(!recorder.canRecord || folderBlocked || destination.isRecording)
+            .help(destination.isRecording ? "Another window is recording." : "")
     }
 
     // Starts from the visible selection; the app list is kept current by the
@@ -616,35 +609,27 @@ struct ContentView: View {
         }
     }
 
-    // The recording was saved as an entry folder holding its audio; the transcript
-    // is written into that same folder, and transcribing starts at once.
+    // The recording was saved as an entry folder holding its audio; once its language
+    // is chosen, the transcript is written into that same folder. Until then (and if
+    // the app quits first) the audio stays there, an entry the library skips.
     private func addRecording(_ url: URL, startedAt: Date) {
         _ = addInput([url], recording: (url.deletingLastPathComponent(), startedAt))
     }
 
-    // Same path as a drop; the panel offers only the extensions a drop accepts, and
-    // one file, because the app transcribes one at a time.
+    // Same path as a drop; the panel offers only the extensions a drop accepts.
     private func chooseFiles() {
-        if let blocker = inputBlocker() {
-            prompt = .failure(title: blocker.title, reason: blocker.reason)
-            return
-        }
         let panel = NSOpenPanel()
-        panel.allowsMultipleSelection = false
+        panel.allowsMultipleSelection = true
         panel.canChooseDirectories = false
         panel.allowedContentTypes = supportedExtensions.compactMap { UTType(filenameExtension: $0) }
         guard panel.runModal() == .OK else { return }
         _ = addInput(panel.urls)
     }
 
-    // Status, not controls: language and destination read quietly here, and
-    // preferences live in Settings.
+    // Status, not controls: the destination reads quietly here, and preferences
+    // live in Settings. The language belongs to each input (LTR-72), not here.
     private var footer: some View {
         HStack(spacing: 16) {
-            languagePicker
-
-            Spacer()
-
             destinationStatus
 
             Spacer()
@@ -661,31 +646,6 @@ struct ContentView: View {
         .controlSize(.small)
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
-    }
-
-    private var languagePicker: some View {
-        HStack(spacing: 6) {
-            Text("New items:")
-            languageMenu
-        }
-    }
-
-    // The language for newly added and recorded items; a started job keeps its own.
-    // The footer and the import zone show this one menu on the one preference, so
-    // they cannot disagree. Locked while a recording runs.
-    private var languageMenu: some View {
-        Picker("Language for new items", selection: $selectedLanguage) {
-            ForEach(TranscriptionLanguage.allCases) { language in
-                Text(language.title).tag(language)
-            }
-        }
-        .labelsHidden()
-        .pickerStyle(.menu)
-        .fixedSize()
-        .disabled(!destination.canChangeLanguage)
-        .help(destination.canChangeLanguage
-              ? "Language given to each new transcription when it starts."
-              : "The language can’t change while recording.")
     }
 
     private var folderLockReason: String {
@@ -736,78 +696,52 @@ struct ContentView: View {
         }
     }
 
-    // Why no new transcription input is taken right now, or nil. Nothing is ever
-    // queued behind a running job or a recording, and nothing is dropped silently.
-    private func inputBlocker() -> (title: String, reason: String)? {
-        if destination.isRecording {
-            return ("A recording is in progress",
-                    "Stop the recording first. It is transcribed as soon as you stop.")
-        }
-        if queue.isBusy {
-            return ("Another transcription is running",
-                    "Local Transcriber transcribes one file or link at a time. Add the next one when this one has finished, or dismiss it if it needs attention.")
-        }
-        return nil
-    }
-
-    // The one way an input becomes a job. Accepts exactly one file or link, and
-    // starts it at once with the language chosen now. Anything else is refused with
-    // the reason, and nothing is added.
+    // The one way inputs reach the queue (drop, ⌘V, the file panel, a saved
+    // recording). Supported files and YouTube links wait, in order, for their
+    // language on New Transcription; nothing starts here. Anything unsupported is
+    // reported with the reason and not added.
     @discardableResult
     private func addInput(_ urls: [URL], recording: (folder: URL, startedAt: Date)? = nil) -> Bool {
-        guard !urls.isEmpty else { return false }
-        if urls.count > 1 {
-            prompt = .failure(
-                title: "One file at a time",
-                reason: "Local Transcriber transcribes one file or link at a time. Nothing was added; drop a single file or link.")
-            return false
-        }
-        let url = urls[0]
-
-        if recording == nil, let blocker = inputBlocker() {
-            prompt = .failure(title: blocker.title, reason: blocker.reason)
-            return false
-        }
-        if recording != nil, queue.isBusy {
-            prompt = .failure(
-                title: "The recording wasn’t transcribed",
-                reason: "It is saved in your library folder, but another transcription is running.")
-            return false
-        }
-
-        let source: JobSource
-        if url.isFileURL {
-            guard supportedExtensions.contains(url.pathExtension.lowercased()) else {
+        notice = nil
+        var sources: [JobSource] = []
+        for url in urls {
+            if url.isFileURL {
+                guard supportedExtensions.contains(url.pathExtension.lowercased()) else {
+                    notice = "Not supported. Drop an MP4, MOV, M4A, MP3 or WAV file, or a YouTube link."
+                    continue
+                }
+                sources.append(.file(url))
+            } else if let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https" {
+                guard let video = YouTubeURL.parse(url) else {
+                    prompt = .failure(title: "Only YouTube links are supported", reason: url.absoluteString)
+                    continue
+                }
+                sources.append(.youtube(videoID: video.videoID, url: video.canonical))
+            } else {
                 notice = "Not supported. Drop an MP4, MOV, M4A, MP3 or WAV file, or a YouTube link."
-                showNewTranscription()   // the notice lives on the input surface
-                return false
             }
-            source = .file(url)
-        } else if let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https" {
-            guard let video = YouTubeURL.parse(url) else {
-                prompt = .failure(title: "Only YouTube links are supported", reason: url.absoluteString)
-                return false
-            }
-            source = .youtube(videoID: video.videoID, url: video.canonical)
-        } else {
-            notice = "Not supported. Drop an MP4, MOV, M4A, MP3 or WAV file, or a YouTube link."
-            showNewTranscription()
-            return false
         }
+        // The notice and the language choice live on the input surface.
+        showNewTranscription()
+        guard !sources.isEmpty else { return false }
 
-        // No usable output folder yet: ask once; cancelling starts nothing.
+        // No usable output folder yet: ask once; cancelling adds nothing.
         guard destination.isReady || destination.choose() else {
             notice = folderBlocked ? Self.folderBlockedNotice : "Choose an output folder to start transcribing."
-            showNewTranscription()
             return false
         }
 
-        notice = nil
-        guard let job = queue.accept(source, locale: selectedLanguage.locale, recording: recording) else { return false }
+        for source in sources { queue.stage(source, recording: recording) }
+        return true
+    }
+
+    // The language was chosen for this input: it becomes a job and starts, or waits
+    // for the jobs before it.
+    private func start(_ input: PendingInput, in language: TranscriptionLanguage) {
+        guard let job = queue.start(input, locale: language.locale) else { return }
         if case .file(let url) = job.source {
             Task { job.mediaInfo = await loadMediaInfo(for: url) }
         }
-        return true
     }
 
     private func pasteFromClipboard() {
@@ -970,6 +904,9 @@ enum TranscriptionLanguage: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var locale: Locale { Locale(identifier: rawValue) }
 
+    // Offered as buttons; the rest are in a menu.
+    static let prominent: [Self] = [.dutch, .english, .russian]
+
     var title: String {
         switch self {
         case .english: "English"
@@ -986,6 +923,62 @@ enum TranscriptionLanguage: String, CaseIterable, Identifiable {
     }
 }
 
+
+// The language of the first input that waits for one (LTR-72). Choosing it is the
+// start: there is no default language and no Start button.
+private struct LanguageChoice: View {
+    let input: PendingInput
+    let waitingAfter: Int
+    let choose: (TranscriptionLanguage) -> Void
+    let remove: () -> Void
+
+    var body: some View {
+        VStack(spacing: 10) {
+            VStack(spacing: 2) {
+                Text("Choose the language spoken in")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text(input.name)
+                    .font(.headline)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .help(input.name)
+            }
+
+            HStack(spacing: 8) {
+                ForEach(TranscriptionLanguage.prominent) { language in
+                    Button(language.title) { choose(language) }
+                }
+                Menu("Other") {
+                    ForEach(TranscriptionLanguage.allCases.filter { !TranscriptionLanguage.prominent.contains($0) }) { language in
+                        Button(language.title) { choose(language) }
+                    }
+                }
+                .fixedSize()
+            }
+
+            HStack(spacing: 12) {
+                if input.recording != nil {
+                    Text("The recording is saved in your library folder.")
+                }
+                if waitingAfter > 0 {
+                    Text(waitingAfter == 1 ? "1 more waits for its language" : "\(waitingAfter) more wait for their language")
+                }
+                Button("Remove", action: remove)
+                    .controlSize(.small)
+                    .help(input.recording != nil
+                          ? "Don’t transcribe it now. The recording stays in your library folder."
+                          : "Don’t transcribe it. The original is not changed.")
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity)
+        .background(Theme.raised)
+        .surface()
+    }
+}
 
 // The alerts of the library actions: a name to type, a Trash confirmation, a failure.
 private struct LibraryPromptModifier: ViewModifier {

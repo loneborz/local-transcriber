@@ -11,17 +11,17 @@ struct ProcessingActions {
     var dismiss: (TranscriptionJob) -> Void
 }
 
-// The sidebar's Processing section: the one job the app is working on (or that
-// needs attention), with its stage, real progress where the recognizer gives it,
-// elapsed time, and the recovery actions. There is no waiting list: the section is
-// there only while the job's slot is taken.
+// The sidebar's Processing section: the job the app is working on, the jobs that
+// wait their turn (their language is chosen, LTR-72) and those that need attention,
+// with stage, real progress where the recognizer gives it, elapsed time, and the
+// recovery actions. The section is there only while there are jobs.
 struct ProcessingSection: View {
     let queue: BatchQueue
     let jobs: [TranscriptionJob]
     let actions: ProcessingActions
 
     @State private var isExpanded = true
-    @State private var isDetailOpen = false
+    @State private var openJob: UUID?
 
     var body: some View {
         Section(isExpanded: $isExpanded) {
@@ -29,7 +29,7 @@ struct ProcessingSection: View {
                 ProcessingRow(
                     job: job,
                     actions: actions,
-                    isDetailOpen: Binding(get: { isDetailOpen }, set: { isDetailOpen = $0 }))
+                    isDetailOpen: Binding(get: { openJob == job.id }, set: { openJob = $0 ? job.id : nil }))
             }
         } header: {
             header
@@ -54,12 +54,15 @@ struct ProcessingSection: View {
     }
 
     private var summary: String {
-        guard let job = jobs.first else { return "" }
-        switch job.state {
-        case .waiting, .downloading, .transcribing: return "1 running"
-        case .failed: return "Needs attention"
-        case .complete: return job.savedTranscriptURL == nil ? "Needs attention" : "Saved, with a warning"
+        var parts: [String] = []
+        if jobs.contains(where: { !$0.isWaiting && !$0.isSettled }) { parts.append("1 running") }
+        let waiting = jobs.filter(\.isWaiting).count
+        if waiting > 0 { parts.append("\(waiting) waiting") }
+        let settled = jobs.filter(\.isSettled)
+        if !settled.isEmpty {
+            parts.append(settled.allSatisfy { $0.savedTranscriptURL != nil } ? "Saved, with a warning" : "Needs attention")
         }
+        return parts.joined(separator: " · ")
     }
 }
 
@@ -145,7 +148,7 @@ private struct ProcessingRow: View {
     // The accurate stage, in the words of the processing steps.
     private var stage: String {
         switch job.state {
-        case .waiting: "Starting…"
+        case .waiting: "Waiting"
         case .downloading: "Acquiring media…"
         case .transcribing(let phase): phase?.label ?? "Transcribing…"
         case .complete:
@@ -283,10 +286,10 @@ private struct ProcessingRow: View {
             Button("Open Video") { NSWorkspace.shared.open(url) }
                 .help("Open on YouTube")
         }
-        // Frees the slot of a job that failed or was not saved (the window asks before
-        // an unsaved transcript is dropped).
+        // Removes a job that has not started, failed or was not saved (the window asks
+        // before an unsaved transcript is dropped).
         switch job.state {
-        case .failed, .complete:
+        case .waiting, .failed, .complete:
             Button("Dismiss") { actions.dismiss(job) }
                 .help("Remove this job from Processing")
         default:

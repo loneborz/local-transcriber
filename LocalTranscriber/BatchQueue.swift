@@ -26,8 +26,8 @@ final class TranscriptionJob: Identifiable {
 
     let id = UUID()
     let source: JobSource
-    // Editable only while Waiting; read once when the job starts.
-    var locale: Locale
+    // Chosen for this input before it became a job (LTR-72); never changes.
+    let locale: Locale
     var mediaInfo: MediaInfo?
     // Set once a YouTube source has been resolved and downloaded.
     var metadata: SourceMetadata?
@@ -85,6 +85,14 @@ final class TranscriptionJob: Identifiable {
         return false
     }
 
+    // Failed or finished: it stays only while something is left to do.
+    var isSettled: Bool {
+        switch state {
+        case .failed, .complete: true
+        default: false
+        }
+    }
+
     // The one place that decides how this job's transcript is presented:
     // automatic save, manual Save and Copy all use it.
     func markdown(for transcript: Transcript) -> String {
@@ -98,13 +106,30 @@ final class TranscriptionJob: Identifiable {
     }
 }
 
-// The app's one transcription slot. At most one job exists at any time: it is
-// accepted only into an empty slot, starts at once, and leaves the slot when it
-// has been saved (or when the user dismisses a failed or unsaved one). There is no
-// waiting list. Owned by the app (MyApp), shared by every window.
+// An input that waits for its language (LTR-72). Session only: an imported file
+// that was not started is forgotten on quit, and a recording's audio is already
+// saved in its entry folder.
+struct PendingInput: Identifiable {
+    let id = UUID()
+    let source: JobSource
+    let recording: (folder: URL, startedAt: Date)?
+
+    var name: String {
+        switch source {
+        case .file(let url): url.lastPathComponent
+        case .youtube(let videoID, _): "YouTube · \(videoID)"
+        }
+    }
+}
+
+// The app's transcription work. Inputs wait in `pending`, in order, until the user
+// chooses each one's language; then they become jobs, which run one at a time in
+// order. A job leaves when it has been saved (or when the user dismisses a waiting,
+// failed or unsaved one). Owned by the app (MyApp), shared by every window.
 @MainActor @Observable
 final class BatchQueue {
     private(set) var jobs: [TranscriptionJob] = []
+    private(set) var pending: [PendingInput] = []
     // UserDefaults key of the "save YouTube links as source packages" mode.
     static let sourcePackageModeKey = "sourcePackageMode"
     // UserDefaults key of the "add YAML frontmatter" setting (LTR-37).
@@ -119,29 +144,33 @@ final class BatchQueue {
     private static let log = Logger(subsystem: "nl.wavesweb.LocalTranscriber", category: "progress")
 
     var isProcessing: Bool { isRunning }
-    // The slot is taken: running, failed, or finished but not saved.
-    var isBusy: Bool { !jobs.isEmpty }
 
-    // Takes the input into the empty slot and starts it. Returns nil, and changes
-    // nothing, when the slot is taken. The language is the one given here.
-    func accept(
-        _ source: JobSource,
-        locale: Locale,
-        recording: (folder: URL, startedAt: Date)? = nil
-    ) -> TranscriptionJob? {
-        guard jobs.isEmpty else { return nil }
-        let job = TranscriptionJob(source: source, locale: locale)
-        job.recording = recording
-        jobs = [job]
+    func stage(_ source: JobSource, recording: (folder: URL, startedAt: Date)? = nil) {
+        pending.append(PendingInput(source: source, recording: recording))
+    }
+
+    // Forgets a pending input. Its media is not touched.
+    func discard(_ input: PendingInput) {
+        pending.removeAll { $0.id == input.id }
+    }
+
+    // Turns a pending input into a job with the language chosen for it. It starts at
+    // once, or after the jobs before it. Nil if the input is no longer pending.
+    func start(_ input: PendingInput, locale: Locale) -> TranscriptionJob? {
+        guard let index = pending.firstIndex(where: { $0.id == input.id }) else { return nil }
+        pending.remove(at: index)
+        let job = TranscriptionJob(source: input.source, locale: locale)
+        job.recording = input.recording
+        jobs.append(job)
         startRunner()
         return job
     }
 
-    // Frees the slot of a failed job, or of one whose transcript was not saved (the
-    // caller asks first: the unsaved transcript is lost). A running job cannot be dismissed.
+    // Removes a job that has not started, failed, or whose transcript was not saved
+    // (the caller asks first: the unsaved transcript is lost). A running job cannot be dismissed.
     func dismiss(_ job: TranscriptionJob) {
         switch job.state {
-        case .failed, .complete: jobs.removeAll { $0.id == job.id }
+        case .waiting, .failed, .complete: jobs.removeAll { $0.id == job.id }
         default: break
         }
     }

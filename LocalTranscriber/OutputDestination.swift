@@ -58,11 +58,9 @@ final class OutputDestination {
     var protectedRecorders: [Recorder] { recorders.compactMap(\.value).filter { $0.protection != nil } }
 
     // The folder receives job saves and the recording at Stop; the source-package
-    // mode is read at each YouTube save; a recording takes the default language
-    // when it is queued after Stop.
+    // mode is read at each YouTube save.
     var canChangeFolder: Bool { !isTranscribing && !isRecording }
     var canChangeSourcePackage: Bool { !isTranscribing }
-    var canChangeLanguage: Bool { !isRecording }
 
     isolated deinit {
         accessedFolder?.stopAccessingSecurityScopedResource()
