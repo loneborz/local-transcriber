@@ -118,15 +118,17 @@ struct WorkspaceSidebar: View {
                     ForEach(sections.folders, id: \.folder.id) { folderRow($0) }
                 } header: {
                     // The action right after the title, so it reads as "new folder".
-                    HStack(spacing: 6) {
+                    HStack(spacing: 8) {
                         Text("Folders")
                         Button { onRequest(.newFolder(moving: nil)) } label: {
-                            Label("New", systemImage: "plus")
+                            Image(systemName: "plus.circle.fill")
+                                .font(.system(size: 16))
+                                // A 24 pt target around the small symbol.
+                                .frame(width: 24, height: 24)
+                                .contentShape(Rectangle())
                         }
                         .buttonStyle(.borderless)
-                        .controlSize(.small)
                         .foregroundStyle(.tint)
-                        .fixedSize()
                         .help("New Folder")
                         .accessibilityLabel("New Folder")
                         Spacer(minLength: 0)
@@ -182,7 +184,8 @@ struct WorkspaceSidebar: View {
         .controlSize(.large)
         .help("Show New Transcription")
         .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.top, 8)
+        .padding(.bottom, 12)
         .background(Theme.sidebar)
     }
 
