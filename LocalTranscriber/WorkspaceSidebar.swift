@@ -117,18 +117,21 @@ struct WorkspaceSidebar: View {
                 Section {
                     ForEach(sections.folders, id: \.folder.id) { folderRow($0) }
                 } header: {
-                    HStack {
+                    // The action right after the title, so it reads as "new folder".
+                    HStack(spacing: 6) {
                         Text("Folders")
-                        Spacer()
                         Button { onRequest(.newFolder(moving: nil)) } label: {
-                            Image(systemName: "plus")
+                            Label("New", systemImage: "plus")
                         }
                         .buttonStyle(.borderless)
+                        .controlSize(.small)
                         .foregroundStyle(.tint)
+                        .fixedSize()
                         .help("New Folder")
                         .accessibilityLabel("New Folder")
+                        Spacer(minLength: 0)
                     }
-                    // The sidebar reads a section header as one heading, so the plus is also
+                    // The sidebar reads a section header as one heading, so the button is also
                     // offered as the heading's action (and as File › New Folder…, ⇧⌘N).
                     .accessibilityAction(named: "New Folder") { onRequest(.newFolder(moving: nil)) }
                 }
