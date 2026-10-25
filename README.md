@@ -76,9 +76,23 @@ For research or archiving, turn on Save YouTube Links as Source Packages in Sett
 
 `source.json` is a small versioned file that the app defines itself (schema version 1). It holds the video's URL, ID, title, channel, publication date and duration, when it was fetched, the audio file name and the transcription language. `entry.json` (schema version 1) holds `createdAt` (the start of a recording, the moment a file was added, or the moment a link was fetched), and `pinned` and `archived` when set. An existing folder is never reused, and a folder that can't be completed isn't left half-written. Transcripts saved by v0.6 and earlier (a loose `.md`, or a source package with `transcript.md`) stay listed and readable and are never changed or moved; they can only be managed in Finder.
 
+For Obsidian Properties or other Markdown tools, turn on Add YAML Frontmatter to New Transcripts in Settings › General (off by default). Transcripts saved after that start with a YAML block, followed by the same Markdown as before:
+
+```yaml
+---
+source: "https://www.youtube.com/watch?v=jNQXAC9IVRw"
+language: "en-US"
+transcriber: "SpeechTranscriber"
+duration: 19
+published: 2005-04-24
+---
+```
+
+Only values that are known are written: `source` (the file name, or the video's URL), `language`, `transcriber`, `duration` in seconds, `recorded` for recordings (local date and time) and `published` for YouTube videos. There is no title. In a source package only the transcript gets the block; `audio.m4a` and `source.json` don't change. Existing transcripts are never rewritten, whichever way the setting is turned.
+
 ## Library and review
 
-The sidebar lists what is in your output folder: Pinned, Folders (real folders you create with the folder button or ⇧⌘N), Recent (transcripts in no folder) and Archive, with the one in progress above them. Right-click a transcript (or use the Transcript menu) to rename it, pin it, archive it, move it to a folder, or move it to the Trash. Rename changes the folder and file name only; archive changes nothing on disk except `entry.json`; Move to Trash asks first and never deletes permanently. The app scans the output folder and the folders directly inside it, nothing deeper. Nothing is imported and no database or index is created, so changes made in Finder show up after a refresh (⌘R). Select a transcript to read it in the window. The Markdown file stays the source of truth, and Copy puts all of it on the clipboard.
+The sidebar lists what is in your output folder: Pinned, Folders (real folders you create with the folder button or ⇧⌘N), Recent (transcripts in no folder) and Archive, with the one in progress above them. Right-click a transcript (or use the Transcript menu) to rename it, pin it, archive it, move it to a folder, or move it to the Trash. Rename changes the folder and file name only; archive changes nothing on disk except `entry.json`; Move to Trash asks first and never deletes permanently. The app scans the output folder and the folders directly inside it, nothing deeper. Nothing is imported and no database or index is created, so changes made in Finder show up after a refresh (⌘R). Select a transcript to read it in the window. The Markdown file stays the source of truth, and Copy puts all of it on the clipboard, except a YAML block at the top of the file.
 
 Each new transcript also gets a `Name.timing.json` next to its Markdown (`transcript.timing.json` inside a source package) with the recognizer's timing. The Markdown itself doesn't change. The timing is used only when it belongs to that Markdown, by its checksum and the text of its lines. Otherwise the transcript opens as plain Markdown with a short note, which is also how transcripts made before 0.6 open.
 

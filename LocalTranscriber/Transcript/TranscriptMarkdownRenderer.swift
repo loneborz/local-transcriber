@@ -55,6 +55,38 @@ enum TranscriptMarkdownRenderer {
         return markdown + "\n"
     }
 
+    // The optional YAML block put before `render`'s output (LTR-37), for
+    // Obsidian Properties. Known values only, never a title. `video` is a
+    // YouTube job's metadata (flat or package), `recorded` a recording's start,
+    // written as local date-time like Obsidian's own. Strings are JSON string
+    // literals, which are valid YAML double-quoted scalars.
+    static func frontmatter(
+        for transcript: Transcript, video: SourceMetadata? = nil, recorded: Date? = nil, timeZone: TimeZone = .current
+    ) -> String {
+        var lines = [
+            "source: " + quoted(video?.url.absoluteString ?? transcript.sourceURL.lastPathComponent),
+            "language: " + quoted(transcript.localeIdentifier),
+            "transcriber: " + quoted(transcript.transcriber.rawValue),
+        ]
+        if let duration = transcript.duration, duration >= 0, let seconds = Int(exactly: duration.rounded()) {
+            lines.append("duration: \(seconds)")
+        }
+        if let recorded {
+            let style = Date.ISO8601FormatStyle(timeZone: timeZone).year().month().day().time(includingFractionalSeconds: false)
+            lines.append("recorded: " + recorded.formatted(style))
+        }
+        // Already yyyy-MM-dd (YouTubeAcquirer), so it stays a YAML date.
+        if let published = video?.uploadDate { lines.append("published: \(published)") }
+        return "---\n" + lines.joined(separator: "\n") + "\n---\n\n"
+    }
+
+    private static func quoted(_ value: String) -> String {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .withoutEscapingSlashes
+        // Encoding a String cannot fail.
+        return String(decoding: try! encoder.encode(value), as: UTF8.self)
+    }
+
     private static func timestamp(_ seconds: TimeInterval) -> String {
         let totalSeconds = max(0, Int(seconds.rounded(.down)))
         return String(

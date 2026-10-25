@@ -72,6 +72,18 @@ nonisolated enum TranscriptMarkdown {
         return Parsed(header: header, blocks: blocks(in: lines))
     }
 
+    // What Copy puts on the clipboard (LTR-37): the text after a leading YAML
+    // block and the blank lines after it, by the same rule as `parse`. Text
+    // without one (or with an unclosed one) is returned unchanged.
+    static func withoutFrontmatter(_ text: String) -> String {
+        let lines = text.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline)
+        guard lines.first == "---",
+              var body = lines.dropFirst().firstIndex(where: { $0 == "---" || $0 == "..." }).map({ $0 + 1 })
+        else { return text }
+        while body < lines.count, lines[body].trimmingCharacters(in: .whitespaces).isEmpty { body += 1 }
+        return body < lines.count ? String(text[lines[body].startIndex...]) : ""
+    }
+
     // `**Key:** value`, with the two trailing spaces of a Markdown line break.
     private static func field(_ line: String) -> (String, String)? {
         guard line.hasPrefix("**"), let close = line.range(of: ":**") else { return nil }

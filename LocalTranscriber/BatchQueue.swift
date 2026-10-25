@@ -42,6 +42,9 @@ final class TranscriptionJob: Identifiable {
     // when the save is attempted, so later changes to the preference cannot
     // change what Copy or the manual Save writes for this job.
     var exportedAsPackage = false
+    // Whether that Markdown starts with YAML frontmatter (LTR-37), fixed at the
+    // same moment for the same reason.
+    var exportedWithFrontmatter = false
     // Set for a recording: the entry folder that already holds its audio, and
     // when the recording started (the entry's creation time).
     var recording: (folder: URL, startedAt: Date)?
@@ -85,7 +88,9 @@ final class TranscriptionJob: Identifiable {
     // The one place that decides how this job's transcript is presented:
     // automatic save, manual Save and Copy all use it.
     func markdown(for transcript: Transcript) -> String {
-        TranscriptMarkdownRenderer.render(transcript, source: exportedAsPackage ? metadata : nil)
+        let body = TranscriptMarkdownRenderer.render(transcript, source: exportedAsPackage ? metadata : nil)
+        guard exportedWithFrontmatter else { return body }
+        return TranscriptMarkdownRenderer.frontmatter(for: transcript, video: metadata, recorded: recording?.startedAt) + body
     }
 
     var canRetry: Bool {
@@ -102,6 +107,8 @@ final class BatchQueue {
     private(set) var jobs: [TranscriptionJob] = []
     // UserDefaults key of the "save YouTube links as source packages" mode.
     static let sourcePackageModeKey = "sourcePackageMode"
+    // UserDefaults key of the "add YAML frontmatter" setting (LTR-37).
+    static let frontmatterKey = "markdownFrontmatter"
 
     let destination: OutputDestination
 
@@ -147,6 +154,7 @@ final class BatchQueue {
         job.saveError = nil
         job.sidecarWarning = nil
         job.exportedAsPackage = false
+        job.exportedWithFrontmatter = false
         job.startedAt = nil
         job.progress = nil
         job.state = .waiting
@@ -234,6 +242,7 @@ final class BatchQueue {
             package = metadata
         }
         job.exportedAsPackage = package != nil
+        job.exportedWithFrontmatter = UserDefaults.standard.bool(forKey: Self.frontmatterKey)
 
         job.sidecarWarning = nil
         var metadataWarning: String?

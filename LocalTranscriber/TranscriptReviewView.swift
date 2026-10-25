@@ -343,7 +343,8 @@ struct TranscriptReviewView: View {
     // MARK: actions
 
     // Reads the file again so the clipboard gets what is on disk now, byte for
-    // byte as text; nothing is regenerated from the parsed transcript.
+    // byte as text without a leading YAML block (LTR-37); nothing is regenerated
+    // from the parsed transcript.
     private func copy() {
         copyClicks += 1
         guard let data = try? Data(contentsOf: item.markdownURL),
@@ -354,7 +355,7 @@ struct TranscriptReviewView: View {
         }
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
-        copied = pasteboard.setString(text, forType: .string)
+        copied = pasteboard.setString(TranscriptMarkdown.withoutFrontmatter(text), forType: .string)
         copyFailed = !copied
     }
 

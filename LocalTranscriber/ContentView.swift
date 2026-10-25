@@ -862,15 +862,15 @@ struct ContentView: View {
         )
     }
 
-    // Read-only: puts the job's Markdown on the pasteboard. The result tells
-    // the row whether it may show "Copied".
+    // Read-only: puts the job's Markdown on the pasteboard, without its YAML
+    // frontmatter (LTR-37). The result tells the row whether it may show "Copied".
     private static let copyFailedNotice = "Could not copy the transcript to the clipboard."
 
     private func copyMarkdown(for job: TranscriptionJob) -> Bool {
         guard case .complete(let transcript, _) = job.state else { return false }
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
-        guard pasteboard.setString(job.markdown(for: transcript), forType: .string) else {
+        guard pasteboard.setString(TranscriptMarkdown.withoutFrontmatter(job.markdown(for: transcript)), forType: .string) else {
             notice = Self.copyFailedNotice
             return false
         }

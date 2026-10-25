@@ -17,6 +17,7 @@ struct SettingsView: View {
 private struct GeneralSettings: View {
     let destination: OutputDestination
     @AppStorage(BatchQueue.sourcePackageModeKey) private var savesSourcePackages = false
+    @AppStorage(BatchQueue.frontmatterKey) private var addsFrontmatter = false
     @AppStorage(AppAppearance.key) private var appearance = AppAppearance.system
 
     var body: some View {
@@ -30,6 +31,9 @@ private struct GeneralSettings: View {
 
             Toggle("Save YouTube Links as Source Packages", isOn: $savesSourcePackages)
                 .disabled(!destination.canChangeSourcePackage)
+
+            // Read when a transcript is saved, so it never needs a lock.
+            Toggle("Add YAML Frontmatter to New Transcripts", isOn: $addsFrontmatter)
 
             if let lockNote {
                 Text(lockNote)
