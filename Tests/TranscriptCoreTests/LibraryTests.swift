@@ -306,3 +306,24 @@ final class ReviewAutoOpenTests: XCTestCase {
         XCTAssertNil(open.transcriptToOpen(isQuiet: true, isListed: { _ in true }))
     }
 }
+
+// LTR-72: the language menu's Recent section.
+final class RecentChoicesTests: XCTestCase {
+    func testFirstAndRepeatedChoices() {
+        XCTAssertEqual(RecentChoices.choosing("English", in: []), ["English"])
+        XCTAssertEqual(RecentChoices.choosing("English", in: ["English"]), ["English"])
+    }
+
+    func testAnExistingChoiceIsPromotedAndANewOneGoesFirst() {
+        XCTAssertEqual(RecentChoices.choosing("Russian", in: ["English", "Dutch", "Russian"]), ["Russian", "English", "Dutch"])
+        XCTAssertEqual(RecentChoices.choosing("German", in: ["English", "Dutch"]), ["German", "English", "Dutch"])
+    }
+
+    func testFiveAtMostTheLeastRecentDropsOutAndNothingRepeats() {
+        let full = ["English", "Dutch", "Russian", "German", "French"]
+        let italian = RecentChoices.choosing("Italian", in: full)
+        XCTAssertEqual(italian, ["Italian", "English", "Dutch", "Russian", "German"])
+        XCTAssertEqual(RecentChoices.choosing("Dutch", in: italian), ["Dutch", "Italian", "English", "Russian", "German"])
+        XCTAssertEqual(Set(italian).count, italian.count)
+    }
+}

@@ -36,3 +36,11 @@ nonisolated struct ReviewAutoOpen {
         return target
     }
 }
+
+// The language menu's Recent section (LTR-72): the newest choice first, each one
+// once, at most `limit`; the oldest drops out (and is listed under All Languages again).
+nonisolated enum RecentChoices {
+    static func choosing<T: Equatable>(_ choice: T, in recent: [T], limit: Int = 5) -> [T] {
+        Array(([choice] + recent.filter { $0 != choice }).prefix(limit))
+    }
+}

@@ -135,7 +135,8 @@ final class BatchQueue {
     private(set) var pending: [PendingInput] = []
     // The last job whose transcript was saved automatically.
     private(set) var lastSaved: TranscriptionJob?
-    // Most recently chosen first, for the language menu. Remembered, never preselected.
+    // Most recently chosen first, at most five (RecentChoices), for the language menu.
+    // Remembered, never preselected; changed only when a language starts a job.
     private(set) var recentLanguages: [TranscriptionLanguage] =
         (UserDefaults.standard.stringArray(forKey: BatchQueue.recentLanguagesKey) ?? []).compactMap(TranscriptionLanguage.init)
     static let recentLanguagesKey = "recentLanguages"
@@ -188,7 +189,7 @@ final class BatchQueue {
     func start(_ input: PendingInput, language: TranscriptionLanguage, requester: UUID) -> TranscriptionJob? {
         guard let index = pending.firstIndex(where: { $0.id == input.id }) else { return nil }
         pending.remove(at: index)
-        recentLanguages = [language] + recentLanguages.filter { $0 != language }.prefix(2)
+        recentLanguages = RecentChoices.choosing(language, in: recentLanguages)
         UserDefaults.standard.set(recentLanguages.map(\.rawValue), forKey: Self.recentLanguagesKey)
         let job = TranscriptionJob(source: input.source, locale: language.locale)
         job.recording = input.recording

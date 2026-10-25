@@ -497,14 +497,21 @@ struct ContentView: View {
                     .foregroundStyle(.secondary)
             }
 
+            // Prominent like New: this is the one thing to do here. A recent language
+            // is listed once, under Recent.
             Menu("Choose Language") {
-                if queue.recentLanguages.isEmpty {
-                    languageButtons(TranscriptionLanguage.byTitle, for: input)
+                let recent = queue.recentLanguages
+                let others = TranscriptionLanguage.byTitle.filter { !recent.contains($0) }
+                if recent.isEmpty {
+                    languageButtons(others, for: input)
                 } else {
-                    Section("Recent") { languageButtons(queue.recentLanguages, for: input) }
-                    Section("All Languages") { languageButtons(TranscriptionLanguage.byTitle, for: input) }
+                    Section("Recent") { languageButtons(recent, for: input) }
+                    Section("All Languages") { languageButtons(others, for: input) }
                 }
             }
+            .menuStyle(.button)
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
             .fixedSize()
             .padding(.vertical, 2)
             .accessibilityLabel("Choose the language spoken in \(input.name)")
@@ -624,18 +631,29 @@ struct ContentView: View {
             }
         case .recording(let since):
             if compact {
-                HStack(spacing: 10) {
+                HStack(spacing: 6) {
                     Image(systemName: "circle.fill")
                         .font(.system(size: 8))
                         .foregroundStyle(.red)
                         .accessibilityHidden(true)
-                    Text("Recording · \(recorder.recordingLabel)")
+                    // The section header says Recording. The source gives way first; the
+                    // time and Stop always fit the sidebar.
+                    Text(recorder.recordingLabel)
                         .lineLimit(1)
                         .truncationMode(.middle)
-                    Spacer(minLength: 8)
+                    Spacer(minLength: 0)
                     Text(since, style: .timer)
-                        .font(.title3.monospacedDigit())
-                    stopButton
+                        .font(.body.monospacedDigit())
+                        .fixedSize()
+                    Button {
+                        Task { await recorder.stop() }
+                    } label: {
+                        Image(systemName: "stop.fill")
+                    }
+                    .buttonStyle(.bordered)
+                    .fixedSize()
+                    .help("Stop Recording")
+                    .accessibilityLabel("Stop Recording")
                 }
                 .accessibilityElement(children: .contain)
                 .accessibilityLabel("Recording")
