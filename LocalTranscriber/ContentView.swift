@@ -82,7 +82,7 @@ struct ContentView: View {
                 queue: queue,
                 jobs: queue.jobs,
                 processing: processingActions,
-                recordingBanner: recorder.isIdle ? nil : AnyView(recordingStatus(compact: true)),
+                recordingBanner: recorder.isIdle ? nil : AnyView(recordingStatus),
                 library: library,
                 destination: destination.status,
                 selection: sidebarSelection,
@@ -379,25 +379,24 @@ struct ContentView: View {
         }
     }
 
-    // New Transcription is an input surface: mark and tagline above one surface
-    // with two inputs, import on the left and record on the right. The work itself
-    // is listed in the sidebar's Processing section.
+    // New Transcription is one composer: mark and tagline above one surface, the
+    // drop area on top and a compact record toolbar below it (LTR-55). Heights come
+    // from the content. The work itself is listed in the sidebar's Processing section.
     private var content: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: 20) {
             VStack(spacing: 12) {
                 BrandMark()
                 BrandLine()
             }
 
-            HStack(spacing: 0) {
+            VStack(spacing: 0) {
                 importZone
-                Theme.rule.frame(width: 1).accessibilityHidden(true)
-                recordZone
-                    .frame(width: 260)
+                Theme.rule.frame(height: 1).accessibilityHidden(true)
+                recordBar
                     .background(Theme.raised)
             }
-            .fixedSize(horizontal: false, vertical: true)
             .surface()
+            .frame(maxWidth: 480)
 
             if hasMessages {
                 messages(alignment: .center)
@@ -405,7 +404,9 @@ struct ContentView: View {
             }
         }
         .frame(maxWidth: 560, maxHeight: .infinity)
-        .padding(40)
+        // Less vertical padding, so the footer stays in view at the minimum height.
+        .padding(.horizontal, 40)
+        .padding(.vertical, 24)
     }
 
     private var hasMessages: Bool {
@@ -427,8 +428,8 @@ struct ContentView: View {
         }
     }
 
-    // The import half: the drop target and file picker, or, while an input waits
-    // for its language, that question in the same place (LTR-72).
+    // The drop area and file picker, or, while an input waits for its language,
+    // that question in the same place (LTR-72).
     @ViewBuilder
     private var importZone: some View {
         if let input = queue.pending.first {
@@ -438,10 +439,6 @@ struct ContentView: View {
         }
     }
 
-    // Both halves start their content at this inset from the surface's top
-    // edge, so the import and record headings share one line (LTR-55).
-    private static let inputInset: CGFloat = 16
-
     private var importBackground: AnyShapeStyle {
         isTargeted ? AnyShapeStyle(Color.accentColor.opacity(0.12)) : AnyShapeStyle(Theme.recessed)
     }
@@ -450,7 +447,12 @@ struct ContentView: View {
     private var dropZone: some View {
         Button(action: chooseFiles) {
             VStack(spacing: 6) {
-                Text(isTargeted ? "Drop to add" : "Drop media")
+                Image(systemName: "arrow.down.doc")
+                    .font(.title2)
+                    .foregroundStyle(.secondary)
+                    .padding(.bottom, 2)
+                    .accessibilityHidden(true)
+                Text(isTargeted ? "Drop to add" : "Drop media here")
                     .font(.headline)
                 Text("or click to choose files")
                     .font(.caption)
@@ -459,8 +461,9 @@ struct ContentView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            .padding(Self.inputInset)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .padding(.vertical, 20)
+            .padding(.horizontal, 16)
+            .frame(maxWidth: .infinity)
             .background(importBackground)
             .contentShape(Rectangle())
         }
@@ -470,7 +473,7 @@ struct ContentView: View {
         .focused($isImportZoneFocused)
         .overlay {
             if isImportZoneFocused {
-                UnevenRoundedRectangle(topLeadingRadius: 16, bottomLeadingRadius: 16)
+                UnevenRoundedRectangle(topLeadingRadius: 16, topTrailingRadius: 16)
                     .strokeBorder(Color(nsColor: .keyboardFocusIndicatorColor), lineWidth: 3)
                     .allowsHitTesting(false)
             }
@@ -501,7 +504,7 @@ struct ContentView: View {
                     .foregroundStyle(.secondary)
             }
 
-            // Prominent like New: this is the one thing to do here. A recent language
+            // Prominent like Home: this is the one thing to do here. A recent language
             // is listed once, under Recent.
             Menu("Choose Language") {
                 let recent = queue.recentLanguages
@@ -515,7 +518,7 @@ struct ContentView: View {
             }
             .menuStyle(.button)
             .buttonStyle(.borderedProminent)
-            .buttonBorderShape(.roundedRectangle(radius: 10))   // New's shape (NewControl.radius)
+            .buttonBorderShape(.roundedRectangle(radius: 10))   // Home's shape
             .controlSize(.large)
             .fixedSize()
             .padding(.vertical, 2)
@@ -535,8 +538,9 @@ struct ContentView: View {
             .buttonStyle(.borderless)
             .font(.caption)
         }
-        .padding(Self.inputInset)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .padding(.vertical, 16)
+        .padding(.horizontal, 16)
+        .frame(maxWidth: .infinity)
         .background(importBackground)
     }
 
@@ -549,46 +553,38 @@ struct ContentView: View {
     // Record is one more input: the finished recording is saved to the output
     // folder and then queued exactly like a dropped file. The choice is made
     // inline; nothing is captured or requested before Record.
-    @ViewBuilder
-    private var recordZone: some View {
-        Group {
-            if recorder.isIdle {
-                VStack(spacing: 10) {
-                    Text("Record audio")
-                        .font(.headline)
-                        .accessibilityAddTraits(.isHeader)
-                    sourceControls
-                    recordButton
-                        .controlSize(.large)
-                        .padding(.top, 2)
+    // One row: the label, the sources together, Record apart at the trailing edge.
+    private var recordBar: some View {
+        HStack(spacing: 12) {
+            Text(isRecording ? "Recording" : "Record audio")
+                .font(.headline)
+                .fixedSize()
+                .accessibilityAddTraits(.isHeader)
+            Group {
+                if recorder.isIdle {
+                    HStack(spacing: 8) {
+                        // Its own width, up to 200: a longer name truncates.
+                        appPicker
+                            .frame(maxWidth: 200)
+                            .fixedSize()
+                        micToggle
+                        Spacer(minLength: 8)
+                        recordButton
+                    }
+                } else {
+                    recordingStatus
                 }
-                .accessibilityElement(children: .contain)
-            } else {
-                recordingStatus(compact: false)
             }
+            // The picker's height, so the row keeps its size while starting, recording and saving.
+            .frame(minHeight: 24)
         }
-        .padding(Self.inputInset)
-        // The idle controls' height, so the surface keeps its size while
-        // starting, recording and saving.
-        .frame(minHeight: 148, maxHeight: .infinity, alignment: .top)
+        .accessibilityElement(children: .contain)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
     }
 
-    // Mic beside the picker; below it only when one row cannot fit. The row's
-    // picker has a fixed ideal width, so a long app name truncates instead of
-    // switching the layout, and then fills what Mic leaves.
-    private var sourceControls: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: 8) {
-                appPicker
-                    .frame(minWidth: 120, idealWidth: 120, maxWidth: .infinity)
-                micToggle
-            }
-            VStack(spacing: 10) {
-                appPicker
-                    .frame(maxWidth: 200)
-                micToggle
-            }
-        }
+    private var isRecording: Bool {
+        if case .recording = recorder.state { true } else { false }
     }
 
     private var appPicker: some View {
@@ -608,7 +604,6 @@ struct ContentView: View {
     private var micToggle: some View {
         Toggle("Mic", isOn: $recorder.includesMicrophone)
             .toggleStyle(.checkbox)
-            .tint(Theme.wineFill)
             .fixedSize()
             .accessibilityLabel("Include microphone")
     }
@@ -637,9 +632,9 @@ struct ContentView: View {
         }
     }
 
-    // Stacked in the record zone when the list is empty, one row in the action bar otherwise.
+    // One row, in the composer's record toolbar and in the sidebar's Recording section.
     @ViewBuilder
-    private func recordingStatus(compact: Bool) -> some View {
+    private var recordingStatus: some View {
         switch recorder.state {
         case .idle:
             EmptyView()
@@ -651,55 +646,32 @@ struct ContentView: View {
                     .foregroundStyle(.secondary)
             }
         case .recording(let since):
-            if compact {
-                HStack(spacing: 6) {
-                    Image(systemName: "circle.fill")
-                        .font(.system(size: 8))
-                        .foregroundStyle(.red)
-                        .accessibilityHidden(true)
-                    // The section header says Recording. The source gives way first; the
-                    // time and Stop always fit the sidebar.
-                    Text(recorder.recordingLabel)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                    Spacer(minLength: 0)
-                    Text(since, style: .timer)
-                        .font(.body.monospacedDigit())
-                        .fixedSize()
-                    Button {
-                        Task { await recorder.stop() }
-                    } label: {
-                        Image(systemName: "stop.fill")
-                    }
-                    .buttonStyle(.bordered)
+            HStack(spacing: 6) {
+                Image(systemName: "circle.fill")
+                    .font(.system(size: 8))
+                    .foregroundStyle(.red)
+                    .accessibilityHidden(true)
+                // The header says Recording. The source gives way first; the
+                // time and Stop always fit the sidebar.
+                Text(recorder.recordingLabel)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Spacer(minLength: 0)
+                Text(since, style: .timer)
+                    .font(.body.monospacedDigit())
                     .fixedSize()
-                    .help("Stop Recording")
-                    .accessibilityLabel("Stop Recording")
+                Button {
+                    Task { await recorder.stop() }
+                } label: {
+                    Image(systemName: "stop.fill")
                 }
-                .accessibilityElement(children: .contain)
-                .accessibilityLabel("Recording")
-            } else {
-                VStack(spacing: 8) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "circle.fill")
-                            .font(.system(size: 8))
-                            .foregroundStyle(.red)
-                            .accessibilityHidden(true)
-                        Text("Recording")
-                            .font(.headline)
-                    }
-                    Text(recorder.recordingLabel)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                    Text(since, style: .timer)
-                        .font(.title2.monospacedDigit())
-                    stopButton
-                        .controlSize(.large)
-                }
-                .accessibilityElement(children: .contain)
-                .accessibilityLabel("Recording")
+                .buttonStyle(.bordered)
+                .fixedSize()
+                .help("Stop Recording")
+                .accessibilityLabel("Stop Recording")
             }
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("Recording")
         case .finishing:
             HStack(spacing: 8) {
                 ProgressView()
@@ -707,12 +679,6 @@ struct ContentView: View {
                 Text("Saving recording…")
                     .foregroundStyle(.secondary)
             }
-        }
-    }
-
-    private var stopButton: some View {
-        Button("Stop Recording") {
-            Task { await recorder.stop() }
         }
     }
 

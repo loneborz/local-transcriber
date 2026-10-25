@@ -112,9 +112,25 @@ struct WorkspaceSidebar: View {
                 }
             }
 
-            if !sections.folders.isEmpty {
-                Section("Folders") {
+            // Also without folders, so New Folder stays one click away.
+            if !sections.folders.isEmpty || canAddFolder {
+                Section {
                     ForEach(sections.folders, id: \.folder.id) { folderRow($0) }
+                } header: {
+                    HStack {
+                        Text("Folders")
+                        Spacer()
+                        Button { onRequest(.newFolder(moving: nil)) } label: {
+                            Image(systemName: "plus")
+                        }
+                        .buttonStyle(.borderless)
+                        .foregroundStyle(.tint)
+                        .help("New Folder")
+                        .accessibilityLabel("New Folder")
+                    }
+                    // The sidebar reads a section header as one heading, so the plus is also
+                    // offered as the heading's action (and as File › New Folder…, ⇧⌘N).
+                    .accessibilityAction(named: "New Folder") { onRequest(.newFolder(moving: nil)) }
                 }
             }
 
@@ -128,8 +144,9 @@ struct WorkspaceSidebar: View {
         // One warm ground for both appearances (see Theme.sidebar).
         .scrollContentBackground(.hidden)
         .background(Theme.sidebar)
-        .safeAreaInset(edge: .top, spacing: 0) { newButton }
+        // Before the inset, so the Home button keeps its own name.
         .accessibilityLabel("Transcription sidebar")
+        .safeAreaInset(edge: .top, spacing: 0) { homeButton }
         // isTargeted is not always told when a drag ends away from its target (a drop beside
         // the row, a cancel), so the highlight also ends once no mouse button is down.
         .task(id: dropTarget) {
@@ -147,10 +164,20 @@ struct WorkspaceSidebar: View {
         }
     }
 
-    private var newButton: some View {
-        NewControl(
-            onNewTranscription: onNewTranscription,
-            onNewFolder: { onRequest(.newFolder(moving: nil)) })
+    private var canAddFolder: Bool {
+        if case .ready = destination { true } else { false }
+    }
+
+    // Back to New Transcription, the same move as choosing it in the list.
+    private var homeButton: some View {
+        Button(action: onNewTranscription) {
+            Label("Home", systemImage: "house")
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.borderedProminent)
+        .buttonBorderShape(.roundedRectangle(radius: 10))
+        .controlSize(.large)
+        .help("Show New Transcription")
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .background(Theme.sidebar)
@@ -307,92 +334,6 @@ private struct SidebarTranscriptRow: View {
         parts.append(item.sortDate.formatted(date: .abbreviated, time: .shortened))
         if let duration = item.header.duration { parts.append(TimestampFormat.string(duration)) }
         return parts.joined(separator: " · ")
-    }
-}
-
-// The creation control at the top of the sidebar: one full-width "New" button that
-// expands, inline, into the things that can be created. More actions can be added
-// to the panel later.
-private struct NewControl: View {
-    let onNewTranscription: () -> Void
-    let onNewFolder: () -> Void
-
-    @State private var isExpanded = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    private static let radius: CGFloat = 10
-
-    var body: some View {
-        VStack(spacing: 6) {
-            Button { set(!isExpanded) } label: {
-                Label("New", systemImage: "plus")
-                    .frame(maxWidth: .infinity)
-                    .overlay(alignment: .trailing) {
-                        Image(systemName: "chevron.down")
-                            .font(.caption.weight(.semibold))
-                            .rotationEffect(.degrees(isExpanded ? 180 : 0))
-                            .accessibilityHidden(true)
-                    }
-            }
-            .buttonStyle(.borderedProminent)
-            .buttonBorderShape(.roundedRectangle(radius: Self.radius))
-            .controlSize(.large)
-            .accessibilityLabel("New")
-            .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
-            .accessibilityHint("Shows New Transcription and New Folder")
-
-            if isExpanded {
-                VStack(spacing: 2) {
-                    PanelRow(title: "New Transcription", symbol: "waveform") { choose(onNewTranscription) }
-                    PanelRow(title: "New Folder…", symbol: "folder.badge.plus") { choose(onNewFolder) }
-                }
-                .padding(4)
-                .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: Self.radius))
-                .overlay {
-                    RoundedRectangle(cornerRadius: Self.radius)
-                        .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
-                }
-                .transition(.opacity.combined(with: .move(edge: .top)))
-            }
-        }
-        .onExitCommand { set(false) }
-    }
-
-    private func set(_ expanded: Bool) {
-        withAnimation(reduceMotion ? nil : .snappy(duration: 0.2)) { isExpanded = expanded }
-    }
-
-    // Does the action, and folds the panel away.
-    private func choose(_ action: () -> Void) {
-        set(false)
-        action()
-    }
-}
-
-private struct PanelRow: View {
-    let title: String
-    let symbol: String
-    let action: () -> Void
-
-    @State private var isHovered = false
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 8) {
-                // A fixed icon column keeps the titles aligned.
-                Image(systemName: symbol)
-                    .frame(width: 20)
-                    .accessibilityHidden(true)
-                Text(title)
-            }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 6)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .background(Color.accentColor.opacity(isHovered ? 0.18 : 0), in: RoundedRectangle(cornerRadius: 6))
-        .onHover { isHovered = $0 }
     }
 }
 
