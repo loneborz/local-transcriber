@@ -10,11 +10,11 @@ Local Transcriber is a native macOS app that turns audio, video, YouTube links a
 
 ## Download
 
-[Local Transcriber 0.7.0](https://github.com/loneborz/local-transcriber/releases/download/v0.7.0/LocalTranscriber-0.7.0.dmg) (DMG, 15.8 MB), from the [v0.7.0 release](https://github.com/loneborz/local-transcriber/releases/tag/v0.7.0).
+[Local Transcriber 0.8.0](https://github.com/loneborz/local-transcriber/releases/download/v0.8.0/LocalTranscriber-0.8.0.dmg) (DMG, 15.9 MB), from the [v0.8.0 release](https://github.com/loneborz/local-transcriber/releases/tag/v0.8.0).
 
 It needs macOS 26 or later on a Mac with Apple silicon. There is no Intel or universal build. The DMG and the app are signed with Developer ID and notarized by Apple. Open the DMG, drag Local Transcriber to Applications and open it from there. The first time, macOS asks you to confirm opening an app downloaded from the Internet.
 
-SHA-256: `35ca45ab2787a0ca47e70cff45345b1ddaaf7486c35afc6daca1ebfe8bf1e6fe`. Check it with `shasum -a 256 LocalTranscriber-0.7.0.dmg`; the release also has a `.sha256` file.
+SHA-256: `8d0bc05df24ebbb0451df97acfcfc76b975e6d98fd9c876aacb2824634ab60f4`. Check it with `shasum -a 256 LocalTranscriber-0.8.0.dmg`; the release also has a `.sha256` file.
 
 ## What it does
 
