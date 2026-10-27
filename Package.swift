@@ -34,7 +34,7 @@ let package = Package(
         ),
         .testTarget(
             name: "TranscriptCoreTests",
-            dependencies: ["TranscriptCore"],
+            dependencies: ["TranscriptCore", .product(name: "WhisperKit", package: "argmax-oss-swift")],
             path: "Tests/TranscriptCoreTests",
             exclude: ["Fixtures"],
             resources: [.copy("Fixtures")],
