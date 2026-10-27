@@ -34,7 +34,7 @@ final class SidecarTests: XCTestCase {
     ) -> TranscriptSidecar {
         TranscriptSidecar(
             recognition: recognition ?? self.recognition,
-            transcriber: "SpeechTranscriber",
+            transcriber: .speechTranscriber,
             locale: "en-US",
             duration: duration,
             markdownFileName: name,
@@ -65,6 +65,17 @@ final class SidecarTests: XCTestCase {
         "schemaVersion":1,"timingGranularity":"word"}
 
         """)
+    }
+
+    // No default picks the engine: both recorded names follow the transcriber.
+    func testEngineNamesFollowTheTranscriber() {
+        func engine(_ transcriber: TranscriptTranscriber) -> TranscriptSidecar.Engine {
+            TranscriptSidecar(recognition: recognition, transcriber: transcriber, locale: "nl-NL", duration: nil,
+                              markdownFileName: "Name.md", markdown: Data()).engine
+        }
+        XCTAssertEqual(engine(.speechTranscriber), .init(name: "Apple SpeechAnalyzer", transcriber: "SpeechTranscriber"))
+        XCTAssertEqual(engine(.dictationTranscriber), .init(name: "Apple SpeechAnalyzer", transcriber: "DictationTranscriber"))
+        XCTAssertEqual(engine(.whisperLargeV3Turbo), .init(name: "WhisperKit", transcriber: "openai_whisper-large-v3-v20240930_turbo"))
     }
 
     func testEncodingIsDeterministic() throws {
@@ -188,7 +199,7 @@ final class SidecarTests: XCTestCase {
         let stored = try TranscriptSidecar.decode(Data(contentsOf: folder.appendingPathComponent("Name 2.timing.json")))
         XCTAssertEqual(stored.markdown.fileName, "Name 2.md")
         XCTAssertEqual(stored, TranscriptSidecar(
-            recognition: recognition, transcriber: "SpeechTranscriber", locale: "en-US", duration: 9.5,
+            recognition: recognition, transcriber: .speechTranscriber, locale: "en-US", duration: 9.5,
             markdownFileName: "Name 2.md", markdown: Data(markdown.utf8)))
     }
 
@@ -299,7 +310,7 @@ final class SidecarTests: XCTestCase {
         XCTAssertNil(saved.sidecarWarning)
         let stored = try TranscriptSidecar.decode(Data(contentsOf: SidecarFile.url(besides: saved.markdownURL)))
         XCTAssertEqual(stored.markdown.sha256, TranscriptSidecar(
-            recognition: TimedRecognition(), transcriber: "x", locale: "x", duration: nil,
+            recognition: TimedRecognition(), transcriber: .speechTranscriber, locale: "x", duration: nil,
             markdownFileName: "x", markdown: try Data(contentsOf: saved.markdownURL)).markdown.sha256)
         XCTAssertEqual(stored.markdown.fileName, "Name 2.md")
     }

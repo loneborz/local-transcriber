@@ -30,6 +30,10 @@ final class WhisperModelStore {
     private(set) var isPreparing = false
     // Loaded at least once on this macOS build, so the next load needs no compile.
     private(set) var isPrepared = false
+    // Whether a waiting or running Whisper job still needs the model. BatchQueue,
+    // which owns the jobs, answers; a job stays unsettled until its transcription
+    // has returned, whether it succeeded or failed.
+    var jobsNeedModel: () -> Bool = { false }
 
     // Application Support/Whisper for the app; a scratch folder and a small
     // manifest in tests.
@@ -62,6 +66,9 @@ final class WhisperModelStore {
         default: false
         }
     }
+
+    // Removal is refused while this is true.
+    var isInUse: Bool { isBusy || isPreparing || jobsNeedModel() }
 
     func refresh() {
         guard !isBusy else { return }
@@ -176,11 +183,27 @@ final class WhisperModelStore {
             progress(done)
         }
         await verifying()
+        try prune(stagingFolder, keeping: files)
         guard WhisperModelManifest.isComplete(at: stagingFolder, files: files) else { throw WhisperModelError.incomplete }
         // Same volume, so the move is a rename: the model appears complete or not at all.
         try? fileManager.removeItem(at: modelFolder)
         try fileManager.moveItem(at: stagingFolder, to: modelFolder)
         try? fileManager.removeItem(at: stagingFolder.deletingLastPathComponent())
+    }
+
+    // Deletes everything in the staging folder that is not a pinned file or a folder
+    // above one, such as a partial ".download" left by an interrupted attempt, so
+    // only the pinned files move into place.
+    private nonisolated static func prune(_ staging: URL, keeping files: [WhisperModelManifest.File]) throws {
+        let kept = Set(files.flatMap { file in
+            let parts = file.path.split(separator: "/")
+            return (1...parts.count).map { parts.prefix($0).joined(separator: "/") }
+        })
+        guard let items = FileManager.default.enumerator(atPath: staging.path) else { return }
+        for case let path as String in items where !kept.contains(path) {
+            try FileManager.default.removeItem(at: staging.appending(path: path))
+            items.skipDescendants()
+        }
     }
 
     // One file over URLSession, reporting bytes received. The redirect to the CDN is followed.
@@ -226,9 +249,9 @@ final class WhisperModelStore {
     // MARK: Remove
 
     // Deletes the installed model and any staged files, nothing else (D3). The
-    // caller confirms first and refuses while a job waits for or uses the model.
+    // caller confirms first; refused while installing or while a job needs the model.
     func remove() throws {
-        guard !isBusy, !isPreparing else { throw WhisperModelError.inUse }
+        guard !isInUse else { throw WhisperModelError.inUse }
         // Never follow a link that points elsewhere.
         guard (try? folder.resourceValues(forKeys: [.isSymbolicLinkKey]))?.isSymbolicLink != true
         else { throw WhisperModelError.unexpectedLocation(folder.path) }
@@ -273,7 +296,7 @@ enum WhisperModelError: LocalizedError {
         case .unexpectedLocation(let path):
             "The Whisper folder at \(path) is not where the app keeps it, so nothing was removed."
         case .inUse:
-            "Whisper Large V3 Turbo is being installed or prepared. Try again when that has finished."
+            "Whisper Large V3 Turbo is being installed or is needed by a waiting or running transcription. Try again when that has finished."
         }
     }
 }

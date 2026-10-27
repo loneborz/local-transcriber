@@ -7,17 +7,15 @@ import SwiftUI
 // runs (see OutputDestination), with a note that says why.
 struct SettingsView: View {
     let destination: OutputDestination
-    let queue: BatchQueue
 
     var body: some View {
-        GeneralSettings(destination: destination, queue: queue)
+        GeneralSettings(destination: destination)
             .frame(width: 480)
     }
 }
 
 private struct GeneralSettings: View {
     let destination: OutputDestination
-    let queue: BatchQueue
     @AppStorage(BatchQueue.sourcePackageModeKey) private var savesSourcePackages = false
     @AppStorage(BatchQueue.frontmatterKey) private var addsFrontmatter = false
     @AppStorage(AppAppearance.key) private var appearance = AppAppearance.system
@@ -43,7 +41,7 @@ private struct GeneralSettings: View {
                     .foregroundStyle(.secondary)
             }
 
-            WhisperSettings(queue: queue)
+            WhisperSettings()
         }
         .padding(20)
     }
@@ -56,7 +54,6 @@ private struct GeneralSettings: View {
 // The optional Whisper Large V3 Turbo model (LTR-76, doc-3 Addendum 8 D2-D4, D8):
 // status, the user-started download, disk use and removal.
 private struct WhisperSettings: View {
-    let queue: BatchQueue
     @State private var confirmsRemoval = false
     @State private var removalError: String?
     private var store: WhisperModelStore { .shared }
@@ -79,9 +76,11 @@ private struct WhisperSettings: View {
                 if let usage = store.diskUsage {
                     LabeledContent("Disk use", value: usage.formatted(.byteCount(style: .file)))
                 }
+                // The Core ML compile cache is the system's; its size is not shown (LTR-76 F2).
+                note("The size of the downloaded model. macOS may also keep a compiled copy in its own caches, which Remove doesn’t delete.")
                 Button("Remove…") { confirmsRemoval = true }
-                    .disabled(isInUse)
-                if isInUse {
+                    .disabled(store.isInUse)
+                if store.isInUse {
                     note("The model can’t be removed while a Whisper job is waiting or running.")
                 }
             case .notInstalled, .failed:
@@ -98,7 +97,7 @@ private struct WhisperSettings: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("The model files are deleted from this Mac. Transcripts and media stay as they are. You can download the model again later.")
+            Text("The downloaded model files are deleted from this Mac. A compiled copy that macOS keeps in its own caches may remain. Transcripts and media stay as they are. You can download the model again later.")
         }
     }
 
@@ -112,11 +111,6 @@ private struct WhisperSettings: View {
         case .installed: "Installed, prepared at first use"
         case .failed(let reason): "Failed: \(reason)"
         }
-    }
-
-    // Waiting or running Whisper jobs, or a model load in progress.
-    private var isInUse: Bool {
-        store.isPreparing || queue.jobs.contains { $0.engine == .whisper && !$0.isSettled }
     }
 
     private func note(_ text: String) -> some View {

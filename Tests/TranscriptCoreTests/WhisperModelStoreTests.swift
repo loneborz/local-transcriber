@@ -234,6 +234,56 @@ final class WhisperModelStoreTests: XCTestCase {
         try await settle(store)
     }
 
+    // Waiting, running and failed stand for BatchQueue's answer through a job's life.
+    func testRemovalIsRefusedWhileAJobNeedsTheModelAndAllowedOnceReleased() async throws {
+        let store = makeStore()
+        store.install(fromFolder: try source())
+        try await settle(store)
+        var jobNeedsModel = true   // waiting, then running
+        store.jobsNeedModel = { jobNeedsModel }
+        XCTAssertTrue(store.isInUse)
+        XCTAssertThrowsError(try store.remove()) { XCTAssertEqual($0.localizedDescription, WhisperModelError.inUse.localizedDescription) }
+        // Loaded, transcribing: the job is still unsettled.
+        store.preparationStarted()
+        store.preparationEnded(succeeded: true)
+        XCTAssertThrowsError(try store.remove())
+        XCTAssertEqual(store.state, .installed)
+        XCTAssertTrue(exists(store.modelFolder))
+
+        jobNeedsModel = false   // completed or failed
+        XCTAssertFalse(store.isInUse)
+        try store.remove()
+        XCTAssertEqual(store.state, .notInstalled)
+        XCTAssertFalse(exists(store.modelFolder))
+    }
+
+    // A partial ".download" from an interrupted attempt, or anything else unpinned,
+    // never reaches the installed folder; verified files are still reused.
+    func testStrayFilesInStagingAreNotPromoted() async throws {
+        let store = makeStore()
+        let good = try source()
+        let model = good.appending(path: WhisperModelManifest.modelName)
+        let staging = store.stagingFolder
+        try FileManager.default.createDirectory(at: staging.appending(path: "Encoder.mlmodelc/weights"), withIntermediateDirectories: true)
+        try FileManager.default.copyItem(at: model.appending(path: "config.json"), to: staging.appending(path: "config.json"))
+        try Data("partial".utf8).write(to: staging.appending(path: "Encoder.mlmodelc/weights/weight.bin.download"))
+        try FileManager.default.createDirectory(at: staging.appending(path: "Stray.mlmodelc"), withIntermediateDirectories: true)
+        try Data("x".utf8).write(to: staging.appending(path: "Stray.mlmodelc/x.bin"))
+
+        let fetched = Fetched()
+        store.install { file, destination, report in
+            fetched.paths.append(file.path)
+            try FileManager.default.copyItem(at: model.appending(path: file.path), to: destination)
+            report(file.size)
+        }
+        try await settle(store)
+        XCTAssertEqual(store.state, .installed)
+        XCTAssertEqual(fetched.paths, ["Encoder.mlmodelc/metadata.json", "Encoder.mlmodelc/weights/weight.bin"])
+        let installed = FileManager.default.enumerator(atPath: store.modelFolder.path)!.allObjects as! [String]
+        XCTAssertEqual(Set(installed), Set(files.map(\.path) + ["Encoder.mlmodelc", "Encoder.mlmodelc/weights"]))
+        XCTAssertFalse(exists(staging.deletingLastPathComponent()))
+    }
+
     func testRemovalRefusesALinkedFolder() async throws {
         let elsewhere = root.appending(path: "elsewhere")
         let model = elsewhere.appending(path: WhisperModelManifest.modelName)

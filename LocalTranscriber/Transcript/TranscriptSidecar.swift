@@ -27,7 +27,6 @@ import Foundation
 nonisolated struct TranscriptSidecar: Codable, Equatable, Sendable {
     static let currentSchemaVersion = 1
     static let fileExtension = "timing.json"
-    static let engineName = "Apple SpeechAnalyzer"
 
     struct Markdown: Codable, Equatable, Sendable {
         var fileName: String
@@ -64,8 +63,7 @@ nonisolated struct TranscriptSidecar: Codable, Equatable, Sendable {
 
     init(
         recognition: TimedRecognition,
-        transcriber: String,
-        engine engineName: String = engineName,
+        transcriber: TranscriptTranscriber,
         locale: String,
         duration: Double?,
         markdownFileName: String,
@@ -81,7 +79,8 @@ nonisolated struct TranscriptSidecar: Codable, Equatable, Sendable {
             fileName: markdownFileName,
             sha256: SHA256.hash(data: markdown).map { String(format: "%02x", $0) }.joined()
         )
-        engine = Engine(name: engineName, transcriber: transcriber)
+        // Both names come from the one transcriber, so they cannot disagree.
+        engine = Engine(name: transcriber.engineName, transcriber: transcriber.rawValue)
         self.locale = locale
         durationSeconds = finite(duration)
         timingGranularity = recognition.granularity
@@ -187,8 +186,7 @@ extension TranscriptSidecar {
         do {
             let sidecar = TranscriptSidecar(
                 recognition: transcript.recognition,
-                transcriber: transcript.transcriber.rawValue,
-                engine: transcript.transcriber.engineName,
+                transcriber: transcript.transcriber,
                 locale: transcript.localeIdentifier,
                 duration: transcript.duration,
                 markdownFileName: markdownURL.lastPathComponent,

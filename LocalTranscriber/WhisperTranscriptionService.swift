@@ -5,16 +5,15 @@ import WhisperKit
 // Whisper Large V3 Turbo through WhisperKit (LTR-76; doc-3 Addenda 7 and 8).
 // Recognition is fully local: the model comes from WhisperModelStore's folder in
 // the app's container and the tokenizer is bundled with the app
-// (Contents/Resources/WhisperTokenizer). WhisperKit's download is off and every
-// file is checked before loading, because WhisperKit would otherwise fetch a
-// missing tokenizer from the network. Audio is loaded whole (WhisperKit's
+// (Contents/Resources/WhisperTokenizer). WhisperKit's download is off, and the
+// tokenizer's pinned hashes are checked before every load, because WhisperKit
+// would otherwise fetch a missing or unreadable tokenizer from the network. Audio is loaded whole (WhisperKit's
 // incremental loading is not adopted). Never falls back to Apple Speech.
 enum WhisperTranscriptionService {
     private nonisolated static let log = Logger(subsystem: "nl.wavesweb.LocalTranscriber", category: "whisper")
     nonisolated static let transcriber = TranscriptTranscriber.whisperLargeV3Turbo
 
     nonisolated static var tokenizerFolder: URL? { Bundle.main.url(forResource: "WhisperTokenizer", withExtension: nil) }
-    private static let tokenizerFiles = ["config.json", "tokenizer.json", "tokenizer_config.json"]
 
     // The runtime's own language list.
     static let supportedLanguages = Set(Constants.languages.values)
@@ -38,7 +37,7 @@ enum WhisperTranscriptionService {
         store.refresh()
         guard store.isInstalled else { throw WhisperTranscriptionError.modelNotInstalled }
         guard let tokenizerFolder,
-              tokenizerFiles.allSatisfy({ FileManager.default.fileExists(atPath: tokenizerFolder.appending(path: $0).path) })
+              WhisperModelManifest.isVerified(at: tokenizerFolder, files: WhisperModelManifest.tokenizerFiles)
         else { throw WhisperTranscriptionError.tokenizerMissing }
 
         // Video is exported to audio first, exactly as for Apple Speech.
@@ -148,7 +147,7 @@ enum WhisperTranscriptionError: LocalizedError {
         case .modelNotInstalled:
             "Whisper Large V3 Turbo isn’t installed. Download it in Settings › General, then choose Retry."
         case .tokenizerMissing:
-            "This copy of Local Transcriber is missing the Whisper tokenizer files. Reinstall the app."
+            "This copy of Local Transcriber has missing or damaged Whisper tokenizer files. Reinstall the app."
         case .preparationFailed(let reason):
             "Whisper couldn’t prepare the model: \(reason)"
         case .recognitionFailed(let reason):

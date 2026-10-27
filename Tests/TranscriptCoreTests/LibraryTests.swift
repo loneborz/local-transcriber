@@ -70,7 +70,7 @@ class TreeTestCase: XCTestCase {
                 ]),
                 RecognitionResult(start: 65, end: 66, units: [RecognitionUnit(text: "Second minute.", kind: .word, start: 65, end: 66)]),
             ]),
-            transcriber: "SpeechTranscriber", locale: "en-US", duration: 90,
+            transcriber: .speechTranscriber, locale: "en-US", duration: 90,
             markdownFileName: md.lastPathComponent, markdown: Data(text.utf8))
         try writeData(try sidecar.encoded(), SidecarFile.url(besides: md).path.replacingOccurrences(of: folder.path + "/", with: ""))
         return md

@@ -113,7 +113,7 @@ final class TranscriptReviewTests: TreeTestCase {
     private var twoMarkdown: String { markdown(seconds: [(0, "Hello there."), (65, "Second minute.")]) }
 
     private func sidecar(_ recognition: TimedRecognition, for markdown: String, duration: Double? = 90) throws -> Data {
-        try TranscriptSidecar(recognition: recognition, transcriber: "SpeechTranscriber", locale: "en-US", duration: duration,
+        try TranscriptSidecar(recognition: recognition, transcriber: .speechTranscriber, locale: "en-US", duration: duration,
                               markdownFileName: "Talk.md", markdown: Data(markdown.utf8)).encoded()
     }
 
@@ -289,7 +289,7 @@ final class TranscriptReviewTests: TreeTestCase {
             transcriber: real.engine.transcriber == "SpeechTranscriber" ? .speechTranscriber : .dictationTranscriber,
             duration: real.durationSeconds, segments: segments))
         let data = try TranscriptSidecar(
-            recognition: real.recognition, transcriber: real.engine.transcriber, locale: real.locale,
+            recognition: real.recognition, transcriber: TranscriptTranscriber(rawValue: real.engine.transcriber)!, locale: real.locale,
             duration: real.durationSeconds, markdownFileName: "Talk.md", markdown: Data(md.utf8)).encoded()
         return (md, data, real.recognition)
     }

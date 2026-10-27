@@ -53,7 +53,7 @@ final class TranscriptionJob: Identifiable {
     // transcript when the request settles (ReviewAutoOpen).
     var requester: UUID?
 
-    init(source: JobSource, locale: Locale, engine: TranscriptionEngine = .appleSpeech) {
+    init(source: JobSource, locale: Locale, engine: TranscriptionEngine) {
         self.source = source
         self.locale = locale
         self.engine = engine
@@ -135,6 +135,10 @@ final class BatchQueue {
 
     init(destination: OutputDestination) {
         self.destination = destination
+        // The one answer to whether the Whisper model may be removed (LTR-76).
+        WhisperModelStore.shared.jobsNeedModel = { [weak self] in
+            self?.jobs.contains { $0.engine == .whisper && !$0.isSettled } ?? false
+        }
     }
     private var isRunning = false
     private static let log = Logger(subsystem: "nl.wavesweb.LocalTranscriber", category: "progress")

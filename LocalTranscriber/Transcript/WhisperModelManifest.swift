@@ -31,6 +31,21 @@ nonisolated enum WhisperModelManifest {
         }
     }
 
+    // The tokenizer bundled with the app (Vendor/WhisperTokenizer/README.md).
+    // WhisperKit 1.1.1 downloads a tokenizer from the Hub when its local one is
+    // missing or fails to load (ModelUtilities.loadTokenizer), whatever its
+    // `download` setting says, so these are checked before every load.
+    static let tokenizerFiles: [File] = [
+        File(path: "config.json", size: 1272, sha256: "ad0e8d1e46f4d01f7861a21509e5d0f977d6cc1f367a370603c92541d819807b"),
+        File(path: "tokenizer.json", size: 2480617, sha256: "6d8cbd7cd0d8d5815e478dac67b85a26bbe77c1f5e0c6d76d1ce2abc0e5f21ca"),
+        File(path: "tokenizer_config.json", size: 282843, sha256: "844b642c73a91359722f47b35705f7174686df33d252695d8572cf9ac03a6389"),
+    ]
+
+    // Every file present with its pinned size and SHA-256.
+    static func isVerified(at folder: URL, files: [File]) -> Bool {
+        files.allSatisfy { (try? matches(folder.appending(path: $0.path), $0)) == true }
+    }
+
     // Size and SHA-256 of the file on disk against the pin.
     static func matches(_ url: URL, _ file: File) throws -> Bool {
         let handle = try FileHandle(forReadingFrom: url)
