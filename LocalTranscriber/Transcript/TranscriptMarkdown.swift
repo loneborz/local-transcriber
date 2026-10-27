@@ -2,7 +2,7 @@ import Foundation
 
 // What the header of a Markdown file written by TranscriptMarkdownRenderer says.
 // This is how the library tells a Local Transcriber transcript from any other
-// Markdown file: the `**Engine:** Apple SpeechAnalyzer` line plus a `## Transcript`
+// Markdown file: an `**Engine:**` line naming a known engine plus a `## Transcript`
 // section. Nothing here writes or rewrites a file.
 nonisolated struct TranscriptHeader: Equatable, Sendable {
     var title: String
@@ -17,7 +17,7 @@ nonisolated struct TranscriptHeader: Equatable, Sendable {
 }
 
 nonisolated enum TranscriptMarkdown {
-    static let engineName = "Apple SpeechAnalyzer"
+    static let engineNames: Set<String> = ["Apple SpeechAnalyzer", "WhisperKit"]
     static let transcriptHeading = "## Transcript"
 
     // One minute block of the Markdown body. Legacy transcripts only have these
@@ -58,7 +58,7 @@ nonisolated enum TranscriptMarkdown {
             if let (key, value) = field(line) { fields[key] = value }
         }
 
-        guard foundTranscript, fields["Engine"] == engineName, let source = fields["Source"] else { return nil }
+        guard foundTranscript, fields["Engine"].map(engineNames.contains) == true, let source = fields["Source"] else { return nil }
 
         let header = TranscriptHeader(
             title: title,

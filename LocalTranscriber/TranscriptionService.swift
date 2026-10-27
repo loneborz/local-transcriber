@@ -5,12 +5,15 @@ import Speech
 enum TranscriptionPhase: Sendable {
     case preparingVideo
     case preparingLanguage
+    // Whisper: loading the model; the first load compiles it for this Mac.
+    case preparingModel
     case transcribing
 
     var label: String {
         switch self {
         case .preparingVideo: "Preparing audio…"
         case .preparingLanguage: "Preparing language…"
+        case .preparingModel: "Preparing Whisper model…"
         case .transcribing: "Transcribing…"
         }
     }

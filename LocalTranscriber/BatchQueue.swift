@@ -267,12 +267,20 @@ final class BatchQueue {
         let locale = job.locale
         job.state = .transcribing(nil)
 
+        // Apple Speech, or Whisper when a Debug build's Developer menu says so (LTR-76 phase 1).
+        #if DEBUG
+        let transcribe = UserDefaults.standard.bool(forKey: WhisperDeveloperMenu.engineKey)
+            ? WhisperTranscriptionService.transcribe : TranscriptionService.transcribe
+        #else
+        let transcribe = TranscriptionService.transcribe
+        #endif
+
         do {
-            let transcript = try await TranscriptionService.transcribe(
-                url: mediaURL,
-                locale: locale,
-                onPhaseChange: { job.state = .transcribing($0) },
-                onProgress: { position, total in
+            let transcript = try await transcribe(
+                mediaURL,
+                locale,
+                { job.state = .transcribing($0) },
+                { position, total in
                     // Late or overlapping results never move the position back.
                     if job.progress == nil {
                         job.progress = RecognitionProgress(position: position, total: total)

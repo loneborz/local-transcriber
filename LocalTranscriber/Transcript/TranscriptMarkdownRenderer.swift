@@ -22,7 +22,7 @@ enum TranscriptMarkdownRenderer {
         }
 
         metadata.append("**Language:** \(transcript.localeIdentifier)")
-        metadata.append("**Engine:** Apple SpeechAnalyzer")
+        metadata.append("**Engine:** \(transcript.transcriber.engineName)")
         metadata.append("**Transcriber:** \(transcript.transcriber.rawValue)")
 
         var markdown = "# \(title)\n\n"

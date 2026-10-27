@@ -17,7 +17,8 @@ let package = Package(
                 "Assets.xcassets", "AudioReviewPlayer.swift", "BatchQueue.swift", "ContentView.swift", "Credits.rtf",
                 "LibraryStore.swift", "MyApp.swift", "OutputDestination.swift", "Recorder.swift", "RecordingCloseGuard.swift",
                 "SettingsView.swift", "SourcePackage.swift", "Theme.swift", "TranscriptReviewView.swift",
-                "TranscriptionService.swift", "WorkspaceSidebar.swift",
+                "TranscriptionService.swift", "WhisperDeveloperMenu.swift", "WhisperTranscriptionService.swift",
+                "WorkspaceSidebar.swift",
             ],
             sources: ["Transcript", "YouTubeSource.swift"],
             // Same as the app target (SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor).

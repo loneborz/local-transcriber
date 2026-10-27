@@ -84,6 +84,10 @@ import SwiftUI
                     .keyboardShortcut(.delete, modifiers: .command)
                     .disabled(item == nil)
             }
+
+            #if DEBUG
+            WhisperDeveloperMenu()
+            #endif
         }
 
         // The app menu's Settings… item and ⌘, come with this scene; the footer

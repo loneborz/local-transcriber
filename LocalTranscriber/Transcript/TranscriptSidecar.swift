@@ -10,7 +10,7 @@ import Foundation
 // {
 //   "schemaVersion": 1,
 //   "markdown": { "fileName": "Name.md", "sha256": "<hex of the exact saved bytes>" },
-//   "engine": { "name": "Apple SpeechAnalyzer", "transcriber": "SpeechTranscriber" },
+//   "engine": { "name": "Apple SpeechAnalyzer" | "WhisperKit", "transcriber": "SpeechTranscriber" },
 //   "locale": "en-US",
 //   "durationSeconds": 13.14,                     (omitted when unknown)
 //   "timingGranularity": "word" | "segment" | "none",
@@ -65,6 +65,7 @@ nonisolated struct TranscriptSidecar: Codable, Equatable, Sendable {
     init(
         recognition: TimedRecognition,
         transcriber: String,
+        engine engineName: String = engineName,
         locale: String,
         duration: Double?,
         markdownFileName: String,
@@ -80,7 +81,7 @@ nonisolated struct TranscriptSidecar: Codable, Equatable, Sendable {
             fileName: markdownFileName,
             sha256: SHA256.hash(data: markdown).map { String(format: "%02x", $0) }.joined()
         )
-        engine = Engine(name: Self.engineName, transcriber: transcriber)
+        engine = Engine(name: engineName, transcriber: transcriber)
         self.locale = locale
         durationSeconds = finite(duration)
         timingGranularity = recognition.granularity
@@ -187,6 +188,7 @@ extension TranscriptSidecar {
             let sidecar = TranscriptSidecar(
                 recognition: transcript.recognition,
                 transcriber: transcript.transcriber.rawValue,
+                engine: transcript.transcriber.engineName,
                 locale: transcript.localeIdentifier,
                 duration: transcript.duration,
                 markdownFileName: markdownURL.lastPathComponent,

@@ -3,6 +3,14 @@ import Foundation
 enum TranscriptTranscriber: String, Sendable {
     case speechTranscriber = "SpeechTranscriber"
     case dictationTranscriber = "DictationTranscriber"
+    // The WhisperKit Core ML model (LTR-76 phase 1). The recorded names are
+    // provisional until the owner decides them (doc-3 Addendum 7 F).
+    case whisperLargeV3Turbo = "openai_whisper-large-v3-v20240930_turbo"
+
+    // The Engine written in the Markdown header and the timing sidecar.
+    var engineName: String {
+        self == .whisperLargeV3Turbo ? "WhisperKit" : "Apple SpeechAnalyzer"
+    }
 }
 
 struct Transcript: Sendable {
