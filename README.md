@@ -30,6 +30,14 @@ You can add several files at once, and more while one is transcribing. They are 
 
 Settings (⌘,) has Appearance: System follows macOS, while Light and Dark keep the app in that look whatever macOS uses.
 
+### Whisper Large V3 Turbo (in development, not in the 0.9.0 download)
+
+The next version adds a second engine you can choose per item: while an item waits for its language, a switch above Choose Language picks Apple Speech (always preselected) or Whisper Large V3 Turbo. The job keeps that engine, and the Processing row names it. Whisper runs on your Mac through [WhisperKit](https://github.com/argmaxinc/argmax-oss-swift) and works with files, video (the audio is extracted first, as for Apple Speech) and YouTube links, in all ten languages of the menu.
+
+The model (about 1.6 GB) is not in the app. Settings › General › Whisper Large V3 Turbo shows its state and has Download, which fetches a fixed version from Hugging Face (`argmaxinc/whisperkit-coreml`) only when you click it, checks every file against a pinned SHA-256 and installs it only when all files match. An interrupted download is never treated as installed; Download again keeps the files that were already verified. Settings also shows the disk use and has Remove…, which asks first, deletes only the model and is unavailable while a Whisper job is waiting or running. The Whisper tokenizer files are part of the app. The first Whisper job on a Mac (and after a macOS update) prepares the model for that Mac, which took about a minute and a half on mine; the job shows "Preparing Whisper model…" meanwhile.
+
+On one English test file, Whisper wrote the first minute in lowercase with little punctuation (the words were right); the same audio as a 16 kHz WAV did not do that.
+
 ## Output
 
 The first time you transcribe, the app asks for an output folder and remembers it. To change it, click "Saves to …" in the window's footer (right-click it to show the folder in Finder); it can't change while something is transcribing or recording. The app never overwrites anything: each transcript gets its own folder named after the media (`Weekly Meeting/`), and a name that already exists becomes `Weekly Meeting 2/`, `Weekly Meeting 3/` and so on.
@@ -102,7 +110,7 @@ When the recording sits next to its transcript, a player appears. Click a timest
 
 ## Privacy
 
-Transcription never leaves your Mac. So do extraction, recording, and reading and writing transcripts. The app uses the network in two places: to download a YouTube link's audio, and for Apple's language assets, which macOS manages. A YouTube download is temporary and is deleted when the job ends, and any leftovers are swept at the next launch. The exception is a source package: the audio is copied into the package folder first, and that `audio.m4a` stays next to the transcript on purpose.
+Transcription never leaves your Mac. So do extraction, recording, and reading and writing transcripts. The app uses the network in two places: to download a YouTube link's audio, and for Apple's language assets, which macOS manages. The in-development Whisper engine adds a third, only when you click Download in Settings: the Whisper model download. Recognition itself, with either engine, uses no network. A YouTube download is temporary and is deleted when the job ends, and any leftovers are swept at the next launch. The exception is a source package: the audio is copied into the package folder first, and that `audio.m4a` stays next to the transcript on purpose.
 
 YouTube audio is fetched by a small helper bundled in the app: a pinned [yt-dlp](https://github.com/yt-dlp/yt-dlp) release run by an arm64 build of Python 3.13. It runs as a child of the app inside the same App Sandbox with no entitlements of its own beyond inheriting the app's. It never updates itself, and ffmpeg and a JavaScript runtime are not bundled, so a change on YouTube's side can break downloads until the pinned yt-dlp is replaced. Versions, checksums and licence notes are in [`Vendor/YouTubeHelper/README.md`](Vendor/YouTubeHelper/README.md).
 

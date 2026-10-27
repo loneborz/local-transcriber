@@ -93,7 +93,7 @@ import SwiftUI
         // The app menu's Settings… item and ⌘, come with this scene; the footer
         // entry opens the same window.
         Settings {
-            SettingsView(destination: destination)
+            SettingsView(destination: destination, queue: queue)
         }
     }
 }

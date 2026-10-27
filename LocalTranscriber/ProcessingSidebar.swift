@@ -97,7 +97,7 @@ private struct ProcessingRow: View {
                     .font(.callout)
                     .lineLimit(1)
                     .truncationMode(.middle)
-                // The language this job was accepted with, not the current preference.
+                // The language and engine this job was accepted with, not the current preference.
                 Text("\(language) · \(Text(stage).foregroundStyle(isFailure ? Color.red : Color.secondary))")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -238,8 +238,10 @@ private struct ProcessingRow: View {
         .fixedSize(horizontal: false, vertical: true)
     }
 
+    // The language and engine (short name) the job was accepted with.
     private var language: String {
-        TranscriptionLanguage.allCases.first { $0.locale == job.locale }?.title ?? job.locale.identifier
+        let title = TranscriptionLanguage.allCases.first { $0.locale == job.locale }?.title ?? job.locale.identifier
+        return "\(title) · \(job.engine == .whisper ? "Whisper" : "Apple Speech")"
     }
 
     private var buttons: some View {

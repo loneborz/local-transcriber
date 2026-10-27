@@ -59,6 +59,7 @@
 				000000000000000130000000 /* Frameworks */,
 				000000000000000140000000 /* Resources */,
 				000000000000000150000000 /* Embed YouTube helper */,
+				000000000000000160000000 /* Embed Whisper tokenizer */,
 			);
 			buildRules = (
 			);
@@ -129,6 +130,17 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/bash;
 			shellScript = "set -euo pipefail\n[ \"${PLATFORM_NAME}\" = \"macosx\" ] || exit 0\n\n# Installs the vendored YouTube helper (see Vendor/YouTubeHelper/README.md):\n# the only Mach-O goes to Contents/Helpers, everything else is data in Resources.\nSRC=\"${SRCROOT}/Vendor/YouTubeHelper\"\nAPP=\"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}\"\n\nrm -rf \"${APP}/Helpers/python3.13\" \"${APP}/Resources/python-home\"\nmkdir -p \"${APP}/Helpers\" \"${APP}/Resources\"\ncp \"${SRC}/python3.13\" \"${APP}/Helpers/python3.13\"\ncp -R \"${SRC}/python-home\" \"${APP}/Resources/python-home\"\ncp \"${SRC}/yt-dlp\" \"${SRC}/ytdlp_launcher.py\" \"${APP}/Resources/\"\n\nIDENTITY=\"${EXPANDED_CODE_SIGN_IDENTITY:--}\"\n[ -n \"${IDENTITY}\" ] || IDENTITY=\"-\"\nFLAGS=()\nif [ \"${ENABLE_HARDENED_RUNTIME:-NO}\" = \"YES\" ]; then\n  FLAGS+=(--options runtime)\n  [ \"${IDENTITY}\" = \"-\" ] || FLAGS+=(--timestamp)\nfi\n\n# The helper is signed before the app. Entitlements: app-sandbox + inherit only.\ncodesign --force --sign \"${IDENTITY}\" ${FLAGS[@]+\"${FLAGS[@]}\"} \\\n  --entitlements \"${SRC}/helper-inherit.entitlements\" \"${APP}/Helpers/python3.13\"\n";
+		};
+		000000000000000160000000 /* Embed Whisper tokenizer */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			name = "Embed Whisper tokenizer";
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/bash;
+			shellScript = "set -euo pipefail\n[ \"${PLATFORM_NAME}\" = \"macosx\" ] || exit 0\n\n# Installs the vendored Whisper tokenizer (see Vendor/WhisperTokenizer/README.md)\n# as plain data, so recognition never fetches it.\nSRC=\"${SRCROOT}/Vendor/WhisperTokenizer\"\nDEST=\"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Resources/WhisperTokenizer\"\n\nrm -rf \"${DEST}\"\nmkdir -p \"${DEST}\"\ncp \"${SRC}/config.json\" \"${SRC}/tokenizer.json\" \"${SRC}/tokenizer_config.json\" \"${DEST}/\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 

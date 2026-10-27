@@ -28,6 +28,8 @@ final class TranscriptionJob: Identifiable {
     let source: JobSource
     // Chosen for this input before it became a job (LTR-72); never changes.
     let locale: Locale
+    // Likewise (LTR-76, doc-3 Addendum 8 D1).
+    let engine: TranscriptionEngine
     var mediaInfo: MediaInfo?
     // Set once a YouTube source has been resolved and downloaded.
     var metadata: SourceMetadata?
@@ -57,9 +59,10 @@ final class TranscriptionJob: Identifiable {
     // transcript when the request settles (ReviewAutoOpen).
     var requester: UUID?
 
-    init(source: JobSource, locale: Locale) {
+    init(source: JobSource, locale: Locale, engine: TranscriptionEngine = .appleSpeech) {
         self.source = source
         self.locale = locale
+        self.engine = engine
     }
 
     var displayName: String {
@@ -116,6 +119,8 @@ struct PendingInput: Identifiable {
     let id = UUID()
     let source: JobSource
     let recording: (folder: URL, startedAt: Date)?
+    // Apple Speech unless the user picks Whisper for this input (D1).
+    var engine = TranscriptionEngine.appleSpeech
 
     var name: String {
         switch source {
@@ -186,14 +191,19 @@ final class BatchQueue {
         if let recording = input.recording { removedRecordings.insert(recording.folder.libraryKey) }
     }
 
+    func setEngine(_ engine: TranscriptionEngine, for input: PendingInput) {
+        guard let index = pending.firstIndex(where: { $0.id == input.id }) else { return }
+        pending[index].engine = engine
+    }
+
     // Turns a pending input into a job with the language chosen for it. It starts at
     // once, or after the jobs before it. Nil if the input is no longer pending.
     func start(_ input: PendingInput, language: TranscriptionLanguage, requester: UUID) -> TranscriptionJob? {
         guard let index = pending.firstIndex(where: { $0.id == input.id }) else { return nil }
-        pending.remove(at: index)
+        let queued = pending.remove(at: index)
         recentLanguages = RecentChoices.choosing(language, in: recentLanguages)
         UserDefaults.standard.set(recentLanguages.map(\.rawValue), forKey: Self.recentLanguagesKey)
-        let job = TranscriptionJob(source: input.source, locale: language.locale)
+        let job = TranscriptionJob(source: queued.source, locale: language.locale, engine: queued.engine)
         job.recording = input.recording
         job.requester = requester
         jobs.append(job)
@@ -267,13 +277,11 @@ final class BatchQueue {
         let locale = job.locale
         job.state = .transcribing(nil)
 
-        // Apple Speech, or Whisper when a Debug build's Developer menu says so (LTR-76 phase 1).
-        #if DEBUG
-        let transcribe = UserDefaults.standard.bool(forKey: WhisperDeveloperMenu.engineKey)
-            ? WhisperTranscriptionService.transcribe : TranscriptionService.transcribe
-        #else
-        let transcribe = TranscriptionService.transcribe
-        #endif
+        // The engine chosen for this input; never the other one as a fallback.
+        let transcribe = switch job.engine {
+        case .appleSpeech: TranscriptionService.transcribe
+        case .whisper: WhisperTranscriptionService.transcribe
+        }
 
         do {
             let transcript = try await transcribe(

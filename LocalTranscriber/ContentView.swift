@@ -503,11 +503,37 @@ struct ContentView: View {
                     .foregroundStyle(.secondary)
             }
 
+            // The engine for this input only, Apple Speech unless changed (LTR-76, D1).
+            Picker("Engine", selection: Binding(
+                get: { input.engine },
+                set: { queue.setEngine($0, for: input) }
+            )) {
+                ForEach(TranscriptionEngine.allCases) { Text($0.title).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .fixedSize()
+            .accessibilityLabel("Engine for \(input.name)")
+
+            let needsModel = input.engine == .whisper && !WhisperModelStore.shared.isInstalled
+            if needsModel {
+                HStack(spacing: 6) {
+                    Text("Whisper Large V3 Turbo isn’t installed.")
+                        .foregroundStyle(.secondary)
+                    SettingsLink { Text("Download in Settings…") }
+                        .buttonStyle(.link)
+                }
+                .font(.caption)
+            }
+
             // Prominent like Home: this is the one thing to do here. A recent language
-            // is listed once, under Recent.
+            // is listed once, under Recent. Only languages the chosen engine supports.
             Menu("Choose Language") {
-                let recent = queue.recentLanguages
-                let others = TranscriptionLanguage.byTitle.filter { !recent.contains($0) }
+                let usable = { (language: TranscriptionLanguage) in
+                    input.engine == .appleSpeech || WhisperTranscriptionService.supports(language)
+                }
+                let recent = queue.recentLanguages.filter(usable)
+                let others = TranscriptionLanguage.byTitle.filter { !recent.contains($0) && usable($0) }
                 if recent.isEmpty {
                     languageButtons(others, for: input)
                 } else {
@@ -522,6 +548,7 @@ struct ContentView: View {
             .fixedSize()
             .padding(.vertical, 2)
             .accessibilityLabel("Choose the language spoken in \(input.name)")
+            .disabled(needsModel)
 
             HStack(spacing: 10) {
                 Button("Remove") { queue.discard(input) }

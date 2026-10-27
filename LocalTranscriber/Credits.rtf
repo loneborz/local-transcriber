@@ -14,6 +14,12 @@ Local Transcriber is released under the MIT License (see LICENSE in the source r
 Transcription uses Apple's on-device speech frameworks. The software below is bundled only\
 with the YouTube helper, which downloads the audio of a YouTube link you add. It is installed\
 inside the app as Contents/Helpers/python3.13 and Contents/Resources (python-home, yt-dlp).\
+Whisper Large V3 Turbo, the optional second engine, runs on this Mac through WhisperKit\
+(Argmax OSS 1.1.1, MIT; parts derived from swift-transformers, Apache License 2.0),\
+linked into the app. The Whisper tokenizer files of openai/whisper-large-v3 (Apache\
+License 2.0) are bundled in Contents/Resources/WhisperTokenizer. The Whisper model\
+itself (argmaxinc/whisperkit-coreml, MIT) is not bundled: it is downloaded only when\
+you choose Download in Settings.\
 \
 Bundled components and their licences:\
 \
@@ -1262,4 +1268,55 @@ been taken from other projects or from the open internet. Every line of code can
 be traced back to its original author, and all of those authors have public\
 domain dedications on file. So the SQLite code base is clean and is\
 uncontaminated with licensed code from other projects.\
+\
+==============================================================================\
+WhisperKit, Argmax OSS 1.1.1 (MIT)\
+==============================================================================\
+MIT License\
+\
+Copyright (c) 2024 argmax, inc.\
+\
+Permission is hereby granted, free of charge, to any person obtaining a copy\
+of this software and associated documentation files (the "Software"), to deal\
+in the Software without restriction, including without limitation the rights\
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell\
+copies of the Software, and to permit persons to whom the Software is\
+furnished to do so, subject to the following conditions:\
+\
+The above copyright notice and this permission notice shall be included in all\
+copies or substantial portions of the Software.\
+\
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\
+SOFTWARE.\
+\
+==============================================================================\
+swift-transformers (Apache License 2.0), parts of Argmax OSS\
+==============================================================================\
+Portions of Argmax OSS (under Sources/ArgmaxCore/External) are derived from the\
+swift-transformers project (https://github.com/huggingface/swift-transformers).\
+Copyright 2022 Hugging Face SAS. These files have been modified by Argmax, Inc.\
+Licensed under the Apache License, Version 2.0; the full text is reproduced above\
+under OpenSSL.\
+\
+==============================================================================\
+Whisper tokenizer, openai/whisper-large-v3 (Apache License 2.0)\
+==============================================================================\
+config.json, tokenizer.json and tokenizer_config.json from\
+https://huggingface.co/openai/whisper-large-v3 at commit\
+06f233fe06e710322aca913c1bc4249a0d71fce1, unmodified. Copyright OpenAI.\
+Licensed under the Apache License, Version 2.0; the full text is reproduced above\
+under OpenSSL.\
+\
+==============================================================================\
+Whisper Large V3 Turbo Core ML model, argmaxinc/whisperkit-coreml (MIT)\
+==============================================================================\
+Not bundled. Downloaded on request from https://huggingface.co/argmaxinc/whisperkit-coreml\
+at commit 0f63a7800b00dd0226abd051b906c246e1907482 (folder\
+openai_whisper-large-v3-v20240930_turbo), licensed under the MIT License as stated\
+by that repository. The model is a conversion of OpenAI's Whisper large-v3-turbo.\
 }

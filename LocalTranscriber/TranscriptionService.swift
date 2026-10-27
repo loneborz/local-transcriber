@@ -31,33 +31,9 @@ enum TranscriptionService {
         // not an estimate of the work left.
         onProgress: @escaping @MainActor (_ position: TimeInterval, _ total: TimeInterval) -> Void = { _, _ in }
     ) async throws -> Transcript {
-        var temporaryAudioURL: URL?
-        defer {
-            if let temporaryAudioURL {
-                try? FileManager.default.removeItem(at: temporaryAudioURL)
-            }
-        }
-
-        let audioURL: URL
-        let sourceAudioDuration: TimeInterval?
-        switch url.pathExtension.lowercased() {
-        case "mp4", "mov":
-            let outputURL = FileManager.default.temporaryDirectory
-                .appendingPathComponent(UUID().uuidString)
-                .appendingPathExtension("m4a")
-            temporaryAudioURL = outputURL
-            onPhaseChange(.preparingVideo)
-            sourceAudioDuration = try await exportAudio(from: url, to: outputURL)
-            audioURL = outputURL
-        default:
-            audioURL = url
-            sourceAudioDuration = nil
-        }
-
-        let file = try AVAudioFile(forReading: audioURL)
-        if let sourceAudioDuration {
-            try validateNormalizedAudio(file, covers: sourceAudioDuration)
-        }
+        let audio = try await prepareAudio(for: url, onPhaseChange: onPhaseChange)
+        defer { audio.removeTemporaryFile() }
+        let file = try audio.open()
 
         let totalDuration = file.processingFormat.sampleRate > 0
             ? Double(file.length) / file.processingFormat.sampleRate
@@ -150,6 +126,50 @@ enum TranscriptionService {
             segments: collected.segments,
             recognition: collected.recognition
         )
+    }
+
+    // A file ready to be read by a recognizer: video sources (MP4, MOV) as their
+    // audio track exported to a temporary M4A, other files as they are. Shared by
+    // both engines (doc-3 Addendum 8; LTR-76).
+    struct PreparedAudio {
+        let url: URL
+        // The video's audio-track duration, to check the export against.
+        let sourceDuration: TimeInterval?
+        let isTemporary: Bool
+
+        func open() throws -> AVAudioFile {
+            let file = try AVAudioFile(forReading: url)
+            if let sourceDuration {
+                try TranscriptionService.validateNormalizedAudio(file, covers: sourceDuration)
+            }
+            return file
+        }
+
+        func removeTemporaryFile() {
+            if isTemporary { try? FileManager.default.removeItem(at: url) }
+        }
+    }
+
+    static func prepareAudio(
+        for url: URL,
+        onPhaseChange: @MainActor (TranscriptionPhase) -> Void
+    ) async throws -> PreparedAudio {
+        switch url.pathExtension.lowercased() {
+        case "mp4", "mov":
+            let outputURL = FileManager.default.temporaryDirectory
+                .appendingPathComponent(UUID().uuidString)
+                .appendingPathExtension("m4a")
+            onPhaseChange(.preparingVideo)
+            do {
+                let duration = try await exportAudio(from: url, to: outputURL)
+                return PreparedAudio(url: outputURL, sourceDuration: duration, isTemporary: true)
+            } catch {
+                try? FileManager.default.removeItem(at: outputURL)
+                throw error
+            }
+        default:
+            return PreparedAudio(url: url, sourceDuration: nil, isTemporary: false)
+        }
     }
 
     // UserDefaults key: the locales prepared by this app, most recently used first.
