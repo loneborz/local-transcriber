@@ -6,9 +6,10 @@ import WhisperKit
 // Recognition is fully local: the model comes from WhisperModelStore's folder in
 // the app's container and the tokenizer is bundled with the app
 // (Contents/Resources/WhisperTokenizer). WhisperKit's download is off, and the
-// tokenizer's pinned hashes are checked before every load, because WhisperKit
-// would otherwise fetch a missing or unreadable tokenizer from the network. Audio is loaded whole (WhisperKit's
-// incremental loading is not adopted). Never falls back to Apple Speech.
+// app loads the tokenizer itself (LocalWhisperTokenizer, LocalWhisperKit), so
+// WhisperKit's tokenizer loader and its network fallback are never used. Audio is
+// loaded whole (WhisperKit's incremental loading is not adopted). Never falls
+// back to Apple Speech.
 enum WhisperTranscriptionService {
     private nonisolated static let log = Logger(subsystem: "nl.wavesweb.LocalTranscriber", category: "whisper")
     nonisolated static let transcriber = TranscriptTranscriber.whisperLargeV3Turbo
@@ -36,9 +37,14 @@ enum WhisperTranscriptionService {
         let store = WhisperModelStore.shared
         store.refresh()
         guard store.isInstalled else { throw WhisperTranscriptionError.modelNotInstalled }
-        guard let tokenizerFolder,
-              WhisperModelManifest.isVerified(at: tokenizerFolder, files: WhisperModelManifest.tokenizerFiles)
-        else { throw WhisperTranscriptionError.tokenizerMissing }
+        guard let tokenizerFolder else { throw WhisperTranscriptionError.tokenizerMissing }
+        let tokenizer: LocalWhisperTokenizer
+        do {
+            tokenizer = try await LocalWhisperTokenizer.load(from: tokenizerFolder)
+        } catch {
+            log.error("tokenizer: \(error.localizedDescription, privacy: .public)")
+            throw WhisperTranscriptionError.tokenizerMissing
+        }
 
         // Video is exported to audio first, exactly as for Apple Speech.
         let audio = try await TranscriptionService.prepareAudio(for: url, onPhaseChange: onPhaseChange)
@@ -52,7 +58,7 @@ enum WhisperTranscriptionService {
         store.preparationStarted()
         let kit: WhisperKit
         do {
-            kit = try await load(modelFolder: store.modelFolder, tokenizerFolder: tokenizerFolder)
+            kit = try await load(modelFolder: store.modelFolder, tokenizer: tokenizer)
             store.preparationEnded(succeeded: true)
         } catch {
             store.preparationEnded(succeeded: false)
@@ -79,17 +85,19 @@ enum WhisperTranscriptionService {
     // Off the main actor: the first load compiles the model for this Mac (about
     // 71 s on the LTR-66 Mac; not a guarantee).
     @concurrent
-    private nonisolated static func load(modelFolder: URL, tokenizerFolder: URL) async throws -> WhisperKit {
+    private nonisolated static func load(modelFolder: URL, tokenizer: LocalWhisperTokenizer) async throws -> WhisperKit {
         let start = ContinuousClock.now
-        let kit = try await WhisperKit(WhisperKitConfig(
+        let kit = try await LocalWhisperKit(WhisperKitConfig(
             modelFolder: modelFolder.path,
-            tokenizerFolder: tokenizerFolder,
             verbose: false,
             logLevel: .error,
             prewarm: false,
-            load: true,
+            load: false,
             download: false
         ))
+        // Set before the models load, so WhisperKit never loads a tokenizer (see WhisperLocalTokenizer.swift).
+        kit.tokenizer = tokenizer
+        try await kit.loadModels()
         log.info("model loaded in \(start.duration(to: .now), privacy: .public)")
         return kit
     }
