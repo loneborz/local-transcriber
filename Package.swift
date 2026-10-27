@@ -12,15 +12,16 @@ let package = Package(
             name: "TranscriptCore",
             path: "LocalTranscriber",
             // YouTubeSource.swift is only here for SourceMetadata, which the
-            // renderer takes for source packages.
+            // renderer takes for source packages. WhisperModelStore.swift is
+            // Foundation-only and here for its install and removal tests.
             exclude: [
                 "Assets.xcassets", "AudioReviewPlayer.swift", "BatchQueue.swift", "ContentView.swift", "Credits.rtf",
                 "LibraryStore.swift", "MyApp.swift", "OutputDestination.swift", "Recorder.swift", "RecordingCloseGuard.swift",
                 "SettingsView.swift", "SourcePackage.swift", "Theme.swift", "TranscriptReviewView.swift",
-                "TranscriptionService.swift", "WhisperDeveloperMenu.swift", "WhisperModelStore.swift", "WhisperTranscriptionService.swift",
+                "TranscriptionService.swift", "WhisperDeveloperMenu.swift", "WhisperTranscriptionService.swift",
                 "WorkspaceSidebar.swift",
             ],
-            sources: ["Transcript", "YouTubeSource.swift"],
+            sources: ["Transcript", "YouTubeSource.swift", "WhisperModelStore.swift"],
             // Same as the app target (SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor).
             swiftSettings: [.defaultIsolation(MainActor.self)]
         ),

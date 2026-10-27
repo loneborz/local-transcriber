@@ -8,12 +8,6 @@ struct MediaInfo {
     let fileSize: String
 }
 
-// What a job was created from.
-enum JobSource {
-    case file(URL)
-    case youtube(videoID: String, url: URL)
-}
-
 @MainActor @Observable
 final class TranscriptionJob: Identifiable {
     enum State {
@@ -112,24 +106,6 @@ final class TranscriptionJob: Identifiable {
     }
 }
 
-// An input that waits for its language (LTR-72). Session only: an imported file
-// that was not started is forgotten on quit. A recording's audio is already saved
-// in its entry folder, and the library offers it again after a relaunch (`offer`).
-struct PendingInput: Identifiable {
-    let id = UUID()
-    let source: JobSource
-    let recording: (folder: URL, startedAt: Date)?
-    // Apple Speech unless the user picks Whisper for this input (D1).
-    var engine = TranscriptionEngine.appleSpeech
-
-    var name: String {
-        switch source {
-        case .file(let url): url.lastPathComponent
-        case .youtube(let videoID, _): "YouTube · \(videoID)"
-        }
-    }
-}
-
 // The app's transcription work. Inputs wait in `pending`, in order, until the user
 // chooses each one's language; then they become jobs, which run one at a time in
 // order. A job leaves when it has been saved (or when the user dismisses a waiting,
@@ -192,19 +168,17 @@ final class BatchQueue {
     }
 
     func setEngine(_ engine: TranscriptionEngine, for input: PendingInput) {
-        guard let index = pending.firstIndex(where: { $0.id == input.id }) else { return }
-        pending[index].engine = engine
+        pending.setEngine(engine, for: input.id)
     }
 
     // Turns a pending input into a job with the language chosen for it. It starts at
     // once, or after the jobs before it. Nil if the input is no longer pending.
     func start(_ input: PendingInput, language: TranscriptionLanguage, requester: UUID) -> TranscriptionJob? {
-        guard let index = pending.firstIndex(where: { $0.id == input.id }) else { return nil }
-        let queued = pending.remove(at: index)
+        guard let queued = pending.take(input.id) else { return nil }
         recentLanguages = RecentChoices.choosing(language, in: recentLanguages)
         UserDefaults.standard.set(recentLanguages.map(\.rawValue), forKey: Self.recentLanguagesKey)
         let job = TranscriptionJob(source: queued.source, locale: language.locale, engine: queued.engine)
-        job.recording = input.recording
+        job.recording = queued.recording
         job.requester = requester
         jobs.append(job)
         startRunner()
@@ -278,10 +252,8 @@ final class BatchQueue {
         job.state = .transcribing(nil)
 
         // The engine chosen for this input; never the other one as a fallback.
-        let transcribe = switch job.engine {
-        case .appleSpeech: TranscriptionService.transcribe
-        case .whisper: WhisperTranscriptionService.transcribe
-        }
+        let transcribe = job.engine.transcriber(
+            appleSpeech: TranscriptionService.transcribe, whisper: WhisperTranscriptionService.transcribe)
 
         do {
             let transcript = try await transcribe(

@@ -15,7 +15,7 @@ import os
 // Verified files stay in the staging folder, so a new attempt fetches only the rest.
 @MainActor @Observable
 final class WhisperModelStore {
-    static let shared = WhisperModelStore()
+    static let shared = WhisperModelStore(folder: URL.applicationSupportDirectory.appending(path: "Whisper", directoryHint: .isDirectory))
 
     enum State: Equatable {
         case notInstalled
@@ -31,19 +31,27 @@ final class WhisperModelStore {
     // Loaded at least once on this macOS build, so the next load needs no compile.
     private(set) var isPrepared = false
 
-    nonisolated static var folder: URL { URL.applicationSupportDirectory.appending(path: "Whisper", directoryHint: .isDirectory) }
-    nonisolated static var modelFolder: URL { folder.appending(path: WhisperModelManifest.modelName, directoryHint: .isDirectory) }
-    nonisolated static var stagingFolder: URL {
+    // Application Support/Whisper for the app; a scratch folder and a small
+    // manifest in tests.
+    let folder: URL
+    private let files: [WhisperModelManifest.File]
+    private let defaults: UserDefaults
+    var modelFolder: URL { folder.appending(path: WhisperModelManifest.modelName, directoryHint: .isDirectory) }
+    var stagingFolder: URL {
         folder.appending(path: ".staging", directoryHint: .isDirectory)
             .appending(path: WhisperModelManifest.modelName, directoryHint: .isDirectory)
     }
+    var totalBytes: Int64 { files.reduce(0) { $0 + $1.size } }
     private static let preparedKey = "whisperPreparedOnOSBuild"
     private static let log = Logger(subsystem: "nl.wavesweb.LocalTranscriber", category: "whisper")
 
     private var work: Task<Void, Never>?
     private var activeDownload: URLSessionDownloadTask?
 
-    private init() {
+    init(folder: URL, files: [WhisperModelManifest.File] = WhisperModelManifest.files, defaults: UserDefaults = .standard) {
+        self.folder = folder
+        self.files = files
+        self.defaults = defaults
         refresh()
     }
 
@@ -57,16 +65,16 @@ final class WhisperModelStore {
 
     func refresh() {
         guard !isBusy else { return }
-        state = WhisperModelManifest.isComplete(at: Self.modelFolder) ? .installed : .notInstalled
+        state = WhisperModelManifest.isComplete(at: modelFolder, files: files) ? .installed : .notInstalled
         isPrepared = state == .installed
-            && UserDefaults.standard.string(forKey: Self.preparedKey) == ProcessInfo.processInfo.operatingSystemVersionString
+            && defaults.string(forKey: Self.preparedKey) == ProcessInfo.processInfo.operatingSystemVersionString
     }
 
     // Space the installed files take on disk (allocated blocks). An APFS clone
     // shares blocks with its original, so the space a removal frees can be smaller.
     var diskUsage: Int64? {
         guard state == .installed,
-              let items = FileManager.default.enumerator(at: Self.modelFolder, includingPropertiesForKeys: [.totalFileAllocatedSizeKey])
+              let items = FileManager.default.enumerator(at: modelFolder, includingPropertiesForKeys: [.totalFileAllocatedSizeKey])
         else { return nil }
         var total: Int64 = 0
         for case let url as URL in items {
@@ -81,7 +89,7 @@ final class WhisperModelStore {
     func download() {
         install { file, destination, report in
             try await Self.fetch(WhisperModelManifest.remoteURL(for: file), to: destination, report: report) { task in
-                await MainActor.run { WhisperModelStore.shared.activeDownload = task }
+                await MainActor.run { self.activeDownload = task }
             }
         }
     }
@@ -101,22 +109,24 @@ final class WhisperModelStore {
         activeDownload?.cancel()
     }
 
-    private typealias Fetch = (WhisperModelManifest.File, URL, @escaping @Sendable (Int64) -> Void) async throws -> Void
+    typealias Fetch = (WhisperModelManifest.File, URL, @escaping @Sendable (Int64) -> Void) async throws -> Void
 
-    private func install(_ fetch: @escaping Fetch) {
+    // Internal (not private) so tests can pass their own fetch.
+    func install(_ fetch: @escaping Fetch) {
         guard !isBusy, state != .installed else { return }
-        let total = WhisperModelManifest.totalBytes
+        let total = totalBytes
         state = .downloading(received: 0, total: total)
+        let (files, staging, model) = (files, stagingFolder, modelFolder)
         work = Task {
             do {
-                try await Self.stageAndPromote(fetch) { received in
+                try await Self.stageAndPromote(files, staging: staging, model: model, fetch) { received in
                     Task { @MainActor in
-                        if case .downloading = WhisperModelStore.shared.state {
-                            WhisperModelStore.shared.state = .downloading(received: received, total: total)
+                        if case .downloading = self.state {
+                            self.state = .downloading(received: received, total: total)
                         }
                     }
                 } verifying: {
-                    await MainActor.run { WhisperModelStore.shared.state = .verifying }
+                    await MainActor.run { self.state = .verifying }
                 }
                 state = .installed
                 isPrepared = false
@@ -135,6 +145,9 @@ final class WhisperModelStore {
 
     @concurrent
     private nonisolated static func stageAndPromote(
+        _ files: [WhisperModelManifest.File],
+        staging stagingFolder: URL,
+        model modelFolder: URL,
         _ fetch: Fetch,
         progress: @escaping @Sendable (Int64) -> Void,
         verifying: @Sendable () async -> Void
@@ -142,7 +155,7 @@ final class WhisperModelStore {
         let fileManager = FileManager.default
         try fileManager.createDirectory(at: stagingFolder, withIntermediateDirectories: true)
         var done: Int64 = 0
-        for file in WhisperModelManifest.files {
+        for file in files {
             try Task.checkCancellation()
             let staged = stagingFolder.appending(path: file.path)
             // A file verified by an earlier, interrupted attempt is kept.
@@ -163,7 +176,7 @@ final class WhisperModelStore {
             progress(done)
         }
         await verifying()
-        guard WhisperModelManifest.isComplete(at: stagingFolder) else { throw WhisperModelError.incomplete }
+        guard WhisperModelManifest.isComplete(at: stagingFolder, files: files) else { throw WhisperModelError.incomplete }
         // Same volume, so the move is a rename: the model appears complete or not at all.
         try? fileManager.removeItem(at: modelFolder)
         try fileManager.moveItem(at: stagingFolder, to: modelFolder)
@@ -213,20 +226,18 @@ final class WhisperModelStore {
     // MARK: Remove
 
     // Deletes the installed model and any staged files, nothing else (D3). The
-    // caller confirms first and refuses while a job uses the model.
+    // caller confirms first and refuses while a job waits for or uses the model.
     func remove() throws {
-        guard !isBusy else { return }
-        let folder = Self.folder.standardizedFileURL
+        guard !isBusy, !isPreparing else { throw WhisperModelError.inUse }
         // Never follow a link that points elsewhere.
-        guard (try? folder.resourceValues(forKeys: [.isSymbolicLinkKey]))?.isSymbolicLink != true,
-              folder.path.hasPrefix(URL.applicationSupportDirectory.standardizedFileURL.path + "/")
+        guard (try? folder.resourceValues(forKeys: [.isSymbolicLinkKey]))?.isSymbolicLink != true
         else { throw WhisperModelError.unexpectedLocation(folder.path) }
-        for item in [Self.modelFolder, Self.stagingFolder.deletingLastPathComponent()]
+        for item in [modelFolder, stagingFolder.deletingLastPathComponent()]
         where FileManager.default.fileExists(atPath: item.path) {
             // removeItem deletes links inside the folder, not what they point to.
             try FileManager.default.removeItem(at: item)
         }
-        UserDefaults.standard.removeObject(forKey: Self.preparedKey)
+        defaults.removeObject(forKey: Self.preparedKey)
         isPrepared = false
         state = .notInstalled
     }
@@ -238,7 +249,7 @@ final class WhisperModelStore {
     func preparationEnded(succeeded: Bool) {
         isPreparing = false
         if succeeded {
-            UserDefaults.standard.set(ProcessInfo.processInfo.operatingSystemVersionString, forKey: Self.preparedKey)
+            defaults.set(ProcessInfo.processInfo.operatingSystemVersionString, forKey: Self.preparedKey)
             isPrepared = true
         }
     }
@@ -249,6 +260,7 @@ enum WhisperModelError: LocalizedError {
     case incomplete
     case http(Int)
     case unexpectedLocation(String)
+    case inUse
 
     var errorDescription: String? {
         switch self {
@@ -260,6 +272,8 @@ enum WhisperModelError: LocalizedError {
             "The model server answered with status \(status). Try again later."
         case .unexpectedLocation(let path):
             "The Whisper folder at \(path) is not where the app keeps it, so nothing was removed."
+        case .inUse:
+            "Whisper Large V3 Turbo is being installed or prepared. Try again when that has finished."
         }
     }
 }

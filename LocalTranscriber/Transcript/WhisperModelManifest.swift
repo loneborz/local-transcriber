@@ -23,7 +23,7 @@ nonisolated enum WhisperModelManifest {
 
     // True when every file is present with its pinned size. Cheap enough for every
     // launch; the hashes were checked when the files were installed.
-    static func isComplete(at folder: URL) -> Bool {
+    static func isComplete(at folder: URL, files: [File] = files) -> Bool {
         files.allSatisfy { file in
             let attributes = try? FileManager.default.attributesOfItem(atPath: folder.appending(path: file.path).path)
             return (attributes?[.type] as? FileAttributeType) == .typeRegular

@@ -17,6 +17,15 @@ nonisolated enum TranscriptionEngine: String, Sendable, CaseIterable, Identifiab
         }
     }
 
+    // Picks this engine's own transcriber; BatchQueue calls only the one picked,
+    // so a Whisper failure fails the job instead of reaching Apple Speech.
+    func transcriber<T>(appleSpeech: T, whisper: T) -> T {
+        switch self {
+        case .appleSpeech: appleSpeech
+        case .whisper: whisper
+        }
+    }
+
     // The Whisper language code for a locale identifier ("nl-NL" -> "nl"), or nil
     // when Whisper does not support that language. `supported` is the runtime's
     // own list (WhisperKit's Constants.languages values).

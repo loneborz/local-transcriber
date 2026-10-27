@@ -85,7 +85,7 @@ private struct WhisperSettings: View {
                     note("The model can’t be removed while a Whisper job is waiting or running.")
                 }
             case .notInstalled, .failed:
-                Button("Download (\(WhisperModelManifest.totalBytes.formatted(.byteCount(style: .file))))") { store.download() }
+                Button("Download (\(store.totalBytes.formatted(.byteCount(style: .file))))") { store.download() }
                 note("Downloaded from Hugging Face (argmaxinc/whisperkit-coreml, a fixed version) only when you choose Download, and checked file by file. Transcription itself never uses the network.")
             }
 

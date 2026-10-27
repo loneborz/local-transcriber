@@ -53,7 +53,7 @@ enum WhisperTranscriptionService {
         store.preparationStarted()
         let kit: WhisperKit
         do {
-            kit = try await load(tokenizerFolder: tokenizerFolder)
+            kit = try await load(modelFolder: store.modelFolder, tokenizerFolder: tokenizerFolder)
             store.preparationEnded(succeeded: true)
         } catch {
             store.preparationEnded(succeeded: false)
@@ -80,10 +80,10 @@ enum WhisperTranscriptionService {
     // Off the main actor: the first load compiles the model for this Mac (about
     // 71 s on the LTR-66 Mac; not a guarantee).
     @concurrent
-    private nonisolated static func load(tokenizerFolder: URL) async throws -> WhisperKit {
+    private nonisolated static func load(modelFolder: URL, tokenizerFolder: URL) async throws -> WhisperKit {
         let start = ContinuousClock.now
         let kit = try await WhisperKit(WhisperKitConfig(
-            modelFolder: WhisperModelStore.modelFolder.path,
+            modelFolder: modelFolder.path,
             tokenizerFolder: tokenizerFolder,
             verbose: false,
             logLevel: .error,

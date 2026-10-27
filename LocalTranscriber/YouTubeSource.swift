@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 
 // Everything YouTube-specific lives here. The transcription engine only ever
@@ -177,7 +178,14 @@ nonisolated enum YouTubeAcquirer {
         let namedAudio = directory
             .appendingPathComponent(fileBaseName(title: title, videoID: videoID))
             .appendingPathExtension("m4a")
-        try fileManager.moveItem(at: audio, to: namedAudio)
+        do {
+            try await rewriteContainer(of: audio, to: namedAudio)
+            try? fileManager.removeItem(at: audio)
+        } catch {
+            // Kept as downloaded: it transcribes the same, only Review may refuse it.
+            try? fileManager.removeItem(at: namedAudio)
+            try fileManager.moveItem(at: audio, to: namedAudio)
+        }
 
         let metadata = SourceMetadata(
             sourceType: "youtube",
@@ -191,6 +199,16 @@ nonisolated enum YouTubeAcquirer {
             audioFilename: namedAudio.lastPathComponent
         )
         return AcquiredAudio(audioURL: namedAudio, directory: directory, metadata: metadata)
+    }
+
+    // YouTube serves fragmented (DASH) M4A whose header already states the full
+    // length, and AVFoundation then counts the audio twice (38 s for a 19 s file),
+    // so Review refused the kept audio (LTR-76). A passthrough export writes the
+    // same AAC packets into a plain M4A; nothing is re-encoded.
+    static func rewriteContainer(of source: URL, to destination: URL) async throws {
+        guard let session = AVAssetExportSession(asset: AVURLAsset(url: source), presetName: AVAssetExportPresetPassthrough)
+        else { throw YouTubeError.noAudio }
+        try await session.export(to: destination, as: .m4a)
     }
 
     // "<Title> [<video ID>]" without filesystem-invalid characters, capped so
