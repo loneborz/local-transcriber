@@ -1,23 +1,40 @@
+import AppKit
 import SwiftUI
 
-// The one Settings window (app menu Settings…, ⌘, and the footer entry). Native
-// look: a single Form today (the default language and the output folder live in the footer, next to
-// where they are used); a second category would bring back a TabView. Controls that would change
-// something a running job or recording depends on are locked app-wide while it
-// runs (see OutputDestination), with a note that says why.
+// A page of the Settings window. Which one shows is kept in memory only (MyApp), so
+// the missing-model guidance can open Models; no preference is added for it.
+enum SettingsPage: Hashable {
+    case general, models, output
+}
+
+// The one Settings window (app menu Settings…, ⌘, and the footer entry): native tabs
+// (doc-3 Addendum 9). Controls that would change something a running job or recording
+// depends on are locked app-wide while it runs (see OutputDestination), with a note
+// that says why.
 struct SettingsView: View {
     let destination: OutputDestination
+    @Binding var page: SettingsPage
 
     var body: some View {
-        GeneralSettings(destination: destination)
-            .frame(width: 480)
+        TabView(selection: $page) {
+            Tab("General", systemImage: "gearshape", value: SettingsPage.general) {
+                GeneralSettings()
+            }
+            Tab("Models", systemImage: "waveform", value: SettingsPage.models) {
+                ModelsSettings()
+            }
+            Tab("Output", systemImage: "folder", value: SettingsPage.output) {
+                OutputSettings(destination: destination)
+            }
+        }
+        .frame(width: 480)
+        // Here and not on the Whisper section, so it runs when the window opens, as
+        // before: switching pages must not replace a failed download's reason.
+        .onAppear { WhisperModelStore.shared.refresh() }
     }
 }
 
 private struct GeneralSettings: View {
-    let destination: OutputDestination
-    @AppStorage(BatchQueue.sourcePackageModeKey) private var savesSourcePackages = false
-    @AppStorage(BatchQueue.frontmatterKey) private var addsFrontmatter = false
     @AppStorage(AppAppearance.key) private var appearance = AppAppearance.system
 
     var body: some View {
@@ -28,6 +45,62 @@ private struct GeneralSettings: View {
             .pickerStyle(.menu)
             .fixedSize()
             .onChange(of: appearance) { AppAppearance.apply() }
+        }
+        .padding(20)
+    }
+}
+
+private struct ModelsSettings: View {
+    // Never locked: a job keeps the engine it was enqueued with (LTR-82).
+    @AppStorage(TranscriptionEngine.preferenceKey) private var engine = TranscriptionEngine.appleSpeech
+
+    var body: some View {
+        Form {
+            Picker("Transcription Engine", selection: $engine) {
+                ForEach(TranscriptionEngine.allCases) { Text($0.title).tag($0) }
+            }
+            .pickerStyle(.menu)
+            .fixedSize()
+            note("Engine changes apply when an input is added to the queue. Already queued or running jobs keep their assigned engine.")
+            note("Apple Speech is built into macOS. macOS manages its language files and may download one the first time a language is used.")
+
+            WhisperSettings()
+        }
+        .padding(20)
+    }
+}
+
+private struct OutputSettings: View {
+    let destination: OutputDestination
+    @AppStorage(BatchQueue.sourcePackageModeKey) private var savesSourcePackages = false
+    @AppStorage(BatchQueue.frontmatterKey) private var addsFrontmatter = false
+
+    var body: some View {
+        Form {
+            // Read-only: the footer stays the one place to change the folder (LTR-64).
+            LabeledContent("Output Folder") {
+                switch destination.status {
+                case .none:
+                    Text("Not chosen")
+                case .ready(let url):
+                    let path = url.path(percentEncoded: false)
+                    Text(path)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .help(path)
+                case .unavailable(let message):
+                    Text(message)
+                        .foregroundStyle(.red)
+                }
+            }
+            // Reveal never changes the destination, so it stays available while locked.
+            if let folder = destination.readyFolder {
+                Button("Reveal in Finder") {
+                    NSWorkspace.shared.activateFileViewerSelecting([folder])
+                }
+                .accessibilityLabel("Reveal output folder in Finder")
+            }
+            note("Change the output folder in the footer of the main window.")
 
             Toggle("Save YouTube Links as Source Packages", isOn: $savesSourcePackages)
                 .disabled(!destination.canChangeSourcePackage)
@@ -36,12 +109,8 @@ private struct GeneralSettings: View {
             Toggle("Add YAML Frontmatter to New Transcripts", isOn: $addsFrontmatter)
 
             if let lockNote {
-                Text(lockNote)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                note(lockNote)
             }
-
-            WhisperSettings()
         }
         .padding(20)
     }
@@ -90,7 +159,6 @@ private struct WhisperSettings: View {
 
             if let removalError { note(removalError) }
         }
-        .onAppear { store.refresh() }
         .alert("Remove Whisper Large V3 Turbo?", isPresented: $confirmsRemoval) {
             Button("Remove", role: .destructive) {
                 do { try store.remove() } catch { removalError = error.localizedDescription }
@@ -112,11 +180,11 @@ private struct WhisperSettings: View {
         case .failed(let reason): "Failed: \(reason)"
         }
     }
+}
 
-    private func note(_ text: String) -> some View {
-        Text(text)
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-    }
+private func note(_ text: String) -> some View {
+    Text(text)
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
 }

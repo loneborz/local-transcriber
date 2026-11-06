@@ -217,6 +217,95 @@ final class WhisperModelStoreTests: XCTestCase {
         XCTAssertTrue(exists(transcript))
     }
 
+    // LTR-82: the preference survives removal, and Whisper then blocks admission.
+    func testRemovalKeepsThePreferenceAndBlocksAdmission() async throws {
+        defaults.set(TranscriptionEngine.whisper.rawValue, forKey: TranscriptionEngine.preferenceKey)
+        let store = makeStore()
+        store.install(fromFolder: try source())
+        try await settle(store)
+        var pending = [PendingInput(source: .file(root.appending(path: "a.m4a")), recording: nil)]
+        let id = pending[0].id
+
+        try store.remove()
+
+        XCTAssertEqual(TranscriptionEngine.preferred(in: defaults), .whisper)
+        XCTAssertNil(pending.admit(id, whisperInstalled: store.verifyInstalled(), defaults: defaults))
+        XCTAssertEqual(pending.count, 1)
+    }
+
+    // LTR-82: a model removed outside the app is not admitted on the stored state.
+    func testModelRemovedOutsideTheAppIsRefusedAtAdmission() async throws {
+        defaults.set(TranscriptionEngine.whisper.rawValue, forKey: TranscriptionEngine.preferenceKey)
+        let store = makeStore()
+        store.install(fromFolder: try source())
+        try await settle(store)
+        store.preparationStarted()
+        store.preparationEnded(succeeded: true)
+        var pending = [PendingInput(source: .file(root.appending(path: "a.m4a")), recording: nil)]
+        let id = pending[0].id
+
+        try FileManager.default.removeItem(at: store.modelFolder.appending(path: "config.json"))
+        XCTAssertTrue(store.isInstalled, "the stored state has not noticed yet")
+
+        XCTAssertNil(pending.admit(id, whisperInstalled: store.verifyInstalled(), defaults: defaults))
+        XCTAssertEqual(pending.map(\.id), [id])
+        XCTAssertEqual(TranscriptionEngine.preferred(in: defaults), .whisper)
+        // The guidance can now show.
+        XCTAssertEqual(store.state, .notInstalled)
+        XCTAssertFalse(store.isPrepared)
+    }
+
+    func testVerifyingAnIntactModelAdmitsAndChangesNothing() async throws {
+        defaults.set(TranscriptionEngine.whisper.rawValue, forKey: TranscriptionEngine.preferenceKey)
+        let store = makeStore()
+        store.install(fromFolder: try source())
+        try await settle(store)
+        store.preparationStarted()
+        store.preparationEnded(succeeded: true)
+        var pending = [PendingInput(source: .file(root.appending(path: "a.m4a")), recording: nil)]
+
+        var changed = false
+        withObservationTracking {
+            _ = store.state
+            _ = store.isPrepared
+        } onChange: {
+            changed = true
+        }
+        XCTAssertEqual(pending.admit(pending[0].id, whisperInstalled: store.verifyInstalled(), defaults: defaults)?.engine, .whisper)
+        XCTAssertFalse(changed)
+        XCTAssertEqual(store.state, .installed)
+        XCTAssertTrue(store.isPrepared)
+    }
+
+    // What refresh() would replace: the reason a download failed stays readable.
+    func testVerifyingKeepsAFailedDownloadsReason() async throws {
+        let store = makeStore()
+        store.install(fromFolder: try source(corrupting: "config.json"))
+        try await settle(store)
+        guard case .failed(let reason) = store.state else { return XCTFail("\(store.state)") }
+
+        XCTAssertFalse(store.verifyInstalled())
+        XCTAssertEqual(store.state, .failed(reason))
+    }
+
+    func testVerifyingDoesNotDisturbAnInstallInProgress() async throws {
+        let store = makeStore()
+        let release = AsyncStream<Void>.makeStream()
+        store.install { _, _, _ in
+            for await _ in release.stream { break }
+            throw CancellationError()
+        }
+        XCTAssertTrue(store.isBusy)
+        let before = store.state
+
+        XCTAssertFalse(store.verifyInstalled())
+        XCTAssertEqual(store.state, before)
+
+        release.continuation.yield()
+        release.continuation.finish()
+        try await settle(store)
+    }
+
     func testRemovalIsRefusedWhileInUse() async throws {
         let store = makeStore()
         store.install(fromFolder: try source())

@@ -153,7 +153,7 @@ enum WhisperTranscriptionError: LocalizedError {
         case .unsupportedLanguage(let locale):
             "Whisper Large V3 Turbo doesn’t support \(locale). Choose another language or Apple Speech."
         case .modelNotInstalled:
-            "Whisper Large V3 Turbo isn’t installed. Download it in Settings › General, then choose Retry."
+            "Whisper Large V3 Turbo isn’t installed. Download it in Settings › Models, then choose Retry."
         case .tokenizerMissing:
             "This copy of Local Transcriber has missing or damaged Whisper tokenizer files. Reinstall the app."
         case .preparationFailed(let reason):

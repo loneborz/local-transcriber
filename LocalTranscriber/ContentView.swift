@@ -62,10 +62,15 @@ struct ContentView: View {
     @State private var windowID = UUID()
     // Opens the transcript this window asked for once the request settles (LTR-72).
     @State private var autoOpen = ReviewAutoOpen()
+    // Read only here: Settings > Models is the one place that changes it.
+    @AppStorage(TranscriptionEngine.preferenceKey) private var engine = TranscriptionEngine.appleSpeech
+    @Environment(\.openSettings) private var openSettings
+    @Binding private var settingsPage: SettingsPage
 
-    init(destination: OutputDestination, queue: BatchQueue) {
+    init(destination: OutputDestination, queue: BatchQueue, settingsPage: Binding<SettingsPage>) {
         self.destination = destination
         self.queue = queue
+        _settingsPage = settingsPage
     }
 
     private let supportedExtensions = [
@@ -503,25 +508,22 @@ struct ContentView: View {
                     .foregroundStyle(.secondary)
             }
 
-            // The engine for this input only, Apple Speech unless changed (LTR-76, D1).
-            Picker("Engine", selection: Binding(
-                get: { input.engine },
-                set: { queue.setEngine($0, for: input) }
-            )) {
-                ForEach(TranscriptionEngine.allCases) { Text($0.title).tag($0) }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .fixedSize()
-            .accessibilityLabel("Engine for \(input.name)")
+            // Static text: VoiceOver reads it, and it adds no Tab stop.
+            Text("Engine: \(engine.title)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
 
-            let needsModel = input.engine == .whisper && !WhisperModelStore.shared.isInstalled
+            // The stored state, for drawing. Admission checks the files themselves.
+            let needsModel = !engine.canStartJob(whisperInstalled: WhisperModelStore.shared.isInstalled)
             if needsModel {
                 HStack(spacing: 6) {
                     Text("Whisper Large V3 Turbo isn’t installed.")
                         .foregroundStyle(.secondary)
-                    SettingsLink { Text("Download in Settings…") }
-                        .buttonStyle(.link)
+                    Button("Open Settings › Models") {
+                        settingsPage = .models
+                        openSettings()
+                    }
+                    .buttonStyle(.link)
                 }
                 .font(.caption)
             }
@@ -530,7 +532,7 @@ struct ContentView: View {
             // is listed once, under Recent. Only languages the chosen engine supports.
             Menu("Choose Language") {
                 let usable = { (language: TranscriptionLanguage) in
-                    input.engine == .appleSpeech || WhisperTranscriptionService.supports(language)
+                    engine == .appleSpeech || WhisperTranscriptionService.supports(language)
                 }
                 let recent = queue.recentLanguages.filter(usable)
                 let others = TranscriptionLanguage.byTitle.filter { !recent.contains($0) && usable($0) }
@@ -861,8 +863,9 @@ struct ContentView: View {
     // The language was chosen for this input: it becomes a job and starts, or waits
     // for the jobs before it. This window opens the transcript when the request settles.
     private func start(_ input: PendingInput, in language: TranscriptionLanguage) {
-        autoOpen.languageChosen()
         guard let job = queue.start(input, language: language, requester: windowID) else { return }
+        // Armed only for a job that exists; the runner cannot save before this returns.
+        autoOpen.languageChosen()
         if case .file(let url) = job.source {
             Task { job.mediaInfo = await loadMediaInfo(for: url) }
         }

@@ -27,6 +27,8 @@ import SwiftUI
     // The one transcription queue: every window shows and feeds it, and a closed
     // window does not take its work with it. Not kept across quitting the app.
     @State private var queue: BatchQueue
+    // The page the Settings window shows; a window's guidance can open Models.
+    @State private var settingsPage = SettingsPage.general
 
     // Cmd+Q and Quit in the Dock go through the delegate's applicationShouldTerminate.
     @NSApplicationDelegateAdaptor(QuitGuard.self) private var quitGuard
@@ -37,7 +39,7 @@ import SwiftUI
 
     var body: some Scene {
         WindowGroup {
-            ContentView(destination: destination, queue: queue)
+            ContentView(destination: destination, queue: queue, settingsPage: $settingsPage)
         }
         // The compact title bar shows the window's context (ContentView.contextTitle).
         .windowToolbarStyle(.unifiedCompact)
@@ -93,7 +95,7 @@ import SwiftUI
         // The app menu's Settings… item and ⌘, come with this scene; the footer
         // entry opens the same window.
         Settings {
-            SettingsView(destination: destination)
+            SettingsView(destination: destination, page: $settingsPage)
         }
     }
 }

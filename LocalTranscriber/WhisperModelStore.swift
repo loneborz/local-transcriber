@@ -77,6 +77,18 @@ final class WhisperModelStore {
             && defaults.string(forKey: Self.preparedKey) == ProcessInfo.processInfo.operatingSystemVersionString
     }
 
+    // Queue admission asks here (LTR-82): whether the model counts as installed and
+    // its files are still there now. Narrower than refresh(), which would replace a
+    // failed download's reason: the only change is a stale Installed, removed outside
+    // the app, becoming Not Installed, so the guidance shows.
+    func verifyInstalled() -> Bool {
+        guard state == .installed else { return false }
+        if WhisperModelManifest.isComplete(at: modelFolder, files: files) { return true }
+        state = .notInstalled
+        isPrepared = false
+        return false
+    }
+
     // Space the installed files take on disk (allocated blocks). An APFS clone
     // shares blocks with its original, so the space a removal frees can be smaller.
     var diskUsage: Int64? {
