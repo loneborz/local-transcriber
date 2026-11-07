@@ -2,7 +2,7 @@
 
 **Media in. Markdown out.**
 
-Local Transcriber is a native macOS app that turns audio, video, YouTube links and your own recordings into timestamped Markdown transcripts. I built it because the media was already on my Mac and I didn't want to send it somewhere else to get text back. Speech recognition runs on your Mac with Apple's on-device speech stack. There is no cloud service, no account and no model picker.
+Local Transcriber is a native macOS app that turns audio, video, YouTube links and your own recordings into timestamped Markdown transcripts. I built it because the media was already on my Mac and I didn't want to send it somewhere else to get text back. Speech recognition runs locally on your Mac. The 0.9.0 download uses Apple's on-device speech stack; a second engine, a locally running Whisper model, is in development for a future release (see below). Transcription needs no cloud service and no account.
 
 <img src="website/assets/library-light.webp" alt="The Local Transcriber window: Transcribe is selected in the sidebar, Processing shows a long file being transcribed in English with its progress, the Library lists pinned and recent transcripts and folders, and New Transcription asks which language is spoken in Interview Lisbon.m4a." width="1920" height="1272">
 
@@ -32,7 +32,7 @@ Settings (⌘,) has three pages. General has Appearance: System follows macOS, w
 
 ### Whisper Large V3 Turbo (in development, not in the 0.9.0 download)
 
-The next release supports two transcription engines, selected globally in Settings › Models: Apple Speech (the default) and Whisper Large V3 Turbo. An item waiting for its language follows the current setting and shows the engine above Choose Language. The engine is fixed when you choose the language and the item joins the queue: a queued or running job keeps it even if you change the setting, Retry uses it again, and the Processing row names it. If Whisper is selected and its model isn't installed, Choose Language is disabled with a link to Settings › Models. One engine never stands in for the other. Whisper runs on your Mac through [WhisperKit](https://github.com/argmaxinc/argmax-oss-swift) and works with files, video (the audio is extracted first, as for Apple Speech) and YouTube links, in all ten languages of the menu.
+Builds after v0.9.0 support two transcription engines, selected globally in Settings › Models: Apple Speech (the default) and Whisper Large V3 Turbo. An item waiting for its language follows the current setting and shows the engine above Choose Language. The engine is fixed when you choose the language and the item joins the queue: a queued or running job keeps it even if you change the setting, Retry uses it again, and the Processing row names it. If Whisper is selected and its model isn't installed, Choose Language is disabled with a link to Settings › Models. One engine never stands in for the other. Whisper runs on your Mac through [WhisperKit](https://github.com/argmaxinc/argmax-oss-swift) and works with files, video (the audio is extracted first, as for Apple Speech) and YouTube links, in all ten languages of the menu.
 
 The model (about 1.6 GB) is not in the app. Settings › Models shows its state and has Download, which fetches a fixed version from Hugging Face (`argmaxinc/whisperkit-coreml`) only when you click it, checks every file against a pinned SHA-256 and installs it only when all files match. An interrupted download is never treated as installed; Download again keeps the files that were already verified. That page also shows the disk use and has a trash icon, which asks first, deletes only the model and is unavailable while a Whisper job is waiting or running. The Whisper tokenizer files are part of the app. The first Whisper job on a Mac (and after a macOS update) prepares the model for that Mac, which took about a minute and a half on mine; the job shows "Preparing Whisper model…" meanwhile. On an Apple M5 Mac (24 GB RAM, macOS 27.0.1), 9:58 of English audio was transcribed in 26.1 seconds after model loading. Observed process memory ranged from approximately 0.5 to 1.7 GB across the measured jobs; this does not include all GPU and Neural Engine memory. These are individual measurements, not performance guarantees. Multi-hour transcription has not yet been validated inside the app.
 
@@ -117,13 +117,13 @@ YouTube audio is fetched by a small helper bundled in the app: a pinned [yt-dlp]
 ## Limitations
 
 - Apple silicon only. The YouTube helper is arm64 and Intel Macs are untested.
-- Recognition quality is Apple's. Dutch Dictation output can be sparse, and I haven't fixed that.
+- Recognition quality is that of the engine: Apple's, or Whisper's in builds after v0.9.0. Dutch Dictation output can be sparse, and I haven't fixed that.
 - YouTube is the only link source (no other sites, playlists or channels), and a single download is limited to 30 minutes.
 - Retrying a job that fails for a lasting reason, such as an unavailable video, simply fails again. There is no retry limit or backoff.
 - The microphone is the system default input. Closing or quitting asks before it ends a recording, and a saved recording without a transcript is offered again at the next launch, but a recording is not recovered after a crash or a force quit, and quitting while a file is transcribing loses that job (files you added but had not started are forgotten; their originals are not touched).
 - A failed write of a source package has been tested only for failure at folder creation, not later in the write.
 
-The app does not summarize, search, edit or correct transcripts, and it has no cloud transcription, accounts or model picker.
+The app does not summarize, search, edit or correct transcripts, and it has no cloud transcription or accounts. The in-development Whisper engine uses one fixed model; there is no model picker.
 
 ## Build and run
 
@@ -140,7 +140,7 @@ scripts/dev.sh run    # build, install and launch the development app
 
 Debug is signed manually with an Apple Development certificate of the project's team (`JZ9667QFWA`). To build with a different team you need a matching Apple Development certificate and changes to the Debug signing settings (`DEVELOPMENT_TEAM`, `CODE_SIGN_IDENTITY`). Distribution builds use `scripts/release.sh` and Developer ID. `swift test` at the repository root runs the automated tests for the transcript, timing, sidecar, library and review logic without building the app; the app itself, including the views and audio playback, is checked by running it.
 
-The app is SwiftUI. It uses Apple's `SpeechAnalyzer` for recognition, AVFoundation for extraction and microphone recording, and ScreenCaptureKit for app audio. It runs in the App Sandbox with user-selected read/write access (the output folder), network client access (YouTube) and audio input.
+The app is SwiftUI. It uses Apple's `SpeechAnalyzer` for recognition (and, after v0.9.0, WhisperKit for the optional Whisper engine), AVFoundation for extraction and microphone recording, and ScreenCaptureKit for app audio. It runs in the App Sandbox with user-selected read/write access (the output folder), network client access (YouTube and, after v0.9.0, the optional Whisper model download; recognition itself uses no network) and audio input.
 
 ## About the project
 
