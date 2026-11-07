@@ -277,7 +277,6 @@ final class WhisperModelStoreTests: XCTestCase {
         XCTAssertTrue(store.isPrepared)
     }
 
-    // What refresh() would replace: the reason a download failed stays readable.
     func testVerifyingKeepsAFailedDownloadsReason() async throws {
         let store = makeStore()
         store.install(fromFolder: try source(corrupting: "config.json"))
@@ -286,6 +285,55 @@ final class WhisperModelStoreTests: XCTestCase {
 
         XCTAssertFalse(store.verifyInstalled())
         XCTAssertEqual(store.state, .failed(reason))
+    }
+
+    // LTR-84: what opening Settings and a Whisper job start do.
+    func testRefreshKeepsAFailedReasonUntilTheModelAppears() async throws {
+        let store = makeStore()
+        store.install(fromFolder: try source(corrupting: "config.json"))
+        try await settle(store)
+        guard case .failed(let reason) = store.state else { return XCTFail("\(store.state)") }
+
+        store.refresh()
+        XCTAssertEqual(store.state, .failed(reason))
+
+        // Installed outside the app: the failure is obsolete.
+        try FileManager.default.copyItem(at: try source().appending(path: WhisperModelManifest.modelName), to: store.modelFolder)
+        store.refresh()
+        XCTAssertEqual(store.state, .installed)
+    }
+
+    func testRefreshNoticesAModelAddedOrRemovedOutsideTheApp() async throws {
+        let store = makeStore()
+        try FileManager.default.createDirectory(at: store.folder, withIntermediateDirectories: true)
+        try FileManager.default.copyItem(at: try source().appending(path: WhisperModelManifest.modelName), to: store.modelFolder)
+        XCTAssertEqual(store.state, .notInstalled)
+        store.refresh()
+        XCTAssertEqual(store.state, .installed)
+
+        store.preparationStarted()
+        store.preparationEnded(succeeded: true)
+        try FileManager.default.removeItem(at: store.modelFolder.appending(path: "config.json"))
+        store.refresh()
+        XCTAssertEqual(store.state, .notInstalled)
+        XCTAssertFalse(store.isPrepared)
+    }
+
+    func testANewAttemptReplacesAFailedReason() async throws {
+        let store = makeStore()
+        store.install(fromFolder: try source(corrupting: "config.json"))
+        try await settle(store)
+        guard case .failed(let first) = store.state else { return XCTFail("\(store.state)") }
+
+        store.install(fromFolder: try source(omitting: "config.json"))
+        XCTAssertEqual(store.state, .downloading(received: 0, total: store.totalBytes))
+        try await settle(store)
+        guard case .failed(let second) = store.state else { return XCTFail("\(store.state)") }
+        XCTAssertNotEqual(first, second)
+
+        store.install(fromFolder: try source())
+        try await settle(store)
+        XCTAssertEqual(store.state, .installed)
     }
 
     func testVerifyingDoesNotDisturbAnInstallInProgress() async throws {

@@ -29,8 +29,7 @@ struct SettingsView: View {
         }
         .frame(width: 480)
         .containerBackground(Theme.paper, for: .window)
-        // Here and not on the Whisper section, so it runs when the window opens, as
-        // before: switching pages must not replace a failed download's reason.
+        // Here and not on the Whisper section, so it runs when the window opens, as before.
         .onAppear { WhisperModelStore.shared.refresh() }
     }
 }
@@ -242,8 +241,16 @@ private struct WhisperSettings: View {
                         .cardNote()
                 }
             case .notInstalled, .failed:
-                note("Downloaded from Hugging Face (argmaxinc/whisperkit-coreml, a fixed version) only when you choose Download, and checked file by file. Transcription itself never uses the network.")
-                    .cardNote()
+                VStack(alignment: .leading, spacing: 4) {
+                    // The whole reason, in full contrast (LTR-83); the row above keeps one line.
+                    if case .failed(let reason) = store.state {
+                        Text(reason)
+                            .font(.caption)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    note("Downloaded from Hugging Face (argmaxinc/whisperkit-coreml, a fixed version) only when you choose Download, and checked file by file. Transcription itself never uses the network.")
+                }
+                .cardNote()
             }
 
             if let removalError {
@@ -284,7 +291,7 @@ private struct WhisperSettings: View {
         case .installed where store.isPreparing: "Preparing"
         case .installed where store.isPrepared: "Ready"
         case .installed: "Installed, prepared at first use"
-        case .failed(let reason): "Failed: \(reason)"
+        case .failed: "Failed"
         }
     }
 }

@@ -72,15 +72,18 @@ final class WhisperModelStore {
 
     func refresh() {
         guard !isBusy else { return }
-        state = WhisperModelManifest.isComplete(at: modelFolder, files: files) ? .installed : .notInstalled
+        let isComplete = WhisperModelManifest.isComplete(at: modelFolder, files: files)
+        // A failure's reason stays until a new attempt replaces it or the model appears (LTR-84).
+        if case .failed = state, !isComplete { return }
+        state = isComplete ? .installed : .notInstalled
         isPrepared = state == .installed
             && defaults.string(forKey: Self.preparedKey) == ProcessInfo.processInfo.operatingSystemVersionString
     }
 
     // Queue admission asks here (LTR-82): whether the model counts as installed and
-    // its files are still there now. Narrower than refresh(), which would replace a
-    // failed download's reason: the only change is a stale Installed, removed outside
-    // the app, becoming Not Installed, so the guidance shows.
+    // its files are still there now. Narrower than refresh(): the only change is a
+    // stale Installed, removed outside the app, becoming Not Installed, so the
+    // guidance shows.
     func verifyInstalled() -> Bool {
         guard state == .installed else { return false }
         if WhisperModelManifest.isComplete(at: modelFolder, files: files) { return true }
