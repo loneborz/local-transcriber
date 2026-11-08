@@ -26,7 +26,7 @@
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="icon" href="favicon.png" type="image/png" sizes="32x32">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<link rel="stylesheet" href="styles.css?v=2026-11-08">
+<link rel="stylesheet" href="styles.css?v=2026-11-08-reader">
 <script>
   // Light unless the visitor explicitly saved dark. The OS appearance is ignored.
   (function () {
@@ -78,7 +78,7 @@
 
 <main id="main">
 
-<section class="hero" id="top">
+<section class="hero lr-hero" id="top">
   <div class="hero-grid">
     <div class="hero-copy">
       <h1><span>Media in.</span> <span>Markdown <em>out.</em></span></h1>
@@ -102,31 +102,78 @@
       </ul>
     </div>
 
-    <!-- Captures of Local Transcriber 0.9.0 with a demo library of synthetic speech. -->
-    <div class="stage">
-      <figure class="reader">
-        <picture class="th-light">
-          <source media="(max-width: 767px)" srcset="assets/reader-narrow-light.webp" width="1280" height="1042">
-          <img src="assets/reader-light.webp" width="1804" height="1200" fetchpriority="high"
-               alt="The Local Transcriber reader with the transcript Weekly Product Review: its player paused at 0:11 of 0:37 above timestamped lines, the line at 0:09 highlighted, with Copy and Reveal in Finder. On wider screens the sidebar also shows Quarterly Strategy Offsite.m4a transcribing under Processing, a pinned transcript, recent transcripts with New badges, and folders.">
-        </picture>
-        <picture class="th-dark">
-          <source media="(max-width: 767px)" srcset="assets/reader-narrow-dark.webp" width="1280" height="1042">
-          <img src="assets/reader-dark.webp" width="1804" height="1200" loading="lazy"
-               alt="The Local Transcriber reader with the transcript Weekly Product Review: its player paused at 0:11 of 0:37 above timestamped lines, the line at 0:09 highlighted, with Copy and Reveal in Finder. On wider screens the sidebar also shows Quarterly Strategy Offsite.m4a transcribing under Processing, a pinned transcript, recent transcripts with New badges, and folders.">
-        </picture>
-        <div class="composer">
-          <picture class="th-light">
-            <source media="(max-width: 767px)" srcset="assets/composer-chip-light.webp" width="420" height="206">
-            <img src="assets/composer-light.webp" width="960" height="348"
-                 alt="New Transcription asks which language is spoken in Interview Lisbon.m4a, with a Choose Language menu.">
-          </picture>
-          <picture class="th-dark">
-            <source media="(max-width: 767px)" srcset="assets/composer-chip-dark.webp" width="420" height="206">
-            <img src="assets/composer-dark.webp" width="960" height="348" loading="lazy"
-                 alt="New Transcription asks which language is spoken in Interview Lisbon.m4a, with a Choose Language menu.">
-          </picture>
+    <!-- A working web version of the v0.9.0 reader. Synthetic voice: Kokoro-82M
+         (Apache-2.0), voice af_heart. Every start and end below is measured from
+         assets/weekly-product-review.m4a. -->
+    <div class="stage lr-stage">
+      <figure class="lr" data-reader>
+        <figcaption class="lr-note">Web demo with a synthetic voice. <span class="lr-hint">Choose a line to play it.</span></figcaption>
+        <div class="lr-tabs" role="tablist" aria-label="Show the transcript">
+          <button type="button" role="tab" id="lr-tab-reader" aria-controls="lr-reader" aria-selected="true">In the app</button>
+          <button type="button" role="tab" id="lr-tab-file" aria-controls="lr-file" aria-selected="false" tabindex="-1">As Markdown</button>
         </div>
+
+        <div class="lr-panels">
+          <div class="lr-window" id="lr-reader" role="tabpanel" aria-labelledby="lr-tab-reader">
+            <div class="lr-titlebar" aria-hidden="true">
+              <span class="lr-lights"><i></i><i></i><i></i></span>
+              <span class="lr-crumb">Library / Meetings</span>
+            </div>
+            <div class="lr-head">
+              <p class="lr-title">Weekly Product Review</p>
+              <p class="lr-meta"><span class="lr-created">Created 8 Nov 2026 at 16:01 · </span>0:34 · English (United States) · SpeechTranscriber</p>
+            </div>
+
+            <div class="lr-player">
+              <button type="button" class="lr-play" data-play aria-label="Play">
+                <svg class="i-play" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M4.5 2.8v10.4c0 .5.5.8.9.5l8-5.2a.6.6 0 0 0 0-1L5.4 2.3c-.4-.3-.9 0-.9.5z"/></svg>
+                <svg class="i-pause" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><rect x="3.5" y="2.5" width="3" height="11" rx=".8"/><rect x="9.5" y="2.5" width="3" height="11" rx=".8"/></svg>
+                <svg class="i-replay" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8 2.5a5.5 5.5 0 1 1-5.2 3.7" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M1.6 2.4l1.3 4 3.9-1.5z"/></svg>
+              </button>
+              <span class="lr-time" data-now aria-hidden="true">0:11</span>
+              <input class="lr-seek" data-seek type="range" min="0" max="34.3" step="0.1" value="11" aria-label="Playback position" aria-valuetext="0:11 of 0:34">
+              <span class="lr-time lr-dur" aria-hidden="true">0:34</span>
+              <audio data-audio preload="none" src="assets/weekly-product-review.m4a"></audio>
+            </div>
+
+            <div class="lr-body">
+              <ol class="lr-lines" data-lines aria-label="Transcript. Choose a timestamp to play from there.">
+                <li data-start="0.40" data-end="2.66"><button type="button" class="lr-ts" disabled aria-label="Play from 0:00">0:00</button><span>Okay, let's start the weekly product review.</span></li>
+                <li data-start="3.26" data-end="6.76"><button type="button" class="lr-ts" disabled aria-label="Play from 0:03">0:03</button><span>The goal this week was to get the language choice ready for the beta.</span></li>
+                <li data-start="7.36" data-end="8.42"><button type="button" class="lr-ts" disabled aria-label="Play from 0:07">0:07</button><span>First the good news.</span></li>
+                <li data-start="9.02" data-end="16.60"><button type="button" class="lr-ts" disabled aria-label="Play from 0:09">0:09</button><span>Every file now asks which language is spoken before it starts, and the early feedback from the design team has been very positive.</span></li>
+                <li data-start="17.20" data-end="18.32"><button type="button" class="lr-ts" disabled aria-label="Play from 0:17">0:17</button><span>Second, the library.</span></li>
+                <li data-start="18.92" data-end="23.86"><button type="button" class="lr-ts" disabled aria-label="Play from 0:18">0:18</button><span>Transcripts can now be moved into folders, and the sidebar shows what it's still processing.</span></li>
+                <li data-start="24.46" data-end="26.55"><button type="button" class="lr-ts" disabled aria-label="Play from 0:24">0:24</button><span>One open question is the empty state.</span></li>
+                <li data-start="27.15" data-end="30.45"><button type="button" class="lr-ts" disabled aria-label="Play from 0:27">0:27</button><span>We agreed to keep it simple for now and look at it again next week.</span></li>
+                <li data-start="31.05" data-end="32.41"><button type="button" class="lr-ts" disabled aria-label="Play from 0:31">0:31</button><span>That's everything for the day.</span></li>
+                <li data-start="33.01" data-end="33.84"><button type="button" class="lr-ts" disabled aria-label="Play from 0:33">0:33</button><span>Thanks, everyone.</span></li>
+              </ol>
+              <button type="button" class="lr-more" data-more aria-expanded="false">Show all 10 lines</button>
+              <button type="button" class="lr-jump" data-jump hidden>Jump to Playing</button>
+            </div>
+
+          </div>
+
+          <div class="lr-file" id="lr-file" role="tabpanel" aria-labelledby="lr-tab-file" hidden>
+            <p class="lr-filebar"><span>Weekly Product Review.md</span><span>in your Transcripts folder</span></p>
+<pre class="lr-md" tabindex="0"><code><span class="md-h"># Weekly Product Review</span>
+
+<span class="md-k">**Source:**</span> `Weekly Product Review.m4a`
+<span class="md-k">**Duration:**</span> 00:00:34
+<span class="md-k">**Language:**</span> en-US
+<span class="md-k">**Engine:**</span> Apple SpeechAnalyzer
+<span class="md-k">**Transcriber:**</span> SpeechTranscriber
+
+<span class="md-h">## Transcript</span>
+
+<span class="md-h">### 00:00:00</span>
+
+Okay, let's start the weekly product review. The goal this week was to get the language choice ready for the beta. First the good news. Every file now asks which language is spoken before it starts, and the early feedback from the design team has been very positive. Second, the library. Transcripts can now be moved into folders, and the sidebar shows what it's still processing. One open question is the empty state. We agreed to keep it simple for now and look at it again next week. That's everything for the day. Thanks, everyone.</code></pre>
+            <p class="lr-filebar lr-filebar-end"><span>+ Weekly Product Review.timing.json</span><span>the line times the reader uses</span></p>
+          </div>
+        </div>
+
       </figure>
     </div>
   </div>
@@ -192,7 +239,7 @@
 <pre class="md" tabindex="0"><code><span class="md-h"># Weekly Product Review</span>
 
 <span class="md-k">**Source:**</span> `Weekly Product Review.m4a`
-<span class="md-k">**Duration:**</span> 00:00:38
+<span class="md-k">**Duration:**</span> 00:00:34
 <span class="md-k">**Language:**</span> en-US
 <span class="md-k">**Engine:**</span> Apple SpeechAnalyzer
 <span class="md-k">**Transcriber:**</span> SpeechTranscriber
@@ -353,6 +400,7 @@ Okay, let's start the weekly product review. The goal this week was to get the l
     <p>
       Local Transcriber is a free, open-source <a href="https://wavesweb.nl/">Wavesweb</a> Labs project, independently maintained without guaranteed support or a fixed release schedule.
       Released under the <a href="https://github.com/loneborz/local-transcriber/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT License</a>.
+      The demo voice in the reader is synthetic, made with <a href="https://huggingface.co/hexgrad/Kokoro-82M" target="_blank" rel="noopener noreferrer">Kokoro-82M</a> (Apache License 2.0).
     </p>
     <nav aria-label="Footer">
       <a href="/journal/">Journal</a>
@@ -372,10 +420,6 @@ Okay, let's start the weekly product review. The goal this week was to get the l
       var dark = root.getAttribute("data-theme") === "dark";
       button.setAttribute("aria-pressed", dark ? "true" : "false");
       meta.content = dark ? "#171214" : "#f3f0ea";
-      // The dark captures are lazy so light visits skip them; once dark is shown, load them now.
-      if (dark) {
-        document.querySelectorAll(".th-dark img").forEach(function (img) { img.loading = "eager"; });
-      }
     }
     button.addEventListener("click", function () {
       var next = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
@@ -390,6 +434,7 @@ Okay, let's start the weekly product review. The goal this week was to get the l
     sync();
   })();
 </script>
+<script src="reader.js?v=2026-11-08-reader" defer></script>
 
 </body>
 </html>
