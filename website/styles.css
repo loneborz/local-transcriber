@@ -313,32 +313,6 @@ kbd {
 .stage { position: relative; background: var(--stage); }
 
 
-.file {
-  background: var(--surface);
-  border: 1px solid var(--rule);
-  border-radius: var(--r-surface);
-  box-shadow: inset 0 1px 0 var(--highlight), var(--shadow);
-  overflow: hidden;
-}
-
-.file-bar {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.65rem 1rem;
-  border-bottom: 1px solid var(--rule);
-  font: 0.75rem/1.4 var(--mono);
-}
-.file-name { font-weight: 600; }
-.file-kind { color: var(--muted); }
-
-.file pre {
-  padding: 1rem 1.1rem 1.1rem;
-  font-size: 0.78rem;
-  line-height: 1.6;
-  overflow-x: auto;
-}
-.file pre.md { white-space: pre-wrap; }
 .md-h { color: var(--wine); font-weight: 600; }
 .md-k { font-weight: 600; }
 .md-dim { color: var(--muted); }
@@ -893,32 +867,148 @@ html:not(.js) .lr-hint { display: none; }
   display: grid;
   gap: 3rem;
 }
-.output-files { display: grid; gap: 1.25rem; min-width: 0; }
-/* On phones the long sourceURL line wraps instead of hiding behind a scroll. */
-@media (max-width: 600px) {
-  .output-files pre { white-space: pre-wrap; overflow-wrap: anywhere; }
-}
-
-.tree {
-  margin: 0;
-  padding: 0.5rem 1.1rem;
-  list-style: none;
-}
-.tree li {
-  display: grid;
-  grid-template-columns: 8.5rem 1fr;
-  gap: 1rem;
-  padding: 0.55rem 0;
-  font-size: 0.92rem;
-}
-.tree li + li { border-top: 1px solid var(--rule); }
-.tree span { color: var(--muted); }
 
 @media (min-width: 960px) {
   .output-grid, .local-grid, .limits-grid { grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr); gap: 5rem; }
 }
-@media (max-width: 480px) {
-  .tree li { grid-template-columns: 1fr; gap: 0.1rem; }
+@media (min-width: 960px) {
+  /* The explorer needs room for its file list beside the editor. */
+  .output-grid { grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr); gap: 4rem; }
+}
+
+/* Artifact explorer --------------------------------------------------------
+   One window for the three example artifacts, in the Live Reader's window
+   tokens: a file list (vertical tablist) and an editor pane per file. Wide:
+   list beside the panes, all panes in one grid cell so switching never moves
+   the page. Narrow: list above, each pane at its own height. No script: the
+   list hides and the panes stack. */
+
+.ax {
+  container-type: inline-size;
+  background: var(--win);
+  border-radius: 14px;
+  box-shadow: var(--win-shadow);
+  overflow: hidden;
+}
+.ax .ax-sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
+.ax svg { flex: none; width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.3; stroke-linecap: round; stroke-linejoin: round; }
+
+.ax-titlebar {
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--win-line);
+}
+.ax-crumb { font-weight: 700; font-size: 0.875rem; letter-spacing: -0.01em; }
+
+.ax-list { display: none; }
+.js .ax-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0.5rem;
+  border-bottom: 1px solid var(--win-line);
+}
+.ax-list button {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-height: 38px;
+  padding: 0.4rem 0.65rem;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  font: 500 0.8125rem/1.3 var(--sans);
+  text-align: left;
+  cursor: pointer;
+}
+.ax-list .ax-nested { padding-left: 2rem; }
+.ax-list svg { color: var(--muted); }
+.ax-list button[aria-selected="true"] { background: var(--act-bg); font-weight: 650; }
+.ax-list button[aria-selected="true"] svg { color: var(--wine); }
+.ax-list button:focus-visible { outline-offset: 0; border-radius: 8px; }
+@media (hover: hover) {
+  .ax-list button:not([aria-selected="true"]):hover { background: var(--btn); }
+}
+@media (pointer: coarse) {
+  .ax-list button { min-height: 44px; }
+}
+
+.ax-panes { background: var(--win-raised); }
+.ax-pane:focus-visible { outline-offset: -2px; border-radius: 0; }
+html:not(.js) .ax-pane[hidden] { display: block; }
+html:not(.js) .ax-pane + .ax-pane { border-top: 1px solid var(--win-line); }
+
+.ax-bar {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.15rem 1rem;
+  padding: 0.65rem 1rem;
+  border-bottom: 1px solid var(--win-line);
+  background: var(--win);
+  font: 0.75rem/1.4 var(--mono);
+}
+.ax-bar span:first-child { font-weight: 600; }
+.ax-bar span:last-child { color: var(--muted); }
+
+/* Editor text: one block per source line, numbered in a gutter; long lines
+   wrap under their own text, never under the number. */
+.ax-code {
+  display: block;
+  counter-reset: ln;
+  padding: 0.85rem 1rem 1rem 0;
+  font-size: 0.78rem;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.ax-code > span {
+  display: block;
+  min-height: 1.6em;
+  padding-left: 2.6rem;
+  white-space: pre-wrap;
+}
+.ax-code > span::before {
+  counter-increment: ln;
+  content: counter(ln);
+  content: counter(ln) / "";
+  display: inline-block;
+  width: 1.75rem;
+  margin: 0 0.85rem 0 -2.6rem;
+  text-align: right;
+  color: var(--muted);
+  opacity: 0.6;
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.j-k { color: var(--wine); }
+
+.ax-tree { margin: 0; padding: 0.4rem 1rem; list-style: none; }
+.ax-tree li {
+  display: grid;
+  grid-template-columns: 16px 7.5rem minmax(0, 1fr);
+  align-items: baseline;
+  gap: 0.25rem 0.65rem;
+  padding: 0.6rem 0;
+  font-size: 0.9rem;
+}
+.ax-tree li + li { border-top: 1px solid var(--win-line); }
+.ax-tree svg { align-self: start; margin-top: 0.2rem; color: var(--muted); }
+.ax-tree span { color: var(--muted); }
+
+@container (min-width: 34rem) {
+  .js .ax-body { display: grid; grid-template-columns: 15rem minmax(0, 1fr); }
+  .js .ax-list { border-bottom: 0; border-right: 1px solid var(--win-line); padding: 0.6rem 0.5rem; }
+  .js .ax-panes { display: grid; }
+  .js .ax-panes > * { grid-area: 1 / 1; min-width: 0; }
+  .js .ax-pane[hidden] { display: block; visibility: hidden; }
+}
+@container (max-width: 26rem) {
+  .ax-tree li { grid-template-columns: 16px minmax(0, 1fr); }
+  .ax-tree li > span { grid-column: 2; }
 }
 
 /* Local and network: two groups keyed by their dot, filled for the Mac and

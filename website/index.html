@@ -26,7 +26,7 @@
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="icon" href="favicon.png" type="image/png" sizes="32x32">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<link rel="stylesheet" href="styles.css?v=2026-11-08-reader">
+<link rel="stylesheet" href="styles.css?v=2026-11-08-explorer">
 <script>
   // Light unless the visitor explicitly saved dark. The OS appearance is ignored.
   (function () {
@@ -233,48 +233,115 @@ Okay, let's start the weekly product review. The goal this week was to get the l
       </p>
     </div>
 
-    <div class="output-files">
-      <figure class="file" aria-label="The saved Markdown file for Weekly Product Review, opening lines">
-        <figcaption class="file-bar"><span class="file-name">Weekly Product Review.md</span><span class="file-kind">Markdown, yours to keep</span></figcaption>
-<pre class="md" tabindex="0"><code><span class="md-h"># Weekly Product Review</span>
+    <!-- One explorer window for the three example artifacts. The list is a
+         vertical tablist; without script it hides and every pane shows. -->
+    <div class="ax" data-explorer>
+      <svg class="ax-sprite" aria-hidden="true" focusable="false">
+        <symbol id="ax-i-doc" viewBox="0 0 16 16"><path d="M4 1.75h4.75L12 5v9.25H4zM8.75 1.75V5H12"/></symbol>
+        <symbol id="ax-i-dir" viewBox="0 0 16 16"><path d="M1.75 3.75h4.5l1.5 1.5h6.5v7.5H1.75z"/></symbol>
+        <symbol id="ax-i-json" viewBox="0 0 16 16"><path d="M6 2.25c-1.4 0-1.9.6-1.9 1.8v1.7c0 .9-.5 1.6-1.6 2.25 1.1.65 1.6 1.35 1.6 2.25v1.7c0 1.2.5 1.8 1.9 1.8M10 2.25c1.4 0 1.9.6 1.9 1.8v1.7c0 .9.5 1.6 1.6 2.25-1.1.65-1.6 1.35-1.6 2.25v1.7c0 1.2-.5 1.8-1.9 1.8"/></symbol>
+        <symbol id="ax-i-audio" viewBox="0 0 16 16"><path d="M2.5 6.75v2.5M5 4.75v6.5M7.5 2.75v10.5M10 5.25v5.5M12.5 6.75v2.5"/></symbol>
+      </svg>
+      <div class="ax-titlebar" aria-hidden="true">
+        <span class="lr-lights"><i></i><i></i><i></i></span>
+        <span class="ax-crumb">Transcripts</span>
+      </div>
 
-<span class="md-k">**Source:**</span> `Weekly Product Review.m4a`
-<span class="md-k">**Duration:**</span> 00:00:34
-<span class="md-k">**Language:**</span> en-US
-<span class="md-k">**Engine:**</span> Apple SpeechAnalyzer
-<span class="md-k">**Transcriber:**</span> SpeechTranscriber
+      <div class="ax-body">
+        <div class="ax-list" role="tablist" aria-orientation="vertical" aria-label="Example files in the Transcripts folder">
+          <button type="button" role="tab" id="ax-tab-md" aria-controls="ax-md" aria-selected="true"><svg aria-hidden="true" focusable="false"><use href="#ax-i-doc"/></svg>Weekly Product Review.md</button>
+          <button type="button" role="tab" id="ax-tab-pkg" aria-controls="ax-pkg" aria-selected="false" tabindex="-1"><svg aria-hidden="true" focusable="false"><use href="#ax-i-dir"/></svg>jNQXAC9IVRw/</button>
+          <button type="button" role="tab" id="ax-tab-json" class="ax-nested" aria-controls="ax-json" aria-selected="false" tabindex="-1"><svg aria-hidden="true" focusable="false"><use href="#ax-i-json"/></svg>source.json</button>
+        </div>
 
-<span class="md-h">## Transcript</span>
+        <div class="ax-panes">
+          <div class="ax-pane" id="ax-md" role="tabpanel" aria-labelledby="ax-tab-md" tabindex="0">
+            <p class="ax-bar"><span>Weekly Product Review.md</span><span>Markdown, yours to keep</span></p>
+            <code class="ax-code">
+              <span><span class="md-h"># Weekly Product Review</span></span>
+              <span></span>
+              <span><span class="md-k">**Source:**</span> `Weekly Product Review.m4a`</span>
+              <span><span class="md-k">**Duration:**</span> 00:00:34</span>
+              <span><span class="md-k">**Language:**</span> en-US</span>
+              <span><span class="md-k">**Engine:**</span> Apple SpeechAnalyzer</span>
+              <span><span class="md-k">**Transcriber:**</span> SpeechTranscriber</span>
+              <span></span>
+              <span><span class="md-h">## Transcript</span></span>
+              <span></span>
+              <span><span class="md-h">### 00:00:00</span></span>
+              <span></span>
+              <span>Okay, let's start the weekly product review. The goal this week was to get the language choice ready for the beta. First the good news. Every file now asks which language is spoken before it starts, and the early feedback from the design team has been very positive. <span class="md-dim">…</span></span>
+            </code>
+          </div>
 
-<span class="md-h">### 00:00:00</span>
+          <div class="ax-pane" id="ax-pkg" role="tabpanel" aria-labelledby="ax-tab-pkg" hidden>
+            <p class="ax-bar"><span>jNQXAC9IVRw/</span><span>Source package</span></p>
+            <ul class="ax-tree" aria-label="Example source package for one YouTube video">
+              <li><svg aria-hidden="true" focusable="false"><use href="#ax-i-audio"/></svg><code>audio.m4a</code><span>the downloaded audio</span></li>
+              <li><svg aria-hidden="true" focusable="false"><use href="#ax-i-json"/></svg><a href="#ax-json" data-open="ax-tab-json"><code>source.json</code></a><span>where it came from</span></li>
+              <li><svg aria-hidden="true" focusable="false"><use href="#ax-i-doc"/></svg><code>transcript.md</code><span>the transcript, with the video's URL, channel and date</span></li>
+            </ul>
+          </div>
 
-Okay, let's start the weekly product review. The goal this week was to get the language choice ready for the beta. First the good news. Every file now asks which language is spoken before it starts, and the early feedback from the design team has been very positive. <span class="md-dim">…</span></code></pre>
-      </figure>
-      <figure class="file" aria-label="Example source package for one YouTube video">
-        <figcaption class="file-bar"><span class="file-name">jNQXAC9IVRw/</span><span class="file-kind">Source package</span></figcaption>
-        <ul class="tree">
-          <li><code>audio.m4a</code><span>the downloaded audio</span></li>
-          <li><code>source.json</code><span>where it came from</span></li>
-          <li><code>transcript.md</code><span>the transcript, with the video's URL, channel and date</span></li>
-        </ul>
-      </figure>
-      <figure class="file" aria-label="Example source.json">
-        <figcaption class="file-bar"><span class="file-name">source.json</span><span class="file-kind">Schema version 1</span></figcaption>
-<pre tabindex="0"><code>{
-  "acquiredAt" : "2026-10-01T00:13:47Z",
-  "audioFilename" : "audio.m4a",
-  "channel" : "jawed",
-  "durationSeconds" : 19,
-  "publishedDate" : "2005-04-24",
-  "schemaVersion" : 1,
-  "sourceType" : "youtube",
-  "sourceURL" : "https://www.youtube.com/watch?v=jNQXAC9IVRw",
-  "title" : "Me at the zoo",
-  "transcriptionLocale" : "en-US",
-  "videoID" : "jNQXAC9IVRw"
-}</code></pre>
-      </figure>
+          <div class="ax-pane" id="ax-json" role="tabpanel" aria-labelledby="ax-tab-json" tabindex="0" hidden>
+            <p class="ax-bar"><span>jNQXAC9IVRw/source.json</span><span>Schema version 1</span></p>
+            <code class="ax-code">
+              <span>{</span>
+              <span>  <span class="j-k">"acquiredAt"</span> : "2026-10-01T00:13:47Z",</span>
+              <span>  <span class="j-k">"audioFilename"</span> : "audio.m4a",</span>
+              <span>  <span class="j-k">"channel"</span> : "jawed",</span>
+              <span>  <span class="j-k">"durationSeconds"</span> : 19,</span>
+              <span>  <span class="j-k">"publishedDate"</span> : "2005-04-24",</span>
+              <span>  <span class="j-k">"schemaVersion"</span> : 1,</span>
+              <span>  <span class="j-k">"sourceType"</span> : "youtube",</span>
+              <span>  <span class="j-k">"sourceURL"</span> : "https://www.youtube.com/watch?v=jNQXAC9IVRw",</span>
+              <span>  <span class="j-k">"title"</span> : "Me at the zoo",</span>
+              <span>  <span class="j-k">"transcriptionLocale"</span> : "en-US",</span>
+              <span>  <span class="j-k">"videoID"</span> : "jNQXAC9IVRw"</span>
+              <span>}</span>
+            </code>
+          </div>
+        </div>
+      </div>
     </div>
+    <script>
+      // Selection follows focus, as in the hero's view switch. Arrows (either
+      // axis), Home and End move through the list; the folder's source.json
+      // link opens that file's pane.
+      (function () {
+        var root = document.querySelector("[data-explorer]");
+        if (!root) return;
+        var tabs = Array.prototype.slice.call(root.querySelectorAll('[role="tab"]'));
+        var calm = matchMedia("(prefers-reduced-motion: reduce)");
+        function select(tab, focus) {
+          tabs.forEach(function (t) {
+            var on = t === tab, pane = document.getElementById(t.getAttribute("aria-controls"));
+            t.setAttribute("aria-selected", on ? "true" : "false");
+            t.tabIndex = on ? 0 : -1;
+            if (on && pane.hidden && !calm.matches && pane.animate) {
+              pane.animate({ opacity: [0, 1] }, { duration: 160, easing: "ease-out" });
+            }
+            pane.hidden = !on;
+          });
+          if (focus) tab.focus();
+        }
+        tabs.forEach(function (t, i) {
+          t.addEventListener("click", function () { select(t); });
+          t.addEventListener("keydown", function (e) {
+            var n = { ArrowDown: i + 1, ArrowRight: i + 1, ArrowUp: i - 1, ArrowLeft: i - 1, Home: 0, End: tabs.length - 1 }[e.key];
+            if (n == null) return;
+            e.preventDefault();
+            select(tabs[(n + tabs.length) % tabs.length], true);
+          });
+        });
+        root.querySelectorAll("[data-open]").forEach(function (a) {
+          a.addEventListener("click", function (e) {
+            e.preventDefault();
+            select(document.getElementById(a.dataset.open), true);
+          });
+        });
+      })();
+    </script>
   </div>
 </section>
 
