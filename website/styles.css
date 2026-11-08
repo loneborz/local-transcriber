@@ -26,6 +26,9 @@
   --highlight:  rgba(255, 255, 255, 0.75);
   --shadow:     0 1px 2px rgba(45, 32, 35, 0.06), 0 24px 48px -28px rgba(45, 32, 35, 0.38);
   --shot-shadow: drop-shadow(0 22px 40px rgba(45, 32, 35, 0.26)) drop-shadow(0 2px 6px rgba(45, 32, 35, 0.16));
+  --composer-shadow: 0 0 0 0.5px rgba(45, 32, 35, 0.22), 0 2px 6px rgba(45, 32, 35, 0.1), 0 24px 44px -22px rgba(45, 32, 35, 0.45);
+  --composer-rim: transparent;
+  --stage:      #e8e2d9;
   --cta-shadow: 0 8px 18px rgba(74, 37, 46, 0.22);
 
   --sans:  -apple-system, BlinkMacSystemFont, "SF Pro Text", Aptos, system-ui, "Segoe UI", Roboto, sans-serif;
@@ -55,6 +58,9 @@
   --highlight:  rgba(255, 255, 255, 0.05);
   --shadow:     0 1px 2px rgba(0, 0, 0, 0.3), 0 24px 48px -24px rgba(0, 0, 0, 0.6);
   --shot-shadow: drop-shadow(0 22px 40px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 1px rgba(235, 229, 220, 0.25));
+  --composer-shadow: 0 0 0 1px rgba(0, 0, 0, 0.85), 0 24px 48px -18px rgba(0, 0, 0, 0.75);
+  --composer-rim: rgba(235, 229, 220, 0.16);
+  --stage:      #34262b;
   --cta-shadow: 0 8px 18px rgba(0, 0, 0, 0.34);
 }
 
@@ -259,22 +265,30 @@ kbd {
   border-bottom: 2px solid var(--wine);
 }
 
-/* Hero ------------------------------------------------------------------ */
+/* Hero ------------------------------------------------------------------
+   The copy beside a stage plate that carries a real capture of the v0.9.0
+   reader, with the New Transcription composer layered in front at the same
+   scale. From 1200 px the plate sits beside the copy and runs off the right
+   edge; below that it sits under the copy. On phones the reader is the narrow
+   window (sidebar hidden) at a readable size, running off the right edge.
+   overflow-x only: the drop shadows must not be clipped at the bottom. */
 
-/* overflow-x only: the screenshot's drop shadow must not be clipped at the bottom. */
-.hero { padding: clamp(2.25rem, 5vw, 4rem) 0 clamp(3rem, 6vw, 4.5rem); overflow-x: clip; }
+.hero { padding: 1.75rem 0 2.75rem; overflow-x: clip; }
 
 .hero-grid {
+  --edge: max(var(--gutter), calc((100% - var(--wrap)) / 2 + var(--gutter)));
   display: grid;
-  gap: 3rem;
-  align-items: center;
+  /* minmax(0, …): the phone reader is wider than the screen and must not widen the column. */
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2.25rem;
 }
+.hero-copy { padding: 0 var(--edge); }
 
 .hero h1 {
-  font-size: clamp(2.5rem, 12vw, 5rem);
-  line-height: 0.94;
+  font-size: clamp(2.6rem, 12.4vw, 3.6rem);
+  line-height: 0.95;
   letter-spacing: -0.04em;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1.15rem;
 }
 .hero h1 span { display: block; white-space: nowrap; }
 
@@ -283,6 +297,12 @@ kbd {
   line-height: 1.55;
   max-width: 34rem;
   margin-bottom: 2rem;
+}
+.hero .lead {
+  font-size: 1.06rem;
+  max-width: 30rem;
+  margin-bottom: 1.6rem;
+  text-wrap: pretty;
 }
 
 .reqs {
@@ -295,20 +315,38 @@ kbd {
   font: 0.8rem/1.5 var(--mono);
   color: var(--muted);
 }
+.hero .reqs { margin-top: 1.35rem; }
 
-.hero-visual { position: relative; }
+/* The plate: deep paper in light; in dark a wine-tinted ground well clear of
+   the app window, whose own ground is the page color (#171214). */
+.stage { position: relative; background: var(--stage); }
 
-.shot img {
-  vertical-align: top;
+.reader { position: relative; margin: 0; }
+.reader img { width: 100%; filter: var(--shot-shadow); }
+
+/* The composer is positioned in units of the reader, so both stay at one scale:
+   480 of the window's 902 points wide, over the sidebar's last folder, the
+   empty end of the transcript and the footer, never over a transcript line. */
+.composer {
+  position: absolute;
+  z-index: 1;
+  left: -8.5%;
+  top: 83.3%;
+  width: 53.2%;
+}
+.composer img {
   width: 100%;
-  height: auto;
-  filter: var(--shot-shadow);
+  border-radius: 12px;
+  box-shadow: var(--composer-shadow);
+  outline: 1px solid var(--composer-rim);
+  outline-offset: -1px;
 }
 
-/* The screenshot matches the selected page theme. */
-.shot-dark { display: none; }
-:root[data-theme="dark"] .shot-light { display: none; }
-:root[data-theme="dark"] .shot-dark { display: block; }
+/* The captures match the selected page theme. Only these rules set display. */
+.th-light { display: block; }
+.th-dark { display: none; }
+:root[data-theme="dark"] .th-light { display: none; }
+:root[data-theme="dark"] .th-dark { display: block; }
 
 .file {
   background: var(--surface);
@@ -335,26 +373,49 @@ kbd {
   line-height: 1.6;
   overflow-x: auto;
 }
+.file pre.md { white-space: pre-wrap; }
 .md-h { color: var(--wine); font-weight: 600; }
 .md-k { font-weight: 600; }
 .md-dim { color: var(--muted); }
 
-/* The Markdown file is a supporting card: beside the headline on wide screens,
-   below the window on narrow ones. It never overlaps the window. */
-.file-float { width: min(26rem, 100%); }
-.file-float pre { white-space: pre-wrap; font-size: 0.78rem; line-height: 1.55; padding: 0.9rem 1.05rem 1.05rem; }
+/* Phones: the narrow window at 0.86 of its point size (13 pt text at about
+   11 px), with the language prompt as a chip above it. */
+@media (max-width: 767px) {
+  .hero .lead { font-size: 1rem; margin-bottom: 1.35rem; }
+  .hero .actions { gap: 0.75rem 1.1rem; }
+  .hero .btn { padding: 0.8rem 1.1rem; }
+  .hero .text-link { font-size: 0.94rem; }
+  .hero .reqs { margin-top: 1.1rem; font-size: 0.74rem; gap: 0.2rem 1rem; }
+  .stage { margin-top: 2.25rem; padding: 3.6rem 0 0 var(--edge); }
+  .reader { width: 550px; }
+  /* The window runs off the plate's bottom edge too, below the last line. */
+  .reader > picture { height: 396px; overflow: hidden; }
+  .composer { left: 0; top: -5.35rem; width: 181px; }
+  .composer img { border-radius: 10px; }
+}
 
-@media (min-width: 960px) {
+@media (min-width: 768px) and (max-width: 1199px) {
+  .stage { padding: 3rem var(--edge) 4.5rem; }
+  .reader { max-width: 812px; }
+  .composer { left: -3%; }
+}
+
+@media (min-width: 1200px) {
+  .hero { padding: 2.5rem 0 3.5rem; }
   .hero-grid {
-    grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
-    grid-template-areas: "copy file" "shot shot";
-    gap: 2.5rem 4rem;
+    grid-template-columns: var(--edge) minmax(0, clamp(20rem, 27vw, 24rem)) clamp(2.5rem, 4vw, 3.5rem) minmax(0, 1fr);
     align-items: center;
+    gap: 0;
   }
-  .hero h1 { font-size: min(6.2vw, 5rem); }
-  .hero-copy { grid-area: copy; }
-  .file-float { grid-area: file; justify-self: end; }
-  .hero-visual { grid-area: shot; width: 100%; max-width: 64rem; justify-self: center; }
+  .hero-copy { grid-column: 2; padding: 0; }
+  .hero h1 { font-size: clamp(3.3rem, 4.4vw, 4rem); }
+  .stage {
+    grid-column: 4;
+    padding: 2.75rem 2rem 2.75rem 3rem;
+    border-radius: 28px 0 0 28px;
+  }
+  /* Never larger than about the window's own size. */
+  .reader { max-width: 860px; }
 }
 
 /* Sections -------------------------------------------------------------- */
